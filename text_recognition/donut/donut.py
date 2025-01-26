@@ -1,6 +1,5 @@
 import sys
 import time
-import copy
 import json
 import re
 from logging import getLogger
@@ -15,9 +14,9 @@ import ailia
 # import original modules
 sys.path.append("../../util")
 from detector_utils import load_image
-import webcamera_utils
 from model_utils import check_and_download_models
-from arg_utils import get_base_parser, update_parser, get_savepath
+from image_utils import normalize_image
+from arg_utils import get_base_parser, update_parser
 
 logger = getLogger(__name__)
 
@@ -27,7 +26,9 @@ logger = getLogger(__name__)
 # ======================
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/donut/"
 WEIGHT_PATH = "donut-base-finetuned-cord-v2.onnx"
+WEIGHT_ENC_PATH = "donut-base-finetuned-cord-v2_encoder.onnx"
 MODEL_PATH = "donut-base-finetuned-cord-v2.onnx.prototxt"
+MODEL_ENC_PATH = "donut-base-finetuned-cord-v2_encoder.onnx.prototxt"
 
 IMAGE_PATH = "cord_sample_receipt1.png"
 
@@ -39,28 +40,13 @@ COPY_BLOB_DATA = True
 # ======================
 
 parser = get_base_parser("Donut: Document Understanding Transformer", IMAGE_PATH, None)
-parser.add_argument(
-    "-w", "--write_results", action="store_true", help="Flag to output results to file."
-)
+parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
 
 
 # ======================
 # Utils
 # ======================
-
-
-def build_post_process(config):
-    support_dict = ["DBPostProcess", "CTCLabelDecode", "ClsPostProcess"]
-
-    config = copy.deepcopy(config)
-    module_name = config.pop("name")
-    assert module_name in support_dict, Exception(
-        "post process only support {}".format(support_dict)
-    )
-    module_class = eval(module_name)(**config)
-
-    return module_class
 
 
 def token2json(tokenizer, tokens, is_inner_value=False):
@@ -122,6 +108,46 @@ def token2json(tokenizer, tokens, is_inner_value=False):
 # ======================
 
 
+def preprocess(img):
+    input_size = (1280, 960)
+    im_h, im_w, _ = img.shape
+
+    size = min(input_size)
+    short, long = (im_w, im_h) if im_w <= im_h else (im_h, im_w)
+    new_short, new_long = size, size * long // short
+    ow, oh = (new_short, new_long) if im_w <= im_h else (new_long, new_short)
+    if ow != im_w or oh != im_h:
+        img = np.array(Image.fromarray(img).resize((ow, oh), Image.Resampling.BILINEAR))
+
+    # PIL.thumbnail
+    scale = min(input_size[1] / ow, input_size[0] / oh)
+    ow = int(ow * scale)
+    oh = int(oh * scale)
+    img = np.array(Image.fromarray(img).resize((ow, oh), Image.Resampling.BICUBIC))
+
+    delta_width = input_size[1] - ow
+    delta_height = input_size[0] - oh
+    pad_width = delta_width // 2
+    pad_height = delta_height // 2
+    img = np.pad(
+        img,
+        (
+            (pad_height, delta_height - pad_height),
+            (pad_width, delta_width - pad_width),
+            (0, 0),
+        ),
+        "constant",
+    )
+
+    img = normalize_image(img, normalize_type="ImageNet")
+
+    img = img.transpose(2, 0, 1)  # HWC -> CHW
+    img = np.expand_dims(img, axis=0)
+    img = img.astype(np.float16)
+
+    return img
+
+
 def forward(
     net,
     input_ids: np.ndarray,
@@ -130,7 +156,7 @@ def forward(
     past_key_values: List[np.ndarray],
     blob_copy: bool,
 ):
-    if 1:  # not args.onnx:
+    if not args.onnx:
         if not blob_copy:
             output = net.predict(
                 [
@@ -178,76 +204,18 @@ def forward(
                 net.get_blob_data(net.find_blob_index_by_name("key_cache_out0"))
             ]
     else:
+        key_cache = {"key_cache%d" % i: past_key_values[i * 2] for i in range(8)}
+        value_cache = {
+            "value_cache%d" % i: past_key_values[i * 2 + 1] for i in range(8)
+        }
         output = net.run(
             None,
             {
                 "input_ids": input_ids,
                 "attention_mask": attention_mask,
-                "audios": audios,
-                "key_cache0": past_key_values[0],
-                "value_cache0": past_key_values[1],
-                "key_cache1": past_key_values[2],
-                "value_cache1": past_key_values[3],
-                "key_cache2": past_key_values[4],
-                "value_cache2": past_key_values[5],
-                "key_cache3": past_key_values[6],
-                "value_cache3": past_key_values[7],
-                "key_cache4": past_key_values[8],
-                "value_cache4": past_key_values[9],
-                "key_cache5": past_key_values[10],
-                "value_cache5": past_key_values[11],
-                "key_cache6": past_key_values[12],
-                "value_cache6": past_key_values[13],
-                "key_cache7": past_key_values[14],
-                "value_cache7": past_key_values[15],
-                "key_cache8": past_key_values[16],
-                "value_cache8": past_key_values[17],
-                "key_cache9": past_key_values[18],
-                "value_cache9": past_key_values[19],
-                "key_cache10": past_key_values[20],
-                "value_cache10": past_key_values[21],
-                "key_cache11": past_key_values[22],
-                "value_cache11": past_key_values[23],
-                "key_cache12": past_key_values[24],
-                "value_cache12": past_key_values[25],
-                "key_cache13": past_key_values[26],
-                "value_cache13": past_key_values[27],
-                "key_cache14": past_key_values[28],
-                "value_cache14": past_key_values[29],
-                "key_cache15": past_key_values[30],
-                "value_cache15": past_key_values[31],
-                "key_cache16": past_key_values[32],
-                "value_cache16": past_key_values[33],
-                "key_cache17": past_key_values[34],
-                "value_cache17": past_key_values[35],
-                "key_cache18": past_key_values[36],
-                "value_cache18": past_key_values[37],
-                "key_cache19": past_key_values[38],
-                "value_cache19": past_key_values[39],
-                "key_cache20": past_key_values[40],
-                "value_cache20": past_key_values[41],
-                "key_cache21": past_key_values[42],
-                "value_cache21": past_key_values[43],
-                "key_cache22": past_key_values[44],
-                "value_cache22": past_key_values[45],
-                "key_cache23": past_key_values[46],
-                "value_cache23": past_key_values[47],
-                "key_cache24": past_key_values[48],
-                "value_cache24": past_key_values[49],
-                "key_cache25": past_key_values[50],
-                "value_cache25": past_key_values[51],
-                "key_cache26": past_key_values[52],
-                "value_cache26": past_key_values[53],
-                "key_cache27": past_key_values[54],
-                "value_cache27": past_key_values[55],
-                "key_cache28": past_key_values[56],
-                "value_cache28": past_key_values[57],
-                "key_cache29": past_key_values[58],
-                "value_cache29": past_key_values[59],
-                "key_cache30": past_key_values[60],
-                "value_cache30": past_key_values[61],
-                "key_cache31": past_key_values[62],
-                "value_cache31": past_key_values[63],
+                "encoder_hidden_states": encoder_hidden_states,
+                **key_cache,
+                **value_cache,
             },
         )
         logits, new_past_key_values = output[0], output[1:]
@@ -341,11 +309,22 @@ def greedy_search(models, input_ids, last_hidden_state):
 
 
 def predict(models, img):
+    img = img[:, :, ::-1]  # BGR -> RGB
+    img = preprocess(img)
+
+    task_prompt = "<s_cord-v2>"
     tokenizer = models["tokenizer"]
+    input_ids = tokenizer(task_prompt, add_special_tokens=False, return_tensors="np")[
+        "input_ids"
+    ]
 
-    last_hidden_state = np.load("last_hidden_state.npy")
+    net = models["enc"]
+    if not args.onnx:
+        output = net.predict([img])
+    else:
+        output = net.run(None, {"x": img})
+    last_hidden_state = output[0]
 
-    input_ids = np.array([[57579]])
     sequences = greedy_search(models, input_ids, last_hidden_state)
 
     output = []
@@ -395,60 +374,23 @@ def recognize_from_image(models):
     logger.info("Script finished successfully.")
 
 
-def recognize_from_video(models):
-    video_file = args.video if args.video else args.input[0]
-    capture = get_capture(video_file)
-    assert capture.isOpened(), "Cannot capture source"
-
-    # create video writer if savepath is specified as video format
-    if args.savepath != SAVE_IMAGE_PATH:
-        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        writer = get_writer(args.savepath, f_h, f_w)
-    else:
-        writer = None
-
-    frame_shown = False
-    while True:
-        ret, frame = capture.read()
-        if (cv2.waitKey(1) & 0xFF == ord("q")) or not ret:
-            break
-        if frame_shown and cv2.getWindowProperty("frame", cv2.WND_PROP_VISIBLE) == 0:
-            break
-
-        # inference
-        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        out = predict(models, img)
-
-        # plot result
-        res_img = draw_bbox(frame, out)
-
-        # show
-        cv2.imshow("frame", res_img)
-        frame_shown = True
-
-        # save results
-        if writer is not None:
-            res_img = res_img.astype(np.uint8)
-            writer.write(res_img)
-
-    capture.release()
-    cv2.destroyAllWindows()
-    if writer is not None:
-        writer.release()
-
-    logger.info("Script finished successfully.")
-
-
 def main():
-    # # model files check and download
-    # check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-    # check_and_download_models(WEIGHT_XXX_PATH, MODEL_XXX_PATH, REMOTE_PATH)
+    # model files check and download
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_ENC_PATH, MODEL_ENC_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
     # initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    if not args.onnx:
+        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        enc = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=env_id)
+    else:
+        import onnxruntime
+
+        providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+        net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
+        enc = onnxruntime.InferenceSession(WEIGHT_ENC_PATH, providers=providers)
 
     args.disable_ailia_tokenizer = True
     if args.disable_ailia_tokenizer:
@@ -460,13 +402,11 @@ def main():
 
     models = dict(
         tokenizer=tokenizer,
+        enc=enc,
         net=net,
     )
 
-    if args.video is not None:
-        recognize_from_video(models)
-    else:
-        recognize_from_image(models)
+    recognize_from_image(models)
 
 
 if __name__ == "__main__":
