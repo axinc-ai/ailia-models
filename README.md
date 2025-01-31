@@ -20,7 +20,7 @@ If you would like to try on your computer:
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-374 models as of January 2nd, 2025
+374 models as of January 2, 2025
 
 # Latest update
 - 2025.01.02 Add qwen_audio, audiosep
