@@ -24,11 +24,9 @@ logger = getLogger(__name__)
 # ======================
 # Parameters
 # ======================
+DEFAULT_MODEL = "donut-base-finetuned-cord-v2"
+
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/donut/"
-WEIGHT_PATH = "donut-base-finetuned-cord-v2.onnx"
-WEIGHT_ENC_PATH = "donut-base-finetuned-cord-v2_encoder.onnx"
-MODEL_PATH = "donut-base-finetuned-cord-v2.onnx.prototxt"
-MODEL_ENC_PATH = "donut-base-finetuned-cord-v2_encoder.onnx.prototxt"
 
 IMAGE_PATH = "cord_sample_receipt1.png"
 
@@ -40,6 +38,7 @@ COPY_BLOB_DATA = True
 # ======================
 
 parser = get_base_parser("Donut: Document Understanding Transformer", IMAGE_PATH, None)
+parser.add_argument("--model_name", default=DEFAULT_MODEL, help="model name")
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
 
@@ -375,6 +374,12 @@ def recognize_from_image(models):
 
 
 def main():
+    model_name = args.model_name
+    WEIGHT_PATH = f"{model_name}.onnx"
+    WEIGHT_ENC_PATH = f"{model_name}_encoder.onnx"
+    MODEL_PATH = f"{model_name}.onnx.prototxt"
+    MODEL_ENC_PATH = f"{model_name}_encoder.onnx.prototxt"
+
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_ENC_PATH, MODEL_ENC_PATH, REMOTE_PATH)
