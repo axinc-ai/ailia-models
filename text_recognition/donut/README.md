@@ -91,7 +91,7 @@ Follow the steps below to export your custom model.
 
 3. Run the command specifying your custom model.
    ```
-   python3 export_model.py --pretrained_path naver-clova-ix/donut-base-finetuned-cord-v2
+   python3 export_model.py --pretrained_path naver-clova-ix/donut-base-finetuned-cord-v2 --half
    ```
 
 4. An export file for the specified model will be created.

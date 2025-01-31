@@ -21,6 +21,7 @@ parser.add_argument("--task", type=str, default="cord-v2")
 parser.add_argument(
     "--pretrained_path", type=str, default="naver-clova-ix/donut-base-finetuned-cord-v2"
 )
+parser.add_argument("--half", action="store_true", help="flaot16 type")
 args, left_argv = parser.parse_known_args()
 
 
@@ -189,6 +190,15 @@ def main():
     pretrained_model = DonutModel.from_pretrained(args.pretrained_path)
     pretrained_model.decoder.model.__class__.__name__ = "DonutModel"
 
+    dtype = torch.float32
+    device = torch.device("cpu")
+    if args.half:
+        pretrained_model.half()
+        dtype = torch.float16
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        pretrained_model.to(device)
+
     # DonutModel
     org_prepare_inputs_for_generation = (
         pretrained_model.decoder.model.prepare_inputs_for_generation
@@ -216,7 +226,7 @@ def main():
         if model_inputs["past_key_values"] is None:
             model_inputs["past_key_values"] = [
                 [
-                    torch.zeros(1, 16, 0, 64, dtype=torch.float16).to(input_ids.device),
+                    torch.zeros(1, 16, 0, 64, dtype=dtype).to(device),
                 ]
                 * 4
             ] * 4
@@ -238,7 +248,7 @@ def main():
 
     with torch.no_grad():
         print("------>")
-        image_tensors = torch.randn(1, 3, 1280, 960)
+        image_tensors = (torch.randn(1, 3, 1280, 960, dtype=dtype).to(device),)
         file_path = f"{model_name}_encoder.onnx"
         torch.onnx.export(
             pretrained_model.encoder,
@@ -254,10 +264,10 @@ def main():
 
         print("------>")
         model = Exp(pretrained_model.decoder.model)
-        input_ids = torch.tensor([[57579]])
+        input_ids = torch.tensor([[57579]]).to(device)
         model_kwargs = {
             "encoder_outputs": SimpleNamespace(
-                last_hidden_state=torch.randn(1, 1200, 1024),
+                last_hidden_state=torch.randn(1, 1200, 1024, dtype=dtype).to(device),
             ),
             "use_cache": True,
             "cache_position": torch.tensor([0]),
