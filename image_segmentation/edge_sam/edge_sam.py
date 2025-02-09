@@ -68,6 +68,7 @@ parser.add_argument(
     help="Box coordinate specified by x1,y1,x2,y2.",
 )
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
+parser.add_argument("--gui", action="store_true", help="Open mouse click GUI.")
 args = update_parser(parser)
 
 
@@ -86,15 +87,16 @@ def apply_coords(coords, h, w):
 
 
 def show_mask(mask, img):
-    color = np.array([255, 144, 30])
+    color = np.array([255, 144, 30], dtype=np.uint8)
     color = color.reshape(1, 1, -1)
 
     h, w = mask.shape[-2:]
     mask = mask.reshape(h, w, 1)
 
     mask_image = mask * color
-    img = (img * ~mask) + (img * mask) * 0.6 + mask_image * 0.4
+    img = (img * (1 - mask)) + (img * mask) * 0.6 + mask_image * 0.4
 
+    img = np.clip(img, 0, 255).astype(np.uint8)
     return img
 
 
@@ -138,6 +140,47 @@ def show_box(box, img):
     )
 
     return img
+
+
+def show_gui(models, image_path):
+    # prepare input data
+    img = load_image(image_path)
+    img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+    overlay_img = img.copy()
+
+    coord_list = []
+    label_list = []
+
+    def predict_on_click(event, x, y, flags, param):
+        nonlocal overlay_img  # クリックごとに更新する
+        if event == cv2.EVENT_LBUTTONDOWN:
+            coord_list.append((x, y))
+            label_list.append(1)
+            coord_input = np.array(coord_list)
+            label_input = np.array(label_list)
+            output = predict(models, img, coord_input, label_input)
+            masks, scores = output
+
+            mask = np.expand_dims(masks[scores.argmax()], axis=0)
+            overlay_img = show_mask(mask, img)
+            overlay_img = show_points(coord_input, label_input, overlay_img)
+            print("x:", x, "y:", y)
+
+    # 画像のウインドウに名前をつけ、コールバック関数をセット
+    winname = "Mouse click GUI"
+    cv2.namedWindow(winname)
+    cv2.setMouseCallback(winname, predict_on_click)
+
+    while True:
+        cv2.imshow(winname, overlay_img)  # 更新した画像を表示
+        # ESCキーで終了
+        if cv2.waitKey(20) & 0xFF == 27 or not cv2.getWindowProperty(
+            winname, cv2.WND_PROP_VISIBLE
+        ):
+            break
+        time.sleep(0.1)
+
+    cv2.destroyAllWindows()
 
 
 # ======================
@@ -317,7 +360,7 @@ def main():
     if not args.gui:
         recognize_from_image(models)
     else:
-        show_gui(args.input[0])
+        show_gui(models, args.input[0])
 
 
 if __name__ == "__main__":
