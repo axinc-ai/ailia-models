@@ -26,6 +26,7 @@ logger = getLogger(__name__)
 WEIGHT_PATH = "model.onnx"
 MODEL_PATH = "model.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_ner_japanese/"
+REMOTE_DIC_PATH = "https://storage.googleapis.com/ailia-models/bert_maskedlm/"
 
 # ======================
 # Arguemnt Parser Config
@@ -199,7 +200,7 @@ def main():
         tokenizer = AutoTokenizer.from_pretrained("tokenizer")
     else:
         from ailia_tokenizer import BertJapaneseWordPieceTokenizer
-        check_and_download_file("unidic-lite.zip", REMOTE_PATH)
+        check_and_download_file("unidic-lite.zip", REMOTE_DIC_PATH)
         if not os.path.exists("unidic-lite"):
             shutil.unpack_archive('unidic-lite.zip', '')
         tokenizer = BertJapaneseWordPieceTokenizer.from_pretrained(dict_path = 'unidic-lite', pretrained_model_name_or_path = './tokenizer/')
