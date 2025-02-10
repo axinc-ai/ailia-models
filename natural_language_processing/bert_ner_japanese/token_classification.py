@@ -5,7 +5,7 @@ import numpy as np
 
 class TokenClassification:
 
-    def __init__(self, tokenizer):
+    def __init__(self, tokenizer, disable_ailia_tokenizer):
         self.tokenizer = tokenizer
         self.id2label = {
             0: "O",
@@ -26,6 +26,7 @@ class TokenClassification:
             15: "B-イベント名",
             16: "I-イベント名",
         }
+        self.disable_ailia_tokenizer = disable_ailia_tokenizer
 
     def gather_pre_entities(
         self,
@@ -113,10 +114,15 @@ class TokenClassification:
         scores = np.nanmean([entity["score"] for entity in entities])
         tokens = [entity["word"] for entity in entities]
 
+        if not self.disable_ailia_tokenizer:
+            word = "".join(token[2:] if token.startswith("##") else token for token in tokens)
+        else:
+            word = self.tokenizer.convert_tokens_to_string(tokens)
+
         entity_group = {
             "entity_group": entity,
             "score": np.mean(scores),
-            "word": self.tokenizer.convert_tokens_to_string(tokens),
+            "word": word,
             "start": entities[0]["start"],
             "end": entities[-1]["end"],
         }
