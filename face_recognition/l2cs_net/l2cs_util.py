@@ -3,7 +3,7 @@ import sys
 import numpy as np
 from dataclasses import dataclass
 
-sys.path.append('../../face_detection/retinaface')
+sys.path.insert(0, '../../face_detection/retinaface')
 from retinaface import postprocessing
 import retinaface_utils as rut
 

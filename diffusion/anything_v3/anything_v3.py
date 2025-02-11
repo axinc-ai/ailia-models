@@ -55,6 +55,12 @@ parser.add_argument(
     help="the prompt to render"
 )
 parser.add_argument(
+    "--steps",
+    type=int,
+    default=50,
+    help="number of inference steps",
+)
+parser.add_argument(
     "--seed",
     type=int,
     default=None,
@@ -82,7 +88,7 @@ def recognize_from_text(pipe):
 
     logger.info('Start inference...')
 
-    image = pipe(prompt).images[0]
+    image = pipe(prompt=prompt, num_inference_steps=args.steps).images[0]
 
     savepath = get_savepath(args.savepath, "", ext='.png')
     image.save(savepath)
@@ -104,7 +110,7 @@ def main():
 
     if not os.path.exists(WEIGHT_PB_UNET_PATH):
         logger.info('Downloading weights.pb...')
-        urlretrieve(REMOTE_PATH, WEIGHT_PB_UNET_PATH, progress_print)
+        urlretrieve(REMOTE_PATH + WEIGHT_PB_UNET_PATH, WEIGHT_PB_UNET_PATH, progress_print)
     logger.info('weights.pb is prepared!')
 
     env_id = args.env_id

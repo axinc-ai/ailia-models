@@ -51,11 +51,11 @@ parser.add_argument(
 )
 parser.add_argument(
     '--seed', type=int, default=1,
-    help='random seed for random stroke mask'
+    help='random seed for random mask'
 )
 parser.add_argument(
     '--random_mask', type=int, default=0,
-    help='using random stroke mask'
+    help='using random rect mask'
 )
 parser.add_argument(
     '--mask_shape', type=str, default='128,128',
@@ -84,8 +84,7 @@ def preprocess(img, img_shape):
 
 
 def recognize_from_image(net, img_shape):
-    if args.random_mask:
-        np.random.seed(args.seed)
+    np.random.seed(args.seed)
 
     # input image loop
     for image_path in args.input:

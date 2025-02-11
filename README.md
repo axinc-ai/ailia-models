@@ -6,6 +6,9 @@ The collection of pre-trained, state-of-the-art AI models.
 
 [ailia SDK](https://axinc.jp/en/solutions/ailia_sdk.html) is a self-contained, cross-platform, high-speed inference SDK for AI. The ailia SDK provides a consistent C++ API across Windows, Mac, Linux, iOS, Android, Jetson, and Raspberry Pi platforms. It also supports Unity (C#), Python, Rust, Flutter(Dart) and JNI for efficient AI implementation. The ailia SDK makes extensive use of the GPU through Vulkan and Metal to enable accelerated computing.
 
+- [Contact us](https://www.ailia.ai/en-contact-product)
+- [Mail](mailto:contact@axinc.jp)
+
 # How to use
 
 Try now on [Google Colaboratory](https://www.ailia.ai/launch_to_colab)
@@ -17,7 +20,7 @@ If you would like to try on your computer:
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-374 models as of January 2nd, 2025
+374 models as of January 2, 2025
 
 # Latest update
 - 2025.01.02 Add qwen_audio, audiosep
