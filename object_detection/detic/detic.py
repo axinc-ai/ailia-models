@@ -307,10 +307,10 @@ def write_predictions(file_name, predictions, file_type='txt'):
         for i in range(num_instances):
             x0, y0, x1, y1 = boxes[i]
             label = labels[i]
-            score = scores[i]
+            score = float(scores[i])
             results.append({
                 'category': label, 'score': score,
-                'x': x0, 'y': y0, 'w': x1 - x0, 'h': y1 - y0
+                'x': int(x0), 'y': int(y0), 'w': int(x1 - x0), 'h': int(y1 - y0)
             })
         with open(file_name, 'w') as f:
             json.dump(results, f, indent=2)
