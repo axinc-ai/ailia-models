@@ -31,24 +31,24 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_SPEECH_PATH = "speech_tokenizer_v2.onnx"
+WEIGHT_SPEECH_PATH = "CosyVoice2-0.5B_speech_tokenizer_v2.onnx"
 WEIGHT_CAMP_PATH = "campplus.onnx"
 WEIGHT_EMB_TKN_PATH = "CosyVoice2-0.5B_embed_tokens.onnx"
 WEIGHT_LLM_PATH = "CosyVoice2-0.5B_llm.onnx"
 WEIGHT_FLOW_ENC_PATH = "CosyVoice2-0.5B_flow_encoder.onnx"
 WEIGHT_FLOW_DEC_PATH = "CosyVoice2-0.5B_flow.decoder.estimator.fp32.onnx"
 WEIGHT_HIFT_PATH = "CosyVoice2-0.5B_hift.onnx"
-MODEL_SPEECH_PATH = "speech_tokenizer_v2.onnx.prototxt"
+MODEL_SPEECH_PATH = "CosyVoice2-0.5B_speech_tokenizer_v2.onnx.prototxt"
 MODEL_CAMP_PATH = "campplus.onnx.prototxt"
 MODEL_EMB_TKN_PATH = "CosyVoice2-0.5B_embed_tokens.onnx.prototxt"
 MODEL_LLM_PATH = "CosyVoice2-0.5B_llm.onnx.prototxt"
 MODEL_FLOW_ENC_PATH = "CosyVoice2-0.5B_flow_encoder.onnx.prototxt"
 MODEL_FLOW_DEC_PATH = "CosyVoice2-0.5B_flow.decoder.estimator.fp32.onnx.prototxt"
 MODEL_HIFT_PATH = "CosyVoice2-0.5B_hift.onnx.prototxt"
-NPY_SPEECH_EMB_PATH = "speech_embedding.npy"
-NPY_LLM_EMB_PATH = "llm_embedding.npy"
-NPY_LLM_DEC_WEIGHT_PATH = "llm_decoder_weight.npy"
-NPY_LLM_DEC_BIAS_PATH = "llm_decoder_bias.npy"
+NPY_SPEECH_EMB_PATH = "CosyVoice2-0.5B_speech_embedding.npy"
+NPY_LLM_EMB_PATH = "CosyVoice2-0.5B_llm_embedding.npy"
+NPY_LLM_DEC_WEIGHT_PATH = "CosyVoice2-0.5B_llm_decoder_weight.npy"
+NPY_LLM_DEC_BIAS_PATH = "CosyVoice2-0.5B_llm_decoder_bias.npy"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/cosyvoice/"
 
 SAMPLE_RATE = 24000
