@@ -16,16 +16,17 @@ from facexlib.alignment import landmark_98_to_68
 import numpy as np
 from PIL import Image
 
+from ailia_module.face_detection import face_detect
+
 class Preprocesser:
-    def __init__(self, device='cuda'):
-        self.predictor = KeypointExtractor(device)
+    def __init__(self, face_det_net):
+        self.predictor = KeypointExtractor(face_det_net)
 
     def get_landmark(self, img_np):
         """get landmark with dlib
         :return: np.array shape=(68, 2)
         """
-        with torch.no_grad():
-            dets = self.predictor.det_net.detect_faces(img_np, 0.97)
+        dets = face_detect(img_np, self.predictor.face_det_net)
 
         if len(dets) == 0:
             return None

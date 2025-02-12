@@ -15,6 +15,22 @@ from src.generate_batch import get_data
 from src.generate_facerender_batch import get_facerender_data
 from src.utils.init_path import init_path
 
+import ailia
+
+# import original modules
+sys.path.append('../../util')
+import webcamera_utils  # noqa: E402
+from image_utils import imread, load_image  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
+
+WEIGHT_FACE_DET_PATH = "retinaface_resnet50.onnx"
+# MODEL_FACE_DET_PATH = "retinaface_resnet50.onnx.prototxt"
+MODEL_FACE_DET_PATH = None
+REMOTE_FACE_DET_PATH = "https://storage.googleapis.com/ailia-models/retinaface/"
+check_and_download_models(WEIGHT_FACE_DET_PATH, MODEL_FACE_DET_PATH, REMOTE_FACE_DET_PATH)
+
 def set_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
@@ -44,8 +60,11 @@ def main(args):
 
     sadtalker_paths = init_path(args.checkpoint_dir, os.path.join(current_root_path, 'src/config'), args.size, args.old_version, args.preprocess)
 
+    # init alila model
+    retinaface_net = ailia.Net(MODEL_FACE_DET_PATH, WEIGHT_FACE_DET_PATH)
+
     #init model
-    preprocess_model = CropAndExtract(sadtalker_paths, device)
+    preprocess_model = CropAndExtract(sadtalker_paths, retinaface_net)
 
     audio_to_coeff = Audio2Coeff(sadtalker_paths,  device)
     

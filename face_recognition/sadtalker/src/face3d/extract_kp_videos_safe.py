@@ -16,6 +16,8 @@ from facexlib.detection import init_detection_model
 from facexlib.utils import load_file_from_url
 from src.face3d.util.my_awing_arch import FAN
 
+from ailia_module.face_detection import face_detect
+
 def init_alignment_model(model_name, half=False, device='cuda', model_rootpath=None):
     if model_name == 'awing_fan':
         model = FAN(num_modules=4, num_landmarks=98, device=device)
@@ -32,7 +34,7 @@ def init_alignment_model(model_name, half=False, device='cuda', model_rootpath=N
 
 
 class KeypointExtractor():
-    def __init__(self, device='cuda'):
+    def __init__(self, face_det_net):
 
         ### gfpgan/weights
         try:
@@ -42,8 +44,8 @@ class KeypointExtractor():
         except:
             root_path = 'gfpgan/weights'
 
-        self.detector = init_alignment_model('awing_fan',device=device, model_rootpath=root_path)   
-        self.det_net = init_detection_model('retinaface_resnet50', half=False,device=device, model_rootpath=root_path)
+        self.detector = init_alignment_model('awing_fan',device="cuda", model_rootpath=root_path)   
+        self.face_det_net = face_det_net
 
     def extract_keypoint(self, images, name=None, info=True):
         if isinstance(images, list):
@@ -70,7 +72,7 @@ class KeypointExtractor():
                     with torch.no_grad():
                         # face detection -> face alignment.
                         img = np.array(images)
-                        bboxes = self.det_net.detect_faces(images, 0.97)
+                        bboxes = face_detect(img, self.face_det_net)
                         
                         bboxes = bboxes[0]
                         img = img[int(bboxes[1]):int(bboxes[3]), int(bboxes[0]):int(bboxes[2]), :]

@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import onnxruntime
 
 def calculate_points(heatmaps):
     # change heatmaps to landmarks
@@ -275,6 +276,7 @@ class FAN(nn.Module):
         self.gray_scale = gray_scale
         self.end_relu = end_relu
         self.num_landmarks = num_landmarks
+        self.face_align = onnxruntime.InferenceSession("./onnx/face_align.onnx")
 
         # Base part
         if self.gray_scale:
@@ -362,15 +364,13 @@ class FAN(nn.Module):
 
         img = cv2.resize(img, (256, 256))
         inp = img[..., ::-1]
-        inp = torch.from_numpy(np.ascontiguousarray(inp.transpose((2, 0, 1)))).float()
-        inp = inp.to(self.device)
-        inp.div_(255.0).unsqueeze_(0)
+        inp = np.transpose(inp.astype(np.float32), (2, 0, 1))
+        inp = np.expand_dims(inp / 255.0, axis=0)
 
-        outputs, _ = self.forward(inp)
-        out = outputs[-1][:, :-1, :, :]
-        heatmaps = out.detach().cpu().numpy()
+        outputs = self.face_align.run(None, {"input_image": inp})[0]
+        out = outputs[:, :-1, :, :]
 
-        pred = calculate_points(heatmaps).reshape(-1, 2)
+        pred = calculate_points(out).reshape(-1, 2)
 
         pred *= offset[:2]
         pred += offset[-2:]

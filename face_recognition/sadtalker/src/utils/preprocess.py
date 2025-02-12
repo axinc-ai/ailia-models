@@ -1,11 +1,9 @@
 import numpy as np
-import cv2, os, sys, torch
+import cv2, os, sys
 from tqdm import tqdm
 from PIL import Image 
 
 # 3dmm extraction
-import safetensors
-import safetensors.torch 
 from src.face3d.util.preprocess import align_img
 from src.face3d.util.load_mats import load_lm3d
 from src.face3d.models import networks
@@ -13,11 +11,12 @@ from src.face3d.models import networks
 from scipy.io import loadmat, savemat
 from src.utils.croper import Preprocesser
 
-
 import warnings
 
 from src.utils.safetensor_helper import load_x_from_safetensor 
 warnings.filterwarnings("ignore")
+
+import onnxruntime
 
 def split_coeff(coeffs):
         """
@@ -44,21 +43,10 @@ def split_coeff(coeffs):
 
 
 class CropAndExtract():
-    def __init__(self, sadtalker_path, device):
-
-        self.propress = Preprocesser(device)
-        self.net_recon = networks.define_net_recon(net_recon='resnet50', use_last_fc=False, init_path='').to(device)
-        
-        if sadtalker_path['use_safetensor']:
-            checkpoint = safetensors.torch.load_file(sadtalker_path['checkpoint'])    
-            self.net_recon.load_state_dict(load_x_from_safetensor(checkpoint, 'face_3drecon'))
-        else:
-            checkpoint = torch.load(sadtalker_path['path_of_net_recon_model'], map_location=torch.device(device))    
-            self.net_recon.load_state_dict(checkpoint['net_recon'])
-
-        self.net_recon.eval()
+    def __init__(self, sadtalker_path, face_det_net):
+        self.propress = Preprocesser(face_det_net)
+        self.net_recon = onnxruntime.InferenceSession("./onnx/net_recon.onnx")
         self.lm3d_std = load_lm3d(sadtalker_path['dir_of_BFM_fitting'])
-        self.device = device
     
     def generate(self, input_path, save_dir, crop_or_resize='crop', source_image_flag=False, pic_size=256):
 
@@ -146,15 +134,12 @@ class CropAndExtract():
                 trans_params, im1, lm1, _ = align_img(frame, lm1, self.lm3d_std)
  
                 trans_params = np.array([float(item) for item in np.hsplit(trans_params, 5)]).astype(np.float32)
-                im_t = torch.tensor(np.array(im1)/255., dtype=torch.float32).permute(2, 0, 1).to(self.device).unsqueeze(0)
+                im_np = np.transpose(np.array(im1, dtype=np.float32) / 255.0, (2, 0, 1))[np.newaxis, ...]
                 
-                with torch.no_grad():
-                    # print(im_t.shape) # torch.Size([1, 3, 224, 224])
-                    full_coeff = self.net_recon(im_t)
-                    # print(full_coeff.shape) # torch.Size([1, 257])
-                    coeffs = split_coeff(full_coeff)
+                full_coeff = self.net_recon.run(None, {"input_image": im_np})[0]
+                coeffs = split_coeff(full_coeff)
 
-                pred_coeff = {key:coeffs[key].cpu().numpy() for key in coeffs}
+                pred_coeff = {key:coeffs[key] for key in coeffs}
  
                 pred_coeff = np.concatenate([
                     pred_coeff['exp'], 
@@ -163,7 +148,7 @@ class CropAndExtract():
                     trans_params[2:][None],
                     ], 1)
                 video_coeffs.append(pred_coeff)
-                full_coeffs.append(full_coeff.cpu().numpy())
+                full_coeffs.append(full_coeff)
 
             semantic_npy = np.array(video_coeffs)[:,0] 
 
