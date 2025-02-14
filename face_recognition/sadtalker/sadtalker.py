@@ -66,7 +66,7 @@ def main(args):
     #init model
     preprocess_model = CropAndExtract(sadtalker_paths, retinaface_net)
 
-    audio_to_coeff = Audio2Coeff(sadtalker_paths,  device)
+    audio_to_coeff = Audio2Coeff()
     
     animate_from_coeff = AnimateFromCoeff(sadtalker_paths, device)
 

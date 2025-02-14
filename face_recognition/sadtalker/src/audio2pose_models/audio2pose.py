@@ -1,99 +1,81 @@
-import torch
-from torch import nn
-from src.audio2pose_models.cvae import CVAE
-from src.audio2pose_models.discriminator import PoseSequenceDiscriminator
-from src.audio2pose_models.audio_encoder import AudioEncoder
+import numpy as np
+import onnxruntime
 
-class Audio2Pose(nn.Module):
-    def __init__(self, cfg, wav2lip_checkpoint, device='cuda'):
-        super().__init__()
-        self.cfg = cfg
-        self.seq_len = cfg.MODEL.CVAE.SEQ_LEN
-        self.latent_dim = cfg.MODEL.CVAE.LATENT_SIZE
-        self.device = device
-
-        self.audio_encoder = AudioEncoder(wav2lip_checkpoint, device)
-        self.audio_encoder.eval()
-        for param in self.audio_encoder.parameters():
-            param.requires_grad = False
-
-        self.netG = CVAE(cfg)
-        self.netD_motion = PoseSequenceDiscriminator(cfg)
-        
-        
-    def forward(self, x):
-
-        batch = {}
-        coeff_gt = x['gt'].cuda().squeeze(0)           #bs frame_len+1 73
-        batch['pose_motion_gt'] = coeff_gt[:, 1:, 64:70] - coeff_gt[:, :1, 64:70] #bs frame_len 6
-        batch['ref'] = coeff_gt[:, 0, 64:70]  #bs  6
-        batch['class'] = x['class'].squeeze(0).cuda() # bs
-        indiv_mels= x['indiv_mels'].cuda().squeeze(0) # bs seq_len+1 80 16
-
-        # forward
-        audio_emb_list = []
-        audio_emb = self.audio_encoder(indiv_mels[:, 1:, :, :].unsqueeze(2)) #bs seq_len 512
-        batch['audio_emb'] = audio_emb
-        batch = self.netG(batch)
-
-        pose_motion_pred = batch['pose_motion_pred']           # bs frame_len 6
-        pose_gt = coeff_gt[:, 1:, 64:70].clone()               # bs frame_len 6
-        pose_pred = coeff_gt[:, :1, 64:70] + pose_motion_pred  # bs frame_len 6
-
-        batch['pose_pred'] = pose_pred
-        batch['pose_gt'] = pose_gt
-
-        return batch
+class Audio2Pose:
+    def __init__(self):
+        self.audio2pose = onnxruntime.InferenceSession("./onnx/audio2pose.onnx")
+        self.seq_len = 32
+        self.latent_dim = 64
 
     def test(self, x):
-        # print(x['ref'].shape) # torch.Size([1, 136, 70])
-        # print(x['class'].shape) # torch.Size([1])
-        # print(x['indiv_mels'].shape) # torch.Size([1, 136, 1, 80, 16])
-        # print(x['num_frames']) # 136
-
+        """
+        元のtest()を修正した
+            - AudioEncoderとnetGを1箇所にまとめる
+            - これらを1つのonnxにエクスポートする
+        """
         batch = {}
-        ref = x['ref']                            #bs 1 70
-        batch['ref'] = x['ref'][:,0,-6:]  
-        batch['class'] = x['class']  
+
+        # 1) 入力データの取得
+        ref = x['ref'].numpy()  # [BS, 1, 70]
+        class_id = x['class'].numpy()  # [BS]
         bs = ref.shape[0]
-        
-        indiv_mels= x['indiv_mels']               # bs T 1 80 16
-        indiv_mels_use = indiv_mels[:, 1:]        # we regard the ref as the first frame
-        num_frames = x['num_frames']
-        num_frames = int(num_frames) - 1
+        pose_ref = ref[:, 0, -6:]  # [BS, 6]
 
-        #  
-        div = num_frames//self.seq_len
-        re = num_frames%self.seq_len
-        audio_emb_list = []
-        pose_motion_pred_list = [torch.zeros(batch['ref'].unsqueeze(1).shape, dtype=batch['ref'].dtype, 
-                                                device=batch['ref'].device)]
+        indiv_mels = x['indiv_mels'].numpy()  # [BS, T, 1, 80, 16]
+        T_total = int(x['num_frames']) - 1  # refフレームを1つ使うので -1
 
-        for i in range(div):
-            z = torch.randn(bs, self.latent_dim).to(ref.device)
-            batch['z'] = z
-            audio_emb = self.audio_encoder(indiv_mels_use[:, i*self.seq_len:(i+1)*self.seq_len,:,:,:]) #bs seq_len 512
-            batch['audio_emb'] = audio_emb
-            batch = self.netG.test(batch)
-            pose_motion_pred_list.append(batch['pose_motion_pred'])  #list of bs seq_len 6
-        
-        if re != 0:
-            z = torch.randn(bs, self.latent_dim).to(ref.device)
-            batch['z'] = z
-            audio_emb = self.audio_encoder(indiv_mels_use[:, -1*self.seq_len:,:,:,:]) #bs seq_len  512
-            if audio_emb.shape[1] != self.seq_len:
-                pad_dim = self.seq_len-audio_emb.shape[1]
-                pad_audio_emb = audio_emb[:, :1].repeat(1, pad_dim, 1) 
-                audio_emb = torch.cat([pad_audio_emb, audio_emb], 1) 
-            batch['audio_emb'] = audio_emb
-            batch = self.netG.test(batch)
-            pose_motion_pred_list.append(batch['pose_motion_pred'][:,-1*re:,:])   
-        
-        pose_motion_pred = torch.cat(pose_motion_pred_list, dim = 1)
+        # 2) seq_len ごとにチャンク分割
+        chunk_count = (T_total + self.seq_len - 1) // self.seq_len
+
+        # 返却用リスト。最初に「pose_ref と同じ形の 0 フレーム」を1つ入れる
+        pose_motion_pred_list = [
+            np.zeros((bs, 1, pose_ref.shape[1]), dtype=np.float32)
+        ]
+
+        # 3) チャンクごとにループ処理
+        start_idx = 0
+        for i in range(chunk_count):
+            # 3-1) 処理するフレーム範囲を決定
+            end_idx = min(start_idx + self.seq_len, T_total)
+            chunk_len = end_idx - start_idx
+
+            # indiv_mels の該当部分を切り出し
+            chunk_mels = indiv_mels[:, 1+start_idx : 1+end_idx]  # 先頭を ref フレームとしているなら +1
+
+            # もし chunk_len < self.seq_len ならパディング
+            if chunk_len < self.seq_len:
+                pad_len = self.seq_len - chunk_len
+                pad_chunk = np.repeat(chunk_mels[:, :1], pad_len, axis=1)
+                chunk_mels = np.concatenate([pad_chunk, chunk_mels], axis=1)  
+
+            # 3-2) ランダムノイズ生成 (潜在変数 z)
+            z = np.random.randn(bs, self.latent_dim).astype(np.float32)
+
+            # 3-3) AudioEncoder → netG
+            motion_pred = self.audio2pose.run(None, {
+                "chunk_mels": chunk_mels,
+                "z": z,
+                "pose_ref": pose_ref,
+                "class": class_id,
+            })[0]
+
+            # 3-4) パディングした分は使わない
+            if chunk_len < self.seq_len:
+                motion_pred = motion_pred[:, -chunk_len:, :]
+
+            # 結果をリストに追加
+            pose_motion_pred_list.append(motion_pred)
+
+            # 次のチャンク開始位置
+            start_idx += chunk_len
+
+        # 4) すべてのチャンクを結合
+        pose_motion_pred = np.concatenate(pose_motion_pred_list, axis=1)  # [BS, T_total, 6]
+
+        # 5) 累積ポーズ計算
+        pose_pred = ref[:, :1, -6:] + pose_motion_pred  # [BS, T_total+1, 6]
+
+        # 6) 結果を辞書に格納して返す
         batch['pose_motion_pred'] = pose_motion_pred
-
-        pose_pred = ref[:, :1, -6:] + pose_motion_pred  # bs T 6
-
         batch['pose_pred'] = pose_pred
-        # print(pose_pred.shape) # torch.Size([1, 136, 6])
         return batch

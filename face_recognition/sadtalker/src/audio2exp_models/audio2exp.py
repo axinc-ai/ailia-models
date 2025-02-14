@@ -1,45 +1,37 @@
 from tqdm import tqdm
-import torch
-from torch import nn
+import numpy as np
+import onnxruntime
 
-
-class Audio2Exp(nn.Module):
-    def __init__(self, netG, cfg, device, prepare_training_loss=False):
-        super(Audio2Exp, self).__init__()
-        self.cfg = cfg
-        self.device = device
-        self.netG = netG.to(device)
+class Audio2Exp:
+    def __init__(self):
+        self.netG = onnxruntime.InferenceSession("./onnx/audio2exp.onnx")
 
     def test(self, batch):
-        # print(batch['indiv_mels'].shape) # torch.Size([1, 136, 1, 80, 16])
-        # print(batch['ref'].shape) # torch.Size([1, 136, 70])
-        # print(batch['ratio_gt'].shape) # torch.Size([1, 136, 1])
+        mel_input = batch['indiv_mels'].numpy()  # (bs, T, 1, 80, 16)
+        ref = batch['ref'].numpy()              # (bs, T, 70)
+        ratio = batch['ratio_gt'].numpy()       # (bs, T, 1)
 
-        mel_input = batch['indiv_mels']                         # bs T 1 80 16
-        bs = mel_input.shape[0]
-        T = mel_input.shape[1]
-
+        bs, T, _, _, _ = mel_input.shape
         exp_coeff_pred = []
 
-        for i in tqdm(range(0, T, 10),'audio2exp:'): # every 10 frames
-            
-            current_mel_input = mel_input[:,i:i+10]
+        for i in tqdm(range(0, T, 10), 'audio2exp:'):  # 10フレームごとに処理
+            current_mel_input = mel_input[:, i:i+10]  # (bs, 10, 1, 80, 16)
+            current_ref = ref[:, i:i+10, :64]         # (bs, 10, 64)
+            current_ratio = ratio[:, i:i+10]         # (bs, 10, 1)
 
-            #ref = batch['ref'][:, :, :64].repeat((1,current_mel_input.shape[1],1))           #bs T 64
-            ref = batch['ref'][:, :, :64][:, i:i+10]
-            ratio = batch['ratio_gt'][:, i:i+10]                               #bs T
+            audiox = current_mel_input.reshape(-1, 1, 80, 16)  # (bs*T, 1, 80, 16)
 
-            audiox = current_mel_input.view(-1, 1, 80, 16)                  # bs*T 1 80 16
-
-            curr_exp_coeff_pred  = self.netG(audiox, ref, ratio)         # bs T 64 
+            curr_exp_coeff_pred = self.netG.run(None, {
+                "audio": audiox,
+                "ref": current_ref,
+                "ratio": current_ratio,
+            })[0]
 
             exp_coeff_pred += [curr_exp_coeff_pred]
 
         # BS x T x 64
         results_dict = {
-            'exp_coeff_pred': torch.cat(exp_coeff_pred, axis=1)
-            }
-        # print(results_dict["exp_coeff_pred"].shape) # torch.Size([1, 136, 64])
+            'exp_coeff_pred': np.concatenate(exp_coeff_pred, axis=1)
+        }
+
         return results_dict
-
-
