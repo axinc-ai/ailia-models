@@ -2,7 +2,6 @@ import os
 import numpy as np
 from PIL import Image
 from skimage import io, img_as_float32, transform
-import torch
 import scipy.io as scio
 
 def get_facerender_data(coeff_path, pic_path, first_coeff_path, audio_path, 
@@ -20,8 +19,8 @@ def get_facerender_data(coeff_path, pic_path, first_coeff_path, audio_path,
     source_image = img_as_float32(source_image)
     source_image = transform.resize(source_image, (size, size, 3))
     source_image = source_image.transpose((2, 0, 1))
-    source_image_ts = torch.FloatTensor(source_image).unsqueeze(0)
-    source_image_ts = source_image_ts.repeat(batch_size, 1, 1, 1)
+    source_image_ts = np.expand_dims(np.array(source_image, dtype=np.float32), axis=0)
+    source_image_ts = np.tile(source_image_ts, (batch_size, 1, 1, 1))
     data['source_image'] = source_image_ts
  
     source_semantics_dict = scio.loadmat(first_coeff_path)
@@ -36,8 +35,8 @@ def get_facerender_data(coeff_path, pic_path, first_coeff_path, audio_path,
         generated_3dmm = generated_dict['coeff_3dmm'][:,:70]
 
     source_semantics_new = transform_semantic_1(source_semantics, semantic_radius)
-    source_semantics_ts = torch.FloatTensor(source_semantics_new).unsqueeze(0)
-    source_semantics_ts = source_semantics_ts.repeat(batch_size, 1, 1)
+    source_semantics_ts = np.expand_dims(np.array(source_semantics_new, dtype=np.float32), axis=0)
+    source_semantics_ts = np.tile(source_semantics_ts, (batch_size, 1, 1))
     data['source_semantics'] = source_semantics_ts
 
     # target 
@@ -69,19 +68,19 @@ def get_facerender_data(coeff_path, pic_path, first_coeff_path, audio_path,
 
     target_semantics_np = np.array(target_semantics_list)             #frame_num 70 semantic_radius*2+1
     target_semantics_np = target_semantics_np.reshape(batch_size, -1, target_semantics_np.shape[-2], target_semantics_np.shape[-1])
-    data['target_semantics_list'] = torch.FloatTensor(target_semantics_np)
+    data['target_semantics_list'] = np.array(target_semantics_np, dtype=np.float32)
     data['video_name'] = video_name
     data['audio_path'] = audio_path
     
     if input_yaw_list is not None:
         yaw_c_seq = gen_camera_pose(input_yaw_list, frame_num, batch_size)
-        data['yaw_c_seq'] = torch.FloatTensor(yaw_c_seq)
+        data['yaw_c_seq'] = np.array(yaw_c_seq, dtype=np.float32)
     if input_pitch_list is not None:
         pitch_c_seq = gen_camera_pose(input_pitch_list, frame_num, batch_size)
-        data['pitch_c_seq'] = torch.FloatTensor(pitch_c_seq)
+        data['pitch_c_seq'] = np.array(pitch_c_seq, dtype=np.float32)
     if input_roll_list is not None:
-        roll_c_seq = gen_camera_pose(input_roll_list, frame_num, batch_size) 
-        data['roll_c_seq'] = torch.FloatTensor(roll_c_seq)
+        roll_c_seq = gen_camera_pose(input_roll_list, frame_num, batch_size)
+        data['roll_c_seq'] = np.array(roll_c_seq, dtype=np.float32)
  
     return data
 

@@ -6,7 +6,6 @@ import argparse
 import scipy
 import numpy as np
 from PIL import Image
-import torch
 from tqdm import tqdm
 from itertools import cycle
 

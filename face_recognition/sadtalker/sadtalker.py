@@ -1,10 +1,8 @@
 from glob import glob
 import shutil
-import torch
 from time import  strftime
 import os, sys, time
 from argparse import ArgumentParser
-import torch.nn as nn
 import numpy as np
 import random
 
@@ -38,15 +36,10 @@ REMOTE_GFPGAN_PATH = "https://storage.googleapis.com/ailia-models/gfpgan/"
 check_and_download_models(WEIGHT_GFPGAN_PATH, MODEL_GFPGAN_PATH, REMOTE_GFPGAN_PATH)
 
 def set_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
     random.seed(seed)
     np.random.seed(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
 
 def main(args):
-    #torch.backends.cudnn.enabled = False
     set_seed(42)
 
     pic_path = args.source_image
@@ -54,7 +47,6 @@ def main(args):
     save_dir = os.path.join(args.result_dir, strftime("%Y_%m_%d_%H.%M.%S"))
     os.makedirs(save_dir, exist_ok=True)
     pose_style = args.pose_style
-    device = args.device
     batch_size = args.batch_size
     input_yaw_list = args.input_yaw
     input_pitch_list = args.input_pitch
@@ -109,13 +101,14 @@ def main(args):
         ref_pose_coeff_path=None
 
     #audio2ceoff
-    batch = get_data(first_coeff_path, audio_path, device, ref_eyeblink_coeff_path, still=args.still)
+    batch = get_data(first_coeff_path, audio_path, ref_eyeblink_coeff_path, still=args.still)
     coeff_path = audio_to_coeff.generate(batch, save_dir, pose_style, ref_pose_coeff_path)
 
-    # 3dface render
-    if args.face3dvis:
-        from src.face3d.visualize import gen_composed_video
-        gen_composed_video(args, device, first_coeff_path, coeff_path, audio_path, os.path.join(save_dir, '3dface.mp4'))
+    # 3dface render 
+    # TODO: deal with this later
+    # if args.face3dvis:
+    #     from src.face3d.visualize import gen_composed_video
+    #     gen_composed_video(args, device, first_coeff_path, coeff_path, audio_path, os.path.join(save_dir, '3dface.mp4'))
     
     #coeff2video
     data = get_facerender_data(coeff_path, crop_pic_path, first_coeff_path, audio_path, 
@@ -174,11 +167,6 @@ if __name__ == '__main__':
     parser.add_argument('--z_far', type=float, default=15.)
 
     args = parser.parse_args()
-
-    if torch.cuda.is_available() and not args.cpu:
-        args.device = "cuda"
-    else:
-        args.device = "cpu"
 
     main(args)
 

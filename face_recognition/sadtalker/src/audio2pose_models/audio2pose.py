@@ -16,12 +16,12 @@ class Audio2Pose:
         batch = {}
 
         # 1) 入力データの取得
-        ref = x['ref'].numpy()  # [BS, 1, 70]
-        class_id = x['class'].numpy()  # [BS]
+        ref = x['ref']  # [BS, 1, 70]
+        class_id = x['class']  # [BS]
         bs = ref.shape[0]
         pose_ref = ref[:, 0, -6:]  # [BS, 6]
 
-        indiv_mels = x['indiv_mels'].numpy()  # [BS, T, 1, 80, 16]
+        indiv_mels = x['indiv_mels']  # [BS, T, 1, 80, 16]
         T_total = int(x['num_frames']) - 1  # refフレームを1つ使うので -1
 
         # 2) seq_len ごとにチャンク分割

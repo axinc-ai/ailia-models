@@ -43,9 +43,9 @@ class AnimateFromCoeff:
     def generate(self, x, video_save_dir, pic_path, crop_info, 
                  enhancer=None, background_enhancer=None, preprocess='crop', img_size=256, 
                  retinaface_net=None, gfpgan_net=None):
-        source_image = x['source_image'].detach().numpy().astype(np.float32)
-        source_semantics = x['source_semantics'].detach().numpy().astype(np.float32)
-        target_semantics = x['target_semantics_list'].detach().numpy().astype(np.float32)
+        source_image = x['source_image']
+        source_semantics = x['source_semantics']
+        target_semantics = x['target_semantics_list']
         
         yaw_c_seq = x.get('yaw_c_seq', None)
         pitch_c_seq = x.get('pitch_c_seq', None)

@@ -7,9 +7,9 @@ class Audio2Exp:
         self.netG = onnxruntime.InferenceSession("./onnx/audio2exp.onnx")
 
     def test(self, batch):
-        mel_input = batch['indiv_mels'].numpy()  # (bs, T, 1, 80, 16)
-        ref = batch['ref'].numpy()              # (bs, T, 70)
-        ratio = batch['ratio_gt'].numpy()       # (bs, T, 1)
+        mel_input = batch['indiv_mels']  # (bs, T, 1, 80, 16)
+        ref = batch['ref']              # (bs, T, 70)
+        ratio = batch['ratio_gt']       # (bs, T, 1)
 
         bs, T, _, _, _ = mel_input.shape
         exp_coeff_pred = []
