@@ -11,7 +11,6 @@ from src.test_audio2coeff import Audio2Coeff
 from src.facerender.animate import AnimateFromCoeff
 from src.generate_batch import get_data
 from src.generate_facerender_batch import get_facerender_data
-from src.utils.init_path import init_path
 
 import ailia
 
@@ -56,14 +55,12 @@ def main(args):
 
     current_root_path = os.path.split(sys.argv[0])[0]
 
-    sadtalker_paths = init_path(args.checkpoint_dir, os.path.join(current_root_path, 'src/config'), args.size, args.old_version, args.preprocess)
-
     # init alila model
     retinaface_net = ailia.Net(MODEL_FACE_DET_PATH, WEIGHT_FACE_DET_PATH)
     gfpgan_net = ailia.Net(MODEL_GFPGAN_PATH, WEIGHT_GFPGAN_PATH)
 
     #init model
-    preprocess_model = CropAndExtract(sadtalker_paths, retinaface_net)
+    preprocess_model = CropAndExtract(current_root_path, retinaface_net)
 
     audio_to_coeff = Audio2Coeff()
     

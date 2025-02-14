@@ -1,31 +1,15 @@
 import os
 import cv2
-import yaml
 import numpy as np
-import warnings
-from skimage import img_as_ubyte
-warnings.filterwarnings('ignore')
-
-
 import imageio
+from pydub import AudioSegment
+import onnxruntime
 
-
-from src.facerender.modules.keypoint_detector import HEEstimator, KPDetector
-from src.facerender.modules.mapping import MappingNet
-from src.facerender.modules.generator import OcclusionAwareGenerator, OcclusionAwareSPADEGenerator
-from src.facerender.modules.make_animation import make_animation 
-
-from pydub import AudioSegment 
+from skimage import img_as_ubyte
+from src.facerender.modules.make_animation import make_animation
 from src.utils.face_enhancer import enhancer_generator_with_len, enhancer_list
 from src.utils.paste_pic import paste_pic
 from src.utils.videoio import save_video_with_watermark
-import onnxruntime
-
-try:
-    import webui  # in webui
-    in_webui = True
-except:
-    in_webui = False
 
 class AnimateFromCoeff:
     def __init__(self):
@@ -46,16 +30,16 @@ class AnimateFromCoeff:
         source_image = x['source_image']
         source_semantics = x['source_semantics']
         target_semantics = x['target_semantics_list']
-        
         yaw_c_seq = x.get('yaw_c_seq', None)
         pitch_c_seq = x.get('pitch_c_seq', None)
         roll_c_seq = x.get('roll_c_seq', None)
-
         frame_num = x['frame_num']
 
-        predictions_video = make_animation(source_image, source_semantics, target_semantics,
-                                        self.generator, self.kp_extractor, self.he_estimator, self.mapping, 
-                                        yaw_c_seq, pitch_c_seq, roll_c_seq, use_exp = True)
+        predictions_video = make_animation(
+            source_image, source_semantics, target_semantics,
+            self.generator, self.kp_extractor, self.he_estimator, self.mapping, 
+            yaw_c_seq, pitch_c_seq, roll_c_seq, use_exp=True
+        )
 
         predictions_video = predictions_video.reshape((-1,)+predictions_video.shape[2:])
         predictions_video = predictions_video[:frame_num]
@@ -70,26 +54,25 @@ class AnimateFromCoeff:
         ### the generated video is 256x256, so we keep the aspect ratio, 
         original_size = crop_info[0]
         if original_size:
-            result = [ cv2.resize(result_i,(img_size, int(img_size * original_size[1]/original_size[0]) )) for result_i in result ]
+            result = [
+                cv2.resize(result_i, (img_size, int(img_size * original_size[1] / original_size[0])))
+                for result_i in result
+            ]
         
         video_name = x['video_name']  + '.mp4'
         path = os.path.join(video_save_dir, 'temp_'+video_name)
-        
-        imageio.mimsave(path, result,  fps=float(25))
+        imageio.mimsave(path, result, fps=float(25))
 
         av_path = os.path.join(video_save_dir, video_name)
-        return_path = av_path 
-        
-        audio_path =  x['audio_path'] 
+        return_path = av_path
+
+        audio_path = x['audio_path']
         audio_name = os.path.splitext(os.path.split(audio_path)[-1])[0]
-        new_audio_path = os.path.join(video_save_dir, audio_name+'.wav')
-        start_time = 0
-        # cog will not keep the .mp3 filename
+        new_audio_path = os.path.join(video_save_dir, audio_name + '.wav')
+
         sound = AudioSegment.from_file(audio_path)
-        frames = frame_num 
-        end_time = start_time + frames*1/25*1000
-        word1=sound.set_frame_rate(16000)
-        word = word1[start_time:end_time]
+        end_time = frame_num * 1000 / 25
+        word = sound.set_frame_rate(16000)[0:end_time]
         word.export(new_audio_path, format="wav")
 
         save_video_with_watermark(path, new_audio_path, av_path, watermark= False)
@@ -100,25 +83,28 @@ class AnimateFromCoeff:
             video_name_full = x['video_name']  + '_full.mp4'
             full_video_path = os.path.join(video_save_dir, video_name_full)
             return_path = full_video_path
-            paste_pic(path, pic_path, crop_info, new_audio_path, full_video_path, extended_crop= True if 'ext' in preprocess.lower() else False)
+            paste_pic(temp_path, pic_path, crop_info, new_audio_path, full_video_path,
+                      extended_crop='ext' in preprocess.lower())
             print(f'The generated video is named {video_save_dir}/{video_name_full}') 
         else:
             full_video_path = av_path 
 
-        #### paste back then enhancers
+        # paste back then enhancers
         if enhancer:
-            video_name_enhancer = x['video_name']  + '_enhanced.mp4'
-            enhanced_path = os.path.join(video_save_dir, 'temp_'+video_name_enhancer)
+            video_name_enhancer = x['video_name'] + '_enhanced.mp4'
+            enhanced_path = os.path.join(video_save_dir, 'temp_' + video_name_enhancer)
             av_path_enhancer = os.path.join(video_save_dir, video_name_enhancer) 
             return_path = av_path_enhancer
 
             try:
-                enhanced_images_gen_with_len = enhancer_generator_with_len(full_video_path, method=enhancer, bg_upsampler=background_enhancer,retinaface_net=retinaface_net, gfpgan_net=gfpgan_net)
-                imageio.mimsave(enhanced_path, enhanced_images_gen_with_len, fps=float(25))
+                enhanced_images_gen_with_len = enhancer_generator_with_len(
+                    full_video_path, method=enhancer, bg_upsampler=background_enhancer,
+                    retinaface_net=retinaface_net, gfpgan_net=gfpgan_net
+                )  
             except:
                 enhanced_images_gen_with_len = enhancer_list(full_video_path, method=enhancer, bg_upsampler=background_enhancer)
-                imageio.mimsave(enhanced_path, enhanced_images_gen_with_len, fps=float(25))
             
+            imageio.mimsave(enhanced_path, enhanced_images_gen_with_len, fps=float(25))
             save_video_with_watermark(enhanced_path, new_audio_path, av_path_enhancer, watermark= False)
             print(f'The generated video is named {video_save_dir}/{video_name_enhancer}')
             os.remove(enhanced_path)

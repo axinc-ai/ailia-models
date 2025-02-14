@@ -1,57 +1,48 @@
+import os, sys
 import numpy as np
-import cv2, os, sys
+import cv2
 from tqdm import tqdm
-from PIL import Image 
-
-# 3dmm extraction
-from src.face3d.util.preprocess import align_img
-from src.face3d.util.load_mats import load_lm3d
-from src.face3d.models import networks
-
+from PIL import Image
 from scipy.io import loadmat, savemat
+
+from src.face3d.util.preprocess import align_img
 from src.utils.croper import Preprocesser
-
-import warnings
-
-from src.utils.safetensor_helper import load_x_from_safetensor 
-warnings.filterwarnings("ignore")
 
 import onnxruntime
 
 def split_coeff(coeffs):
-        """
-        Return:
-            coeffs_dict     -- a dict of torch.tensors
+    return {
+        'id': coeffs[:, :80],
+        'exp': coeffs[:, 80:144],
+        'tex': coeffs[:, 144:224],
+        'angle': coeffs[:, 224:227],
+        'gamma': coeffs[:, 227:254],
+        'trans': coeffs[:, 254:]
+    }
 
-        Parameters:
-            coeffs          -- torch.tensor, size (B, 256)
-        """
-        id_coeffs = coeffs[:, :80]
-        exp_coeffs = coeffs[:, 80: 144]
-        tex_coeffs = coeffs[:, 144: 224]
-        angles = coeffs[:, 224: 227]
-        gammas = coeffs[:, 227: 254]
-        translations = coeffs[:, 254:]
-        return {
-            'id': id_coeffs,
-            'exp': exp_coeffs,
-            'tex': tex_coeffs,
-            'angle': angles,
-            'gamma': gammas,
-            'trans': translations
-        }
+def load_lm3d(bfm_path):
+    Lm3D = loadmat(bfm_path)['lm']
 
+    lm_idx = np.array([31, 37, 40, 43, 46, 49, 55]) - 1
+    selected_lms = [
+        Lm3D[lm_idx[0], :],
+        np.mean(Lm3D[lm_idx[[1, 2]], :], axis=0),
+        np.mean(Lm3D[lm_idx[[3, 4]], :], axis=0),
+        Lm3D[lm_idx[5], :],
+        Lm3D[lm_idx[6], :]
+    ]
+    
+    Lm3D = np.stack(selected_lms, axis=0)
+    return Lm3D[[1, 2, 0, 3, 4], :]
 
 class CropAndExtract():
-    def __init__(self, sadtalker_path, face_det_net):
+    def __init__(self, current_root_path, face_det_net):
         self.propress = Preprocesser(face_det_net)
         self.net_recon = onnxruntime.InferenceSession("./onnx/net_recon.onnx")
-        self.lm3d_std = load_lm3d(sadtalker_path['dir_of_BFM_fitting'])
+        self.lm3d_std = load_lm3d(os.path.join(current_root_path, "preprocess/similarity_Lm3D_all.mat"))
     
     def generate(self, input_path, save_dir, crop_or_resize='crop', source_image_flag=False, pic_size=256):
-
         pic_name = os.path.splitext(os.path.split(input_path)[-1])[0]  
-
         landmarks_path =  os.path.join(save_dir, pic_name+'_landmarks.txt') 
         coeff_path =  os.path.join(save_dir, pic_name+'.mat')  
         png_path =  os.path.join(save_dir, pic_name+'.png')  
