@@ -31,6 +31,12 @@ MODEL_FACE_DET_PATH = None
 REMOTE_FACE_DET_PATH = "https://storage.googleapis.com/ailia-models/retinaface/"
 check_and_download_models(WEIGHT_FACE_DET_PATH, MODEL_FACE_DET_PATH, REMOTE_FACE_DET_PATH)
 
+WEIGHT_GFPGAN_PATH = "GFPGANv1.4.onnx"
+# MODEL_GFPGAN_PATH = "GFPGANv1.4.onnx.prototxt"
+MODEL_GFPGAN_PATH = None
+REMOTE_GFPGAN_PATH = "https://storage.googleapis.com/ailia-models/gfpgan/"
+check_and_download_models(WEIGHT_GFPGAN_PATH, MODEL_GFPGAN_PATH, REMOTE_GFPGAN_PATH)
+
 def set_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
@@ -62,13 +68,14 @@ def main(args):
 
     # init alila model
     retinaface_net = ailia.Net(MODEL_FACE_DET_PATH, WEIGHT_FACE_DET_PATH)
+    gfpgan_net = ailia.Net(MODEL_GFPGAN_PATH, WEIGHT_GFPGAN_PATH)
 
     #init model
     preprocess_model = CropAndExtract(sadtalker_paths, retinaface_net)
 
     audio_to_coeff = Audio2Coeff()
     
-    animate_from_coeff = AnimateFromCoeff(sadtalker_paths, device)
+    animate_from_coeff = AnimateFromCoeff()
 
     #crop image and extract 3dmm from image
     first_frame_dir = os.path.join(save_dir, 'first_frame_dir')
@@ -115,8 +122,9 @@ def main(args):
                                 batch_size, input_yaw_list, input_pitch_list, input_roll_list,
                                 expression_scale=args.expression_scale, still_mode=args.still, preprocess=args.preprocess, size=args.size)
     
-    result = animate_from_coeff.generate(data, save_dir, pic_path, crop_info, \
-                                enhancer=args.enhancer, background_enhancer=args.background_enhancer, preprocess=args.preprocess, img_size=args.size)
+    result = animate_from_coeff.generate(data, save_dir, pic_path, crop_info,
+                                enhancer=args.enhancer, background_enhancer=args.background_enhancer, preprocess=args.preprocess, img_size=args.size,
+                                retinaface_net=retinaface_net, gfpgan_net=gfpgan_net)
     
     shutil.move(result, save_dir+'.mp4')
     print('The generated video is named:', save_dir+'.mp4')
