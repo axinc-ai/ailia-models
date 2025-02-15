@@ -1,10 +1,10 @@
 import os
-
-from tqdm import tqdm
 import numpy as np
 import random
+from tqdm import tqdm
 import scipy.io as scio
-import src.utils.audio as audio
+
+import batch_generation.audio as audio
 
 def crop_pad_audio(wav, audio_length):
     if len(wav) > audio_length:

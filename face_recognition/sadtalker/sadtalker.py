@@ -9,8 +9,7 @@ import random
 from preprocess import CropAndExtract
 from src.test_audio2coeff import Audio2Coeff  
 from src.facerender.animate import AnimateFromCoeff
-from src.generate_batch import get_data
-from src.generate_facerender_batch import get_facerender_data
+from batch_generation import get_data, get_facerender_data
 
 import ailia
 

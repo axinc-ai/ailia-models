@@ -1,10 +1,10 @@
 import librosa
 import librosa.filters
 import numpy as np
-# import tensorflow as tf
 from scipy import signal
 from scipy.io import wavfile
-from src.utils.hparams import hparams as hp
+
+from batch_generation.hparams import hparams as hp
 
 def load_wav(path, sr):
     return librosa.core.load(path, sr=sr)[0]
