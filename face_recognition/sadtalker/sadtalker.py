@@ -6,7 +6,7 @@ from argparse import ArgumentParser
 import numpy as np
 import random
 
-from src.utils.preprocess import CropAndExtract
+from preprocess import CropAndExtract
 from src.test_audio2coeff import Audio2Coeff  
 from src.facerender.animate import AnimateFromCoeff
 from src.generate_batch import get_data

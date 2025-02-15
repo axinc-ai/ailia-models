@@ -3,9 +3,10 @@ import cv2
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
-from src.face3d.extract_kp_videos_safe import KeypointExtractor
 from facexlib.alignment import landmark_98_to_68
-from ailia_module.face_detection import face_detect
+
+from preprocess.extract_kp_videos_safe import KeypointExtractor
+from preprocess.face_detection import face_detect
 
 class Preprocesser:
     def __init__(self, face_det_net):

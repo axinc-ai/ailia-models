@@ -5,8 +5,8 @@ from tqdm import tqdm
 from PIL import Image
 from scipy.io import loadmat, savemat
 
-from src.face3d.util.preprocess import align_img
-from src.utils.croper import Preprocesser
+from preprocess.face3d_utils import align_img
+from preprocess.croper import Preprocesser
 
 import onnxruntime
 

@@ -1,3 +1,7 @@
+"""
+reference: ailia-models/face_detection/retinaface
+"""
+
 import sys
 import numpy as np
 
@@ -11,6 +15,14 @@ NMS_THRES = 0.4
 KEEP_TOP_K = 750
 
 def face_detect(image, retinaface_net):
+    """
+    Args:
+        image (numpy.ndarray): Input image (H, W, C) in BGR format.
+        retinaface_net (ailia.Net): Ailia RetinaFace model.
+
+    Returns:
+        numpy.ndarray: Bounding boxes of detected faces (N, 4) in (x1, y1, x2, y2) format.
+    """
     cfg = rut.cfg_re50
 
     dim = (image.shape[1], image.shape[0])

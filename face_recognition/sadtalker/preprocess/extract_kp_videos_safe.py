@@ -6,8 +6,8 @@ from PIL import Image
 from tqdm import tqdm
 from facexlib.alignment import landmark_98_to_68
 
-from ailia_module.face_detection import face_detect
-from src.face3d.util.my_awing_arch import FAN
+from preprocess.face_detection import face_detect
+from preprocess.fan import FAN
 
 class KeypointExtractor():
     def __init__(self, face_det_net):
