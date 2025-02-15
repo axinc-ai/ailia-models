@@ -3,7 +3,8 @@ import sys
 import cv2
 import numpy as np
 from tqdm import tqdm
-from src.utils.videoio import load_video_to_cv2
+
+from animation.videoio import load_video_to_cv2
 
 sys.path.append('../../util')
 sys.path.append('../../face_restoration/gfpgan')

@@ -3,13 +3,13 @@ import cv2
 import numpy as np
 import imageio
 from pydub import AudioSegment
+from skimage import img_as_ubyte
 import onnxruntime
 
-from skimage import img_as_ubyte
-from src.facerender.modules.make_animation import make_animation
-from src.utils.face_enhancer import enhancer_generator_with_len, enhancer_list
-from src.utils.paste_pic import paste_pic
-from src.utils.videoio import save_video_with_watermark
+from animation.make_animation import make_animation
+from animation.face_enhancer import enhancer_generator_with_len, enhancer_list
+from animation.paste_pic import paste_pic
+from animation.videoio import save_video_with_watermark
 
 class AnimateFromCoeff:
     def __init__(self):

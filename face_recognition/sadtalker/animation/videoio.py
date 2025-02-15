@@ -1,8 +1,6 @@
 import shutil
 import uuid
-
 import os
-
 import cv2
 
 def load_video_to_cv2(input_path):
