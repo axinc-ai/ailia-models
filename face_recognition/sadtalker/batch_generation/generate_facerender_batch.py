@@ -31,7 +31,7 @@ def get_facerender_data(coeff_path, pic_path, first_coeff_path, audio_path,
         generated_3dmm = generated_dict['coeff_3dmm'][:,:70]
 
     else:
-        source_semantics = source_semantics_dict['coeff_3dmm'][:1,:73]         #1 70
+        source_semantics = source_semantics_dict['coeff_3dmm'][:1,:73]         #1 73
         generated_3dmm = generated_dict['coeff_3dmm'][:,:70]
 
     source_semantics_new = transform_semantic_1(source_semantics, semantic_radius)
@@ -123,8 +123,6 @@ def gen_camera_pose(camera_degree_list, frame_num, batch_size):
     elif len(new_degree_list) < frame_num:
         for _ in range(frame_num-len(new_degree_list)):
             new_degree_list.append(new_degree_list[-1])
-    print(len(new_degree_list))
-    print(frame_num)
 
     remainder = frame_num%batch_size
     if remainder!=0:
