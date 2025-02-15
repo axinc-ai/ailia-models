@@ -7,7 +7,7 @@ import numpy as np
 import random
 
 from preprocess import CropAndExtract
-from src.test_audio2coeff import Audio2Coeff  
+from audio2coeff import Audio2Coeff
 from src.facerender.animate import AnimateFromCoeff
 from batch_generation import get_data, get_facerender_data
 

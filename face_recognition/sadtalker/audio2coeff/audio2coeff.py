@@ -3,8 +3,8 @@ import numpy as np
 from scipy.io import savemat, loadmat
 from scipy.signal import savgol_filter
 
-from src.audio2pose_models.audio2pose import Audio2Pose
-from src.audio2exp_models.audio2exp import Audio2Exp
+from audio2coeff.audio2pose import Audio2Pose
+from audio2coeff.audio2exp import Audio2Exp
 
 class Audio2Coeff:
     def __init__(self):
