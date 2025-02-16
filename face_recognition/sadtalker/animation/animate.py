@@ -12,16 +12,15 @@ from animation.paste_pic import paste_pic
 from animation.videoio import save_video_with_watermark
 
 class AnimateFromCoeff:
-    def __init__(self, generator_net, kp_detector_net, mapping_net, retinaface_net, gfpgan_net):
+    def __init__(self, generator_net, kp_detector_net, mapping_net):
         self.generator_net = generator_net
         self.kp_detector_net = kp_detector_net
         self.he_estimator_net = None
         self.mapping_net = mapping_net
-        self.retinaface_net = retinaface_net
-        self.gfpgan_net = gfpgan_net
     
     def generate(self, x, video_save_dir, pic_path, crop_info, 
-                 enhancer=None, background_enhancer=None, preprocess='crop', img_size=256):
+                 enhancer=None, background_enhancer=None, preprocess='crop', img_size=256, 
+                 retinaface_net=None, gfpgan_net=None):
         source_image = x['source_image']
         source_semantics = x['source_semantics']
         target_semantics = x['target_semantics_list']
@@ -94,7 +93,7 @@ class AnimateFromCoeff:
             try:
                 enhanced_images_gen_with_len = enhancer_generator_with_len(
                     full_video_path, method=enhancer, bg_upsampler=background_enhancer,
-                    retinaface_net=self.retinaface_net, gfpgan_net=self.gfpgan_net
+                    retinaface_net=retinaface_net, gfpgan_net=gfpgan_net
                 )  
             except:
                 enhanced_images_gen_with_len = enhancer_list(
