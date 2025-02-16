@@ -4,10 +4,10 @@ import time
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
-from facexlib.alignment import landmark_98_to_68
 
 from preprocess.face_detection import face_detect
 from preprocess.fan import FAN
+from preprocess.facexlib_alignment import landmark_98_to_68
 
 class KeypointExtractor():
     def __init__(self, face_align_net, face_det_net):
