@@ -3,8 +3,8 @@ import numpy as np
 import onnxruntime
 
 class Audio2Exp:
-    def __init__(self):
-        self.netG = onnxruntime.InferenceSession("./onnx/audio2exp.onnx")
+    def __init__(self, audio2exp_net):
+        self.audio2exp_net = audio2exp_net
 
     def test(self, batch):
         mel_input = batch['indiv_mels']  # (bs, T, 1, 80, 16)
@@ -21,11 +21,7 @@ class Audio2Exp:
 
             audiox = current_mel_input.reshape(-1, 1, 80, 16)  # (bs*T, 1, 80, 16)
 
-            curr_exp_coeff_pred = self.netG.run(None, {
-                "audio": audiox,
-                "ref": current_ref,
-                "ratio": current_ratio,
-            })[0]
+            curr_exp_coeff_pred = self.audio2exp_net.run([audiox, current_ref, current_ratio])[0]
 
             exp_coeff_pred += [curr_exp_coeff_pred]
 

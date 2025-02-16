@@ -12,17 +12,11 @@ from animation.paste_pic import paste_pic
 from animation.videoio import save_video_with_watermark
 
 class AnimateFromCoeff:
-    def __init__(self):
-        self.generator = onnxruntime.InferenceSession(
-            "./onnx/animate_generator.onnx", providers=["CUDAExecutionProvider"]
-        )
-        self.kp_extractor = onnxruntime.InferenceSession(
-            "./onnx/kp_detector.onnx", providers=["CUDAExecutionProvider"]
-        )
-        self.he_estimator = None
-        self.mapping = onnxruntime.InferenceSession(
-            "./onnx/mappingnet_full.onnx", providers=["CUDAExecutionProvider"]
-        ) # Need to switch between prerocess being full or otherwise.
+    def __init__(self, generator_net, kp_detector_net, mapping_net):
+        self.generator_net = generator_net
+        self.kp_detector_net = kp_detector_net
+        self.he_estimator_net = None
+        self.mapping_net = mapping_net
     
     def generate(self, x, video_save_dir, pic_path, crop_info, 
                  enhancer=None, background_enhancer=None, preprocess='crop', img_size=256, 
@@ -37,7 +31,7 @@ class AnimateFromCoeff:
 
         predictions_video = make_animation(
             source_image, source_semantics, target_semantics,
-            self.generator, self.kp_extractor, self.he_estimator, self.mapping, 
+            self.generator_net, self.kp_detector_net, self.he_estimator_net, self.mapping_net, 
             yaw_c_seq, pitch_c_seq, roll_c_seq, use_exp=True
         )
 

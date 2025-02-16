@@ -20,8 +20,8 @@ def split_coeff(coeffs):
         'trans': coeffs[:, 254:]
     }
 
-def load_lm3d(bfm_path):
-    Lm3D = loadmat(bfm_path)['lm']
+def load_lm3d(lm3d_path):
+    Lm3D = loadmat(lm3d_path)['lm']
 
     lm_idx = np.array([31, 37, 40, 43, 46, 49, 55]) - 1
     selected_lms = [
@@ -36,10 +36,10 @@ def load_lm3d(bfm_path):
     return Lm3D[[1, 2, 0, 3, 4], :]
 
 class CropAndExtract():
-    def __init__(self, current_root_path, face_det_net):
-        self.propress = Preprocesser(face_det_net)
-        self.net_recon = onnxruntime.InferenceSession("./onnx/net_recon.onnx")
-        self.lm3d_std = load_lm3d(os.path.join(current_root_path, "preprocess/similarity_Lm3D_all.mat"))
+    def __init__(self, face3d_recon_net, face_align_net, face_det_net, lm3d_path):
+        self.propress = Preprocesser(face_align_net, face_det_net)
+        self.face3d_recon_net = face3d_recon_net
+        self.lm3d_std = load_lm3d(lm3d_path)
     
     def generate(self, input_path, save_dir, crop_or_resize='crop', source_image_flag=False, pic_size=256):
         pic_name = os.path.splitext(os.path.split(input_path)[-1])[0]  
@@ -127,7 +127,7 @@ class CropAndExtract():
                 trans_params = np.array([float(item) for item in np.hsplit(trans_params, 5)]).astype(np.float32)
                 im_np = np.transpose(np.array(im1, dtype=np.float32) / 255.0, (2, 0, 1))[np.newaxis, ...]
                 
-                full_coeff = self.net_recon.run(None, {"input_image": im_np})[0]
+                full_coeff = self.face3d_recon_net.run([im_np])[0]
                 coeffs = split_coeff(full_coeff)
 
                 pred_coeff = {key:coeffs[key] for key in coeffs}

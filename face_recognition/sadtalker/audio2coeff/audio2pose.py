@@ -2,8 +2,8 @@ import numpy as np
 import onnxruntime
 
 class Audio2Pose:
-    def __init__(self):
-        self.audio2pose = onnxruntime.InferenceSession("./onnx/audio2pose.onnx")
+    def __init__(self, audio2pose_net):
+        self.audio2pose_net = audio2pose_net
         self.seq_len = 32
         self.latent_dim = 64
 
@@ -39,12 +39,7 @@ class Audio2Pose:
             z = np.random.randn(bs, self.latent_dim).astype(np.float32)
 
             # Inference using a single model for AudioEncoder and netG.
-            motion_pred = self.audio2pose.run(None, {
-                "chunk_mels": chunk_mels,
-                "z": z,
-                "pose_ref": pose_ref,
-                "class": class_id,
-            })[0]
+            motion_pred = self.audio2pose_net.run([chunk_mels, z, pose_ref, class_id])[0]
 
             if chunk_len < self.seq_len:
                 motion_pred = motion_pred[:, -chunk_len:, :]

@@ -10,8 +10,8 @@ from preprocess.face_detection import face_detect
 from preprocess.fan import FAN
 
 class KeypointExtractor():
-    def __init__(self, face_det_net):
-        self.detector = FAN()
+    def __init__(self, face_align_net, face_det_net):
+        self.detector = FAN(face_align_net)
         self.face_det_net = face_det_net
 
     def extract_keypoint(self, images, name=None):

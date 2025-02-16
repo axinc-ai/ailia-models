@@ -3,13 +3,13 @@ import numpy as np
 from scipy.io import savemat, loadmat
 from scipy.signal import savgol_filter
 
-from audio2coeff.audio2pose import Audio2Pose
 from audio2coeff.audio2exp import Audio2Exp
+from audio2coeff.audio2pose import Audio2Pose
 
 class Audio2Coeff:
-    def __init__(self):
-        self.audio2pose_model = Audio2Pose()
-        self.audio2exp_model = Audio2Exp()
+    def __init__(self, audio2exp_net, audio2pose_net):
+        self.audio2exp_model = Audio2Exp(audio2exp_net)
+        self.audio2pose_model = Audio2Pose(audio2pose_net)
 
     def generate(self, batch, coeff_save_dir, pose_style, ref_pose_coeff_path=None):
         results_dict_exp= self.audio2exp_model.test(batch)

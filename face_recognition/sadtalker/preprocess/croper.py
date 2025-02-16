@@ -9,8 +9,8 @@ from preprocess.extract_kp_videos_safe import KeypointExtractor
 from preprocess.face_detection import face_detect
 
 class Preprocesser:
-    def __init__(self, face_det_net):
-        self.predictor = KeypointExtractor(face_det_net)
+    def __init__(self, face_align_net, face_det_net):
+        self.predictor = KeypointExtractor(face_align_net, face_det_net)
 
     def get_landmark(self, img_np):
         dets = face_detect(img_np, self.predictor.face_det_net)
