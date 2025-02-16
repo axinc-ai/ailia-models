@@ -70,7 +70,7 @@ MODEL_ANIMATION_GENERATOR_PATH = "animation_generator.onnx.prototxt"
 WEIGHT_KP_DETECTOR_PATH = "kp_detector.onnx"
 MODEL_KP_DETECTOR_PATH = "kp_detector.onnx.prototxt"
 WEIGHT_MAPPING_NET = "mappingnet_full.onnx" if "full" in args.preprocess else "mappingnet_not_full.onnx"
-MODEL_MAPPING_NET = WEIGHT_MAPPING_NET + "prototxt"
+MODEL_MAPPING_NET = WEIGHT_MAPPING_NET + ".prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/sadtalker/"
 
 WEIGHT_FACE_DET_PATH = "retinaface_resnet50.onnx"
