@@ -6,10 +6,9 @@ from logging import getLogger
 from typing import Optional
 
 import numpy as np
-import scipy.signal as signal
-from PIL import Image
 import librosa
-import soundfile as sf
+import lameenc
+import tqdm
 
 import ailia
 
@@ -29,9 +28,17 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
+WEIGHT_HTDEMUCS_FT_DRUMS_PATH = "htdemucs_ft_drums.onnx"
+WEIGHT_HTDEMUCS_FT_BASS_PATH = "htdemucs_ft_bass.onnx"
+WEIGHT_HTDEMUCS_FT_OTHER_PATH = "htdemucs_ft_other.onnx"
+WEIGHT_HTDEMUCS_FT_VACALS_PATH = "htdemucs_ft_vocals.onnx"
+MODEL_HTDEMUCS_FT_DRUMS_PATH = "htdemucs_ft_drums.onnx.prototxt"
+MODEL_HTDEMUCS_FT_BASS_PATH = "htdemucs_ft_bass.onnx.prototxt"
+MODEL_HTDEMUCS_FT_OTHER_PATH = "htdemucs_ft_other.onnx.prototxt"
+MODEL_HTDEMUCS_FT_VACALS_PATH = "htdemucs_ft_vocals.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/demucs/"
 
-SAMPLE_RATE = 16000
+SAMPLE_RATE = 44100
 
 WAV_PATH = "test.mp3"
 SAVE_WAV_PATH = "output.wav"
@@ -44,7 +51,11 @@ parser = get_base_parser(
     "Demucs Music Source Separation", WAV_PATH, SAVE_WAV_PATH, input_ftype="audio"
 )
 parser.add_argument(
-    "-m", "--model_file", default="htdemucs_ft_drums.onnx", help="specify .onnx file"
+    "-m",
+    "--model_type",
+    default="htdemucs_ft",
+    choices=("htdemucs_ft",),
+    help="model type",
 )
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
@@ -78,6 +89,24 @@ def load_audio(file: str, sr: int = SAMPLE_RATE):
             audio = librosa.resample(audio, orig_sr=source_sr, target_sr=sr)
 
     return audio
+
+
+def encode_mp3(wav, path, samplerate=44100, bitrate=320, quality=2, verbose=False):
+    """Save given audio as mp3. This should work on all OSes."""
+    C, T = wav.shape
+    wav = (np.clip(wav, -1, 1) * (2**15 - 1)).astype(np.int16)
+    encoder = lameenc.Encoder()
+    encoder.set_bit_rate(bitrate)
+    encoder.set_in_sample_rate(samplerate)
+    encoder.set_channels(C)
+    encoder.set_quality(quality)  # 2-highest, 7-fastest
+    if not verbose:
+        encoder.silence()
+    wav = wav.transpose(1, 0)
+    mp3_data = encoder.encode(wav.tobytes())
+    mp3_data += encoder.flush()
+    with open(path, "wb") as f:
+        f.write(mp3_data)
 
 
 def tensor_chunk(tensor, offset=0, length=None):
@@ -134,7 +163,7 @@ def chunk_padded(chunk: TensorChunk, target_length):
 
 
 def apply_model(
-    net,
+    models,
     mix,
     shifts: int = 1,
     split: bool = True,
@@ -142,7 +171,7 @@ def apply_model(
     transition_power: float = 1.0,
     segment: Optional[float] = None,
 ):
-    samplerate = 44100
+    samplerate = SAMPLE_RATE
 
     batch, channels, length = (
         mix.shape if isinstance(mix, np.ndarray) else chunk_shape(mix)
@@ -156,12 +185,13 @@ def apply_model(
             offset = np.random.randint(0, max_shift)
             shifted = tensor_chunk(padded_mix, offset, length + max_shift - offset)
             res = apply_model(
-                net,
+                models,
                 shifted,
                 shifts=0,
                 split=split,
                 overlap=overlap,
                 transition_power=transition_power,
+                segment=segment,
             )
             shifted_out = res
             out += shifted_out[..., max_shift - offset :]
@@ -169,12 +199,9 @@ def apply_model(
         out /= shifts
         return out
     elif split:
-        out = np.zeros((batch, 4, channels, length))
+        out = np.zeros((batch, len(models["sources"]), channels, length))
         sum_weight = np.zeros(length)
-        if segment is None:
-            segment = Fraction(39, 5)
-
-        segment_length = int(samplerate * segment)
+        segment_length = int(samplerate * (segment if segment else models["segment"]))
         stride = int((1 - overlap) * segment_length)
         offsets = range(0, length, stride)
         # We start from a triangle shaped weight, with maximal weight in the middle
@@ -189,15 +216,16 @@ def apply_model(
         # If the overlap < 50%, this will translate to linear transition when
         # transition_power is 1.
         weight = (weight / weight.max()) ** transition_power
-        for offset in offsets:
+        for offset in tqdm.tqdm(offsets):
             chunk = tensor_chunk(mix, offset, segment_length)
             chunk_out = apply_model(
-                net,
+                models,
                 chunk,
                 shifts=0,
                 split=False,
                 overlap=overlap,
                 transition_power=transition_power,
+                segment=segment,
             )
             chunk_length = chunk_out.shape[-1]
             out[..., offset : offset + segment_length] += (
@@ -210,14 +238,14 @@ def apply_model(
         return out
     else:
         valid_length = length
-        # if isinstance(model, HTDemucs) and segment is not None:
-        #     valid_length = int(segment * model.samplerate)
-        # elif hasattr(model, "valid_length"):
-        #     valid_length = model.valid_length(length)  # type: ignore
+        if "valid_length" in models:
+            valid_length = models["valid_length"](length)
+
         mix = tensor_chunk(mix)
         padded_mix = chunk_padded(mix, valid_length)
 
         # apply the model
+        net = models["net"]
         if not args.onnx:
             output = net.predict([padded_mix])
         else:
@@ -231,7 +259,7 @@ def apply_model(
     return output
 
 
-def predict(net, audio):
+def predict(models, audio):
     wav = np.load("wav.npy")
     # padded_mix = np.load("padded_mix.npy")
 
@@ -246,27 +274,23 @@ def predict(net, audio):
     overlap = 0.25
     transition_power = 1.0
 
-    out = apply_model(net, mix, shifts, split, overlap, transition_power)
+    estimates = 0.0
+    for k, name in enumerate(models["sources"]):
+        models["net"] = models["nets"][name]
+        out = apply_model(models, mix, shifts, split, overlap, transition_power)
+        for _k in range(len(models["sources"])):
+            if _k != k:
+                out[:, _k, :, :] *= 0
+        estimates += out
 
-    if not args.onnx:
-        output = net.predict([padded_mix])
-    else:
-        output = net.run(None, {"mix": padded_mix})
-    out = output[0]
+    estimates *= ref.std() + 1e-8
+    estimates += ref.mean()
+    estimates = dict(zip(models["sources"], estimates[0]))
 
-    length = 343980
-    delta = out.shape[-1] - length
-    if delta:
-        out = out[..., delta // 2 : -(delta - delta // 2)]
-
-    chunk_length = chunk_out.shape[-1]
-    out[..., offset : offset + segment_length] += weight[:chunk_length] * chunk_out
-    sum_weight[offset : offset + segment_length] += weight[:chunk_length].to(mix.device)
-
-    return out
+    return estimates
 
 
-def recognize_from_audio(net):
+def recognize_from_audio(models):
     # input audio loop
     for audio_path in args.input:
         logger.info(audio_path)
@@ -279,38 +303,84 @@ def recognize_from_audio(net):
         if args.benchmark:
             logger.info("BENCHMARK mode")
             start = int(round(time.time() * 1000))
-            output = predict(net, audio)
+            output = predict(models, audio)
             end = int(round(time.time() * 1000))
             estimation_time = end - start
             logger.info(f"\ttotal processing time {estimation_time} ms")
         else:
-            output = predict(net, audio)
+            output = predict(models, audio)
 
-        # # save result
-        # savepath = get_savepath(args.savepath, audio_path, ext=".wav")
-        # logger.info(f"saved at : {savepath}")
-        # sf.write(savepath, output, sr)
+        # save result
+        _savepath = get_savepath(args.savepath, audio_path, ext=".mp3")
+        for name, wav in output.items():
+            wav = wav / max(1.01 * np.max(np.abs(wav)), 1)
+            savepath = _savepath.replace(".mp3", f"_{name}.mp3")
+            logger.info(f"saved at : {savepath}")
+            encode_mp3(wav, savepath, samplerate=SAMPLE_RATE, bitrate=320, quality=2)
 
     logger.info("Script finished successfully.")
 
 
 def main():
-    WEIGHT_PATH = args.model_file
-    MODEL_PATH = WEIGHT_PATH.replace(".onnx", ".onnx.prototxt")
-    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    segment = Fraction(39, 5)
+    models_info = dict(
+        htdemucs_ft=dict(
+            sources=["drums", "bass", "other", "vocals"],
+            weight_files=[
+                WEIGHT_HTDEMUCS_FT_DRUMS_PATH,
+                WEIGHT_HTDEMUCS_FT_BASS_PATH,
+                WEIGHT_HTDEMUCS_FT_OTHER_PATH,
+                WEIGHT_HTDEMUCS_FT_VACALS_PATH,
+            ],
+            model_files=[
+                MODEL_HTDEMUCS_FT_DRUMS_PATH,
+                MODEL_HTDEMUCS_FT_BASS_PATH,
+                MODEL_HTDEMUCS_FT_OTHER_PATH,
+                MODEL_HTDEMUCS_FT_VACALS_PATH,
+            ],
+            segment=segment,
+            valid_length=lambda length: int(segment * SAMPLE_RATE),
+        )
+    )
+    model_info = models_info[args.model_type]
+    for weight_file, model_file in zip(
+        model_info["weight_files"], model_info["model_files"]
+    ):
+        check_and_download_models(weight_file, model_file, REMOTE_PATH)
 
     env_id = args.env_id
 
     # initialize
     if not args.onnx:
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        nets = {
+            name: ailia.Net(model_files, weight_files, env_id=env_id)
+            for name, weight_files, model_files in zip(
+                model_info["sources"],
+                model_info["weight_files"],
+                model_info["model_files"],
+            )
+        }
     else:
         import onnxruntime
 
         providers = ["CPUExecutionProvider", "CUDAExecutionProvider"]
-        net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
+        nets = {
+            name: onnxruntime.InferenceSession(weight_files, providers=providers)
+            for name, weight_files in zip(
+                model_info["sources"],
+                model_info["weight_files"],
+            )
+        }
 
-    recognize_from_audio(net)
+    models = dict(
+        sources=model_info["sources"],
+        nets=nets,
+        segment=model_info["segment"],
+    )
+    if "valid_length" in model_info:
+        models["valid_length"] = model_info["valid_length"]
+
+    recognize_from_audio(models)
 
 
 if __name__ == "__main__":
