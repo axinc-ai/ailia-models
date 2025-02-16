@@ -29,8 +29,7 @@ logger = getLogger(__name__)
 IMAGE_PATH = 'input.png'
 INPUT_AUDIO_PATH = "input.wav"
 SAVE_IMAGE_PATH = 'output.mp4'
-
-LM3D_PATH = "preprocess/similarity_Lm3D_all.mat"
+LM3D_PATH = "./preprocess/similarity_Lm3D_all.mat"
 
 # ======================
 # Arguemnt Parser Config
@@ -38,19 +37,20 @@ LM3D_PATH = "preprocess/similarity_Lm3D_all.mat"
 parser = get_base_parser("sadtalker", IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument("-a", "--audio", default=INPUT_AUDIO_PATH, help="Path to input audio")
 parser.add_argument("--result_dir", default='./results', help="path to output")
-parser.add_argument("--pose_style", type=int, default=0,  help="input pose style from [0, 46)")
-parser.add_argument("--expression_scale", type=float, default=1.,  help="the value of expression intensity")
+parser.add_argument("--pose_style", type=int, default=0, help="input pose style from [0, 46)")
+parser.add_argument("--expression_scale", type=float, default=1.0, help="the value of expression intensity")
 parser.add_argument("--batch_size", type=int, default=2, help="the batch size of facerender")
 parser.add_argument("--size", type=int, default=256, help="the image size of the facerender")
 parser.add_argument('--enhancer', type=str, default=None, help="Face enhancer, [gfpgan, RestoreFormer]") #TODO
 parser.add_argument("--still", action="store_true", help="can crop back to the original videos for the full body aniamtion")
-parser.add_argument("--preprocess", default='crop', choices=['crop', 'extcrop', 'resize', 'full', 'extfull'], help="how to preprocess the images" )
+parser.add_argument("--preprocess", default='crop', choices=['crop', 'extcrop', 'resize', 'full', 'extfull'], help="how to preprocess the images")
 parser.add_argument("--ref_eyeblink", default=None, help="path to reference video providing eye blinking")
 parser.add_argument("--ref_pose", default=None, help="path to reference video providing pose")
-parser.add_argument('--input_yaw', nargs='+', type=int, default=None, help="the input yaw degree of the user ")
+parser.add_argument('--input_yaw', nargs='+', type=int, default=None, help="the input yaw degree of the user")
 parser.add_argument('--input_pitch', nargs='+', type=int, default=None, help="the input pitch degree of the user")
 parser.add_argument('--input_roll', nargs='+', type=int, default=None, help="the input roll degree of the user")
-parser.add_argument("--verbose",action="store_true", help="saving the intermedia output or not" )
+parser.add_argument("--verbose", action="store_true", help="saving the intermedia output or not")
+parser.add_argument("--seed", type=int, default=42, help="ramdom seed")
 args = update_parser(parser)
 
 # ======================
@@ -96,11 +96,27 @@ def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
 
+def generate_ref_coeff(preprocess_model, video_path, save_dir):
+    if not video_path:
+        return None
+
+    videoname = os.path.splitext(os.path.split(video_path)[-1])[0]
+    frame_dir = os.path.join(save_dir, videoname)
+    os.makedirs(frame_dir, exist_ok=True)
+    
+    print(f'3DMM Extraction for reference video: {videoname}')
+    coeff_path, _, _ = preprocess_model.generate(
+        video_path, 
+        frame_dir, 
+        args.preprocess, 
+        source_image_flag=False
+    )
+    return coeff_path
+
 # ======================
 # Main functions
 # ======================
-def main():
-    # model files check and download
+def download_and_load_models():
     check_and_download_models(WEIGHT_FACE3D_RECON_PATH, MODEL_FACE3D_RECON_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_FACE_ALIGN_PATH, MODEL_FACE_ALIGN_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_AUDIO2EXP_PATH, MODEL_AUDIO2EXP_PATH, REMOTE_PATH)
@@ -108,87 +124,159 @@ def main():
     check_and_download_models(WEIGHT_ANIMATION_GENERATOR_PATH, MODEL_ANIMATION_GENERATOR_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_KP_DETECTOR_PATH, MODEL_KP_DETECTOR_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_MAPPING_NET, MODEL_MAPPING_NET, REMOTE_PATH)
-
     check_and_download_models(WEIGHT_FACE_DET_PATH, MODEL_FACE_DET_PATH, REMOTE_FACE_DET_PATH)
     check_and_download_models(WEIGHT_GFPGAN_PATH, MODEL_GFPGAN_PATH, REMOTE_GFPGAN_PATH)
 
-    # model initialize
-    face3d_recon_net = ailia.Net(MODEL_FACE3D_RECON_PATH, WEIGHT_FACE3D_RECON_PATH, env_id=args.env_id)
-    face_align_net = ailia.Net(MODEL_FACE_ALIGN_PATH, WEIGHT_FACE_ALIGN_PATH, env_id=args.env_id)
-    audio2exp_net = ailia.Net(MODEL_AUDIO2EXP_PATH, WEIGHT_AUDIO2EXP_PATH, env_id=args.env_id)
-    audio2pose_net = ailia.Net(MODEL_AUDIO2POSE_PATH, WEIGHT_AUDIO2POSE_PATH, env_id=args.env_id)
-    generator_net = ailia.Net(MODEL_ANIMATION_GENERATOR_PATH, WEIGHT_ANIMATION_GENERATOR_PATH, env_id=args.env_id)
-    kp_detector_net = ailia.Net(MODEL_KP_DETECTOR_PATH, WEIGHT_KP_DETECTOR_PATH, env_id=args.env_id)
-    mapping_net = ailia.Net(MODEL_MAPPING_NET, WEIGHT_MAPPING_NET, env_id=args.env_id)
+    models = {
+        "face3d_recon_net": ailia.Net(MODEL_FACE3D_RECON_PATH, WEIGHT_FACE3D_RECON_PATH, env_id=args.env_id),
+        "face_align_net": ailia.Net(MODEL_FACE_ALIGN_PATH, WEIGHT_FACE_ALIGN_PATH, env_id=args.env_id),
+        "audio2exp_net": ailia.Net(MODEL_AUDIO2EXP_PATH, WEIGHT_AUDIO2EXP_PATH, env_id=args.env_id),
+        "audio2pose_net": ailia.Net(MODEL_AUDIO2POSE_PATH, WEIGHT_AUDIO2POSE_PATH, env_id=args.env_id),
+        "generator_net": ailia.Net(MODEL_ANIMATION_GENERATOR_PATH, WEIGHT_ANIMATION_GENERATOR_PATH, env_id=args.env_id),
+        "kp_detector_net": ailia.Net(MODEL_KP_DETECTOR_PATH, WEIGHT_KP_DETECTOR_PATH, env_id=args.env_id),
+        "mapping_net": ailia.Net(MODEL_MAPPING_NET, WEIGHT_MAPPING_NET, env_id=args.env_id),
+        "retinaface_net": ailia.Net(MODEL_FACE_DET_PATH, WEIGHT_FACE_DET_PATH),
+        "gfpgan_net": ailia.Net(MODEL_GFPGAN_PATH, WEIGHT_GFPGAN_PATH),
+    }
+    return models
 
-    retinaface_net = ailia.Net(MODEL_FACE_DET_PATH, WEIGHT_FACE_DET_PATH)
-    gfpgan_net = ailia.Net(MODEL_GFPGAN_PATH, WEIGHT_GFPGAN_PATH)
-
-    set_seed(42)
-
-    pic_path = args.input[0]
-    audio_path = args.audio
-    save_dir = os.path.join(args.result_dir, strftime("%Y_%m_%d_%H.%M.%S"))
-    os.makedirs(save_dir, exist_ok=True)
-    pose_style = args.pose_style
-    # batch_size = args.batch_size
-    input_yaw_list = args.input_yaw
-    input_pitch_list = args.input_pitch
-    input_roll_list = args.input_roll
-    ref_eyeblink = args.ref_eyeblink
-    ref_pose = args.ref_pose
-
-    current_root_path = os.path.split(sys.argv[0])[0]
-
-    #init model
-    preprocess_model = CropAndExtract(face3d_recon_net, face_align_net, retinaface_net, 
-                                      os.path.join(current_root_path, LM3D_PATH))
-    audio_to_coeff = Audio2Coeff(audio2exp_net, audio2pose_net)
-    animate_from_coeff = AnimateFromCoeff(generator_net, kp_detector_net, mapping_net)
-
-    #crop image and extract 3dmm from image
+def preprocess_image(preprocess_model, pic_path, save_dir):
     first_frame_dir = os.path.join(save_dir, 'first_frame_dir')
     os.makedirs(first_frame_dir, exist_ok=True)
-    print('3DMM Extraction for source image')
-    first_coeff_path, crop_pic_path, crop_info =  preprocess_model.generate(pic_path, first_frame_dir, args.preprocess,\
-                                                                             source_image_flag=True, pic_size=args.size)
-    if first_coeff_path is None:
-        print("Can't get the coeffs of the input")
-        return
-
-    if ref_eyeblink is not None:
-        ref_eyeblink_videoname = os.path.splitext(os.path.split(ref_eyeblink)[-1])[0]
-        ref_eyeblink_frame_dir = os.path.join(save_dir, ref_eyeblink_videoname)
-        os.makedirs(ref_eyeblink_frame_dir, exist_ok=True)
-        print('3DMM Extraction for the reference video providing eye blinking')
-        ref_eyeblink_coeff_path, _, _ =  preprocess_model.generate(ref_eyeblink, ref_eyeblink_frame_dir, args.preprocess, source_image_flag=False)
-    else:
-        ref_eyeblink_coeff_path=None
-
-    if ref_pose is not None:
-        if ref_pose == ref_eyeblink: 
-            ref_pose_coeff_path = ref_eyeblink_coeff_path
-        else:
-            ref_pose_videoname = os.path.splitext(os.path.split(ref_pose)[-1])[0]
-            ref_pose_frame_dir = os.path.join(save_dir, ref_pose_videoname)
-            os.makedirs(ref_pose_frame_dir, exist_ok=True)
-            print('3DMM Extraction for the reference video providing pose')
-            ref_pose_coeff_path, _, _ =  preprocess_model.generate(ref_pose, ref_pose_frame_dir, args.preprocess, source_image_flag=False)
-    else:
-        ref_pose_coeff_path=None
-
-    #audio2ceoff
-    batch = get_data(first_coeff_path, audio_path, ref_eyeblink_coeff_path, still=args.still)
-    coeff_path = audio_to_coeff.generate(batch, save_dir, pose_style, ref_pose_coeff_path)
-
-    #coeff2video
-    data = get_facerender_data(coeff_path, crop_pic_path, first_coeff_path, audio_path, 
-                                args.batch_size, input_yaw_list, input_pitch_list, input_roll_list,
-                                expression_scale=args.expression_scale, still_mode=args.still, preprocess=args.preprocess, size=args.size)
     
-    result = animate_from_coeff.generate(data, save_dir, pic_path, crop_info,
-                                enhancer=args.enhancer, background_enhancer=None, preprocess=args.preprocess, img_size=args.size,
-                                retinaface_net=retinaface_net, gfpgan_net=gfpgan_net)
+    first_coeff_path, crop_pic_path, crop_info = preprocess_model.generate(
+        pic_path, 
+        first_frame_dir, 
+        args.preprocess, 
+        source_image_flag=True, 
+        pic_size=args.size
+    )
+    if first_coeff_path is None:
+        raise ValueError("Error: Can't get the coeffs of the input.")
+
+    return first_coeff_path, crop_pic_path, crop_info
+
+def extract_reference_coeffs(preprocess_model, ref_eyeblink, ref_pose, save_dir):
+    ref_eyeblink_coeff_path = generate_ref_coeff(preprocess_model, ref_eyeblink, save_dir)
+
+    if ref_pose == ref_eyeblink:
+        ref_pose_coeff_path = ref_eyeblink_coeff_path
+    else:
+        ref_pose_coeff_path = generate_ref_coeff(preprocess_model, ref_pose, save_dir)
+
+    return ref_eyeblink_coeff_path, ref_pose_coeff_path
+
+def generate_audio_to_coeff(
+    audio_to_coeff, 
+    first_coeff_path, 
+    audio_path, 
+    ref_eyeblink_coeff_path, 
+    save_dir, 
+    ref_pose_coeff_path
+):
+    batch = get_data(first_coeff_path, audio_path, ref_eyeblink_coeff_path, still=args.still)
+    coeff_path = audio_to_coeff.generate(batch, save_dir, args.pose_style, ref_pose_coeff_path)
+    return coeff_path
+
+def generate_animation(
+    animate_from_coeff, 
+    coeff_path, 
+    crop_pic_path, 
+    first_coeff_path, 
+    crop_info, 
+    save_dir, 
+    pic_path
+):
+    data = get_facerender_data(
+        coeff_path,
+        crop_pic_path,
+        first_coeff_path,
+        args.audio,
+        args.batch_size,
+        args.input_yaw,
+        args.input_pitch,
+        args.input_roll,
+        expression_scale=args.expression_scale,
+        still_mode=args.still,
+        preprocess=args.preprocess,
+        size=args.size,
+    )
+
+    result = animate_from_coeff.generate(
+        data,
+        save_dir,
+        pic_path,
+        crop_info,
+        enhancer=args.enhancer,
+        background_enhancer=None,
+        preprocess=args.preprocess,
+        img_size=args.size,
+    )
+
+    return result
+
+def main():
+    set_seed(args.seed)
+    save_dir = os.path.join(args.result_dir, strftime("%Y_%m_%d_%H.%M.%S"))
+    os.makedirs(save_dir, exist_ok=True)
+
+    models = download_and_load_models()
+
+    # init model
+    preprocess_model = CropAndExtract(
+        models["face3d_recon_net"], 
+        models["face_align_net"], 
+        models["retinaface_net"], 
+        LM3D_PATH
+    )
+    audio_to_coeff = Audio2Coeff(
+        models["audio2exp_net"], 
+        models["audio2pose_net"]
+    )
+    animate_from_coeff = AnimateFromCoeff(
+        models["generator_net"], 
+        models["kp_detector_net"], 
+        models["mapping_net"],
+        models["retinaface_net"],
+        models["gfpgan_net"]
+    )
+
+    # crop image and extract 3dmm coefficients
+    print('3DMM Extraction for source image')
+    first_coeff_path, crop_pic_path, crop_info = preprocess_image(
+        preprocess_model, 
+        args.input[0], 
+        save_dir
+    )
+
+    # extract 3dmm coefficients of the reference video (for eye-blink and pose).
+    ref_eyeblink_coeff_path, ref_pose_coeff_path = extract_reference_coeffs(
+        preprocess_model, 
+        args.ref_eyeblink, 
+        args.ref_pose, 
+        save_dir
+    )
+
+    # Generate coefficients for animation from audio data
+    coeff_path = generate_audio_to_coeff(
+        audio_to_coeff, 
+        first_coeff_path, 
+        args.audio,
+        ref_eyeblink_coeff_path, 
+        save_dir, 
+        ref_pose_coeff_path
+    )
+
+    # generate animation
+    result = generate_animation(
+        animate_from_coeff, 
+        coeff_path, 
+        crop_pic_path, 
+        first_coeff_path, 
+        crop_info, 
+        save_dir, 
+        args.input[0]
+    )
     
     shutil.move(result, save_dir+'.mp4')
     print('The generated video is named:', save_dir+'.mp4')
@@ -196,6 +284,5 @@ def main():
     if not args.verbose:
         shutil.rmtree(save_dir)
 
-    
 if __name__ == '__main__':
     main()
