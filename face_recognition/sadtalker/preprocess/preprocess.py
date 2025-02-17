@@ -8,6 +8,9 @@ from scipy.io import loadmat, savemat
 from preprocess.face3d_utils import align_img
 from preprocess.croper import Preprocesser
 
+sys.path.append('../../util')
+from image_utils import imread  # noqa: E402
+
 def split_coeff(coeffs):
     return {
         'id': coeffs[:, :80],
@@ -51,7 +54,7 @@ class CropAndExtract():
             raise ValueError('input_path must be a valid path to video/image file')
         elif input_path.split('.')[-1] in ['jpg', 'png', 'jpeg']:
             # loader for first frame
-            full_frames = [cv2.imread(input_path)]
+            full_frames = [imread(input_path)]
             fps = 25
         else:
             # loader for videos

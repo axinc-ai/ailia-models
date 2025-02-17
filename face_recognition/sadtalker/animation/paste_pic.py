@@ -1,9 +1,12 @@
-import cv2, os
+import cv2, os, sys
 import numpy as np
 from tqdm import tqdm
 import uuid
 
 from animation.videoio import save_video_with_watermark 
+
+sys.path.append('../../util')
+from image_utils import imread  # noqa: E402
 
 def paste_pic(video_path, pic_path, crop_info, new_audio_path, full_video_path, extended_crop=False):
 
@@ -11,7 +14,7 @@ def paste_pic(video_path, pic_path, crop_info, new_audio_path, full_video_path, 
         raise ValueError('pic_path must be a valid path to video/image file')
     elif pic_path.split('.')[-1] in ['jpg', 'png', 'jpeg']:
         # loader for first frame
-        full_img = cv2.imread(pic_path)
+        full_img = imread(pic_path)
     else:
         # loader for videos
         video_stream = cv2.VideoCapture(pic_path)
