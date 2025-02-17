@@ -288,12 +288,11 @@ def main():
         args.input[0]
     )
     
-    save_video_path = os.path.join(args.result_dir, args.savepath)
-    shutil.move(result, save_video_path)
-    print('The generated video is named:', save_video_path)
+    shutil.move(result, args.savepath)
+    print('The generated video is named:', args.savepath)
 
     if not args.verbose:
-        shutil.rmtree(save_dir)
+        shutil.rmtree(args.result_dir)
 
 if __name__ == '__main__':
     main()
