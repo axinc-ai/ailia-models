@@ -15,7 +15,7 @@ class Audio2Exp:
         bs, T, _, _, _ = mel_input.shape
         exp_coeff_pred = []
 
-        for i in tqdm(range(0, T, 10), 'audio2exp:'):  # 10フレームごとに処理
+        for i in tqdm(range(0, T, 10), 'audio2exp'):  # 10フレームごとに処理
             current_mel_input = mel_input[:, i:i+10]  # (bs, 10, 1, 80, 16)
             current_ref = ref[:, i:i+10, :64]         # (bs, 10, 64)
             current_ratio = ratio[:, i:i+10]         # (bs, 10, 1)

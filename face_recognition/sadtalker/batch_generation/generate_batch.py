@@ -67,7 +67,7 @@ def get_data(first_coeff_path, audio_path, ref_eyeblink_coeff_path, still=False,
         spec = orig_mel.copy()         # nframes 80
         indiv_mels = []
 
-        for i in tqdm(range(num_frames), 'mel:'):
+        for i in tqdm(range(num_frames), 'mel'):
             start_frame_num = i-2
             start_idx = int(80. * (start_frame_num / float(fps)))
             end_idx = start_idx + syncnet_mel_step_size
