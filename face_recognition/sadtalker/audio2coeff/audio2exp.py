@@ -1,6 +1,5 @@
 from tqdm import tqdm
 import numpy as np
-import onnxruntime
 
 class Audio2Exp:
     def __init__(self, audio2exp_net, use_onnx):

@@ -1,5 +1,4 @@
 import numpy as np
-import onnxruntime
 
 class Audio2Pose:
     def __init__(self, audio2pose_net, use_onnx):

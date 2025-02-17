@@ -8,8 +8,6 @@ from scipy.io import loadmat, savemat
 from preprocess.face3d_utils import align_img
 from preprocess.croper import Preprocesser
 
-import onnxruntime
-
 def split_coeff(coeffs):
     return {
         'id': coeffs[:, :80],

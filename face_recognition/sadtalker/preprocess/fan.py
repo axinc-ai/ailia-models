@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-import onnxruntime
 
 def calculate_points(heatmaps):
     # change heatmaps to landmarks

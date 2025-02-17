@@ -4,7 +4,6 @@ import numpy as np
 import imageio
 from pydub import AudioSegment
 from skimage import img_as_ubyte
-import onnxruntime
 
 from animation.make_animation import make_animation
 from animation.face_enhancer import enhancer_generator_with_len, enhancer_list
