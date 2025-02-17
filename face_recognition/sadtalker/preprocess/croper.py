@@ -9,8 +9,8 @@ from preprocess.face_detection import face_detect
 from preprocess.facexlib_alignment import landmark_98_to_68
 
 class Preprocesser:
-    def __init__(self, face_align_net, face_det_net):
-        self.predictor = KeypointExtractor(face_align_net, face_det_net)
+    def __init__(self, face_align_net, face_det_net, use_onnx):
+        self.predictor = KeypointExtractor(face_align_net, face_det_net, use_onnx)
 
     def get_landmark(self, img_np):
         dets = face_detect(img_np, self.predictor.face_det_net)

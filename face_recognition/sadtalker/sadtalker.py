@@ -52,6 +52,7 @@ parser.add_argument('--input_pitch', nargs='+', type=int, default=None, help="th
 parser.add_argument('--input_roll', nargs='+', type=int, default=None, help="the input roll degree of the user")
 parser.add_argument("--verbose", action="store_true", help="saving the intermedia output or not")
 parser.add_argument("--seed", type=int, default=42, help="ramdom seed")
+parser.add_argument('-o', '--onnx', action='store_true', help="Option to use onnxrutime to run or not.")
 args = update_parser(parser)
 
 # ======================
@@ -88,6 +89,19 @@ def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
 
+def load_model(model_path, weight_path, env_id=args.env_id, use_onnx=args.onnx):
+    if use_onnx:
+        import onnxruntime
+        cuda = 0 < ailia.get_gpu_environment_id()
+        providers = (
+            ["CUDAExecutionProvider", "CPUExecutionProvider"]
+            if cuda
+            else ["CPUExecutionProvider"]
+        )
+        return onnxruntime.InferenceSession(weight_path, providers=providers)
+    else:
+        return ailia.Net(model_path, weight_path, env_id=env_id)
+
 def generate_ref_coeff(preprocess_model, video_path, save_dir):
     if not video_path:
         return None
@@ -121,15 +135,15 @@ def download_and_load_models():
         check_and_download_models(WEIGHT_GFPGAN_PATH, MODEL_GFPGAN_PATH, REMOTE_GFPGAN_PATH)
 
     models = {
-        "face3d_recon_net": ailia.Net(MODEL_FACE3D_RECON_PATH, WEIGHT_FACE3D_RECON_PATH, env_id=args.env_id),
-        "face_align_net": ailia.Net(MODEL_FACE_ALIGN_PATH, WEIGHT_FACE_ALIGN_PATH, env_id=args.env_id),
-        "audio2exp_net": ailia.Net(MODEL_AUDIO2EXP_PATH, WEIGHT_AUDIO2EXP_PATH, env_id=args.env_id),
-        "audio2pose_net": ailia.Net(MODEL_AUDIO2POSE_PATH, WEIGHT_AUDIO2POSE_PATH, env_id=args.env_id),
-        "generator_net": ailia.Net(MODEL_ANIMATION_GENERATOR_PATH, WEIGHT_ANIMATION_GENERATOR_PATH, env_id=args.env_id),
-        "kp_detector_net": ailia.Net(MODEL_KP_DETECTOR_PATH, WEIGHT_KP_DETECTOR_PATH, env_id=args.env_id),
-        "mapping_net": ailia.Net(MODEL_MAPPING_NET, WEIGHT_MAPPING_NET, env_id=args.env_id),
-        "retinaface_net": ailia.Net(MODEL_FACE_DET_PATH, WEIGHT_FACE_DET_PATH),
-        "gfpgan_net": ailia.Net(MODEL_GFPGAN_PATH, WEIGHT_GFPGAN_PATH) if args.enhancer else None
+        "face3d_recon_net": load_model(MODEL_FACE3D_RECON_PATH, WEIGHT_FACE3D_RECON_PATH),
+        "face_align_net": load_model(MODEL_FACE_ALIGN_PATH, WEIGHT_FACE_ALIGN_PATH),
+        "audio2exp_net": load_model(MODEL_AUDIO2EXP_PATH, WEIGHT_AUDIO2EXP_PATH),
+        "audio2pose_net": load_model(MODEL_AUDIO2POSE_PATH, WEIGHT_AUDIO2POSE_PATH),
+        "generator_net": load_model(MODEL_ANIMATION_GENERATOR_PATH, WEIGHT_ANIMATION_GENERATOR_PATH),
+        "kp_detector_net": load_model(MODEL_KP_DETECTOR_PATH, WEIGHT_KP_DETECTOR_PATH),
+        "mapping_net": load_model(MODEL_MAPPING_NET, WEIGHT_MAPPING_NET),
+        "retinaface_net": ailia.Net(MODEL_FACE_DET_PATH, WEIGHT_FACE_DET_PATH, env_id=args.env_id),
+        "gfpgan_net": ailia.Net(MODEL_GFPGAN_PATH, WEIGHT_GFPGAN_PATH, env_id=args.env_id) if args.enhancer else None
     }
     return models
 
@@ -220,18 +234,21 @@ def main():
         models["face3d_recon_net"], 
         models["face_align_net"], 
         models["retinaface_net"], 
-        LM3D_PATH
+        LM3D_PATH,
+        use_onnx=args.onnx
     )
     audio_to_coeff = Audio2Coeff(
         models["audio2exp_net"], 
-        models["audio2pose_net"]
+        models["audio2pose_net"],
+        use_onnx=args.onnx
     )
     animate_from_coeff = AnimateFromCoeff(
         models["generator_net"], 
         models["kp_detector_net"], 
         models["mapping_net"],
         models["retinaface_net"],
-        models["gfpgan_net"]
+        models["gfpgan_net"],
+        use_onnx=args.onnx
     )
 
     # crop image and extract 3dmm coefficients

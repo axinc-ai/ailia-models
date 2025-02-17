@@ -10,8 +10,8 @@ from preprocess.fan import FAN
 from preprocess.facexlib_alignment import landmark_98_to_68
 
 class KeypointExtractor():
-    def __init__(self, face_align_net, face_det_net):
-        self.detector = FAN(face_align_net)
+    def __init__(self, face_align_net, face_det_net, use_onnx):
+        self.detector = FAN(face_align_net, use_onnx)
         self.face_det_net = face_det_net
 
     def extract_keypoint(self, images, name=None):

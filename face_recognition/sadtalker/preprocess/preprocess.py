@@ -36,10 +36,11 @@ def load_lm3d(lm3d_path):
     return Lm3D[[1, 2, 0, 3, 4], :]
 
 class CropAndExtract():
-    def __init__(self, face3d_recon_net, face_align_net, face_det_net, lm3d_path):
-        self.propress = Preprocesser(face_align_net, face_det_net)
+    def __init__(self, face3d_recon_net, face_align_net, face_det_net, lm3d_path, use_onnx):
+        self.propress = Preprocesser(face_align_net, face_det_net, use_onnx)
         self.face3d_recon_net = face3d_recon_net
         self.lm3d_std = load_lm3d(lm3d_path)
+        self.use_onnx = use_onnx
     
     def generate(self, input_path, save_dir, crop_or_resize='crop', source_image_flag=False, pic_size=256):
         pic_name = os.path.splitext(os.path.split(input_path)[-1])[0]  
@@ -127,7 +128,10 @@ class CropAndExtract():
                 trans_params = np.array([float(item) for item in np.hsplit(trans_params, 5)]).astype(np.float32)
                 im_np = np.transpose(np.array(im1, dtype=np.float32) / 255.0, (2, 0, 1))[np.newaxis, ...]
                 
-                full_coeff = self.face3d_recon_net.run([im_np])[0]
+                if self.use_onnx:
+                    full_coeff = self.face3d_recon_net.run(None, {"input_image": im_np})[0]
+                else:
+                    full_coeff = self.face3d_recon_net.run([im_np])[0]
                 coeffs = split_coeff(full_coeff)
 
                 pred_coeff = {key:coeffs[key] for key in coeffs}

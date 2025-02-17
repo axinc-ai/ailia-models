@@ -7,9 +7,9 @@ from audio2coeff.audio2exp import Audio2Exp
 from audio2coeff.audio2pose import Audio2Pose
 
 class Audio2Coeff:
-    def __init__(self, audio2exp_net, audio2pose_net):
-        self.audio2exp_model = Audio2Exp(audio2exp_net)
-        self.audio2pose_model = Audio2Pose(audio2pose_net)
+    def __init__(self, audio2exp_net, audio2pose_net, use_onnx):
+        self.audio2exp_model = Audio2Exp(audio2exp_net, use_onnx)
+        self.audio2pose_model = Audio2Pose(audio2pose_net, use_onnx)
 
     def generate(self, batch, coeff_save_dir, pose_style, ref_pose_coeff_path=None):
         results_dict_exp= self.audio2exp_model.test(batch)

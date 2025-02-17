@@ -72,12 +72,17 @@ def keypoint_transformation(kp_canonical, he, wo_exp=False):
 def make_animation(
     source_image, source_semantics, target_semantics,
     generator_net, kp_detector_net, he_estimator_net, mapping_net, 
-    yaw_c_seq=None, pitch_c_seq=None, roll_c_seq=None, use_exp=True, use_half=False
+    yaw_c_seq=None, pitch_c_seq=None, roll_c_seq=None, use_exp=True, use_half=False, 
+    use_onnx=False
 ):
     predictions = []
 
-    kp_canonical = {"value": kp_detector_net.run([source_image])[0]}
-    he_source_tmp = mapping_net.run([source_semantics])
+    if use_onnx:
+        kp_canonical = {"value": kp_detector_net.run(None, {"input_image": source_image})[0]}
+        he_source_tmp = mapping_net.run(None, {"input_3dmm": source_semantics})
+    else:
+        kp_canonical = {"value": kp_detector_net.run([source_image])[0]}
+        he_source_tmp = mapping_net.run([source_semantics])
     he_source = {
         "yaw": he_source_tmp[0],
         "pitch": he_source_tmp[1],
@@ -90,7 +95,10 @@ def make_animation(
 
     for frame_idx in tqdm(range(target_semantics.shape[1]), 'Face Renderer:'):
         target_semantics_frame = target_semantics[:, frame_idx]
-        he_driving_tmp = mapping_net.run([target_semantics_frame])
+        if use_onnx:
+            he_driving_tmp = mapping_net.run(None, {"input_3dmm": target_semantics_frame})
+        else:
+            he_driving_tmp = mapping_net.run([target_semantics_frame])
         he_driving = {
             "yaw": he_driving_tmp[0],
             "pitch": he_driving_tmp[1],
@@ -108,6 +116,13 @@ def make_animation(
         
         kp_driving = keypoint_transformation(kp_canonical, he_driving)
         
-        out = generator_net.run([source_image, kp_driving["value"], kp_source["value"]])[0]
+        if use_onnx:
+            out = generator_net.run(None, {
+                "source_image": source_image,
+                "kp_driving": kp_driving["value"],
+                "kp_source": kp_source["value"],
+            })[0]
+        else:
+            out = generator_net.run([source_image, kp_driving["value"], kp_source["value"]])[0]
         predictions.append(out)
     return np.stack(predictions, axis=1)

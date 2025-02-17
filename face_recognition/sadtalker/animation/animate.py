@@ -12,13 +12,14 @@ from animation.paste_pic import paste_pic
 from animation.videoio import save_video_with_watermark
 
 class AnimateFromCoeff:
-    def __init__(self, generator_net, kp_detector_net, mapping_net, retinaface_net, gfpgan_net):
+    def __init__(self, generator_net, kp_detector_net, mapping_net, retinaface_net, gfpgan_net, use_onnx):
         self.generator_net = generator_net
         self.kp_detector_net = kp_detector_net
         self.he_estimator_net = None
         self.mapping_net = mapping_net
         self.retinaface_net = retinaface_net
         self.gfpgan_net = gfpgan_net
+        self.use_onnx = use_onnx
     
     def generate(self, x, video_save_dir, pic_path, crop_info, 
                  enhancer=None, background_enhancer=None, preprocess='crop', img_size=256):
@@ -33,7 +34,8 @@ class AnimateFromCoeff:
         predictions_video = make_animation(
             source_image, source_semantics, target_semantics,
             self.generator_net, self.kp_detector_net, self.he_estimator_net, self.mapping_net, 
-            yaw_c_seq, pitch_c_seq, roll_c_seq, use_exp=True
+            yaw_c_seq, pitch_c_seq, roll_c_seq, use_exp=True,
+            use_onnx=self.use_onnx
         )
 
         predictions_video = predictions_video.reshape((-1,)+predictions_video.shape[2:])

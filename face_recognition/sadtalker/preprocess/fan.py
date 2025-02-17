@@ -38,8 +38,9 @@ def calculate_points(heatmaps):
     return preds
 
 class FAN():
-    def __init__(self, face_align_net):
+    def __init__(self, face_align_net, use_onnx):
         self.face_align_net = face_align_net
+        self.use_onnx = use_onnx
 
     def get_landmarks(self, img):
         H, W, _ = img.shape
@@ -50,7 +51,10 @@ class FAN():
         inp = np.transpose(inp.astype(np.float32), (2, 0, 1))
         inp = np.expand_dims(inp / 255.0, axis=0)
 
-        outputs = self.face_align_net.run([inp])[0]
+        if self.use_onnx:
+            outputs = self.face_align_net.run(None, {"input_image": inp})[0]
+        else:
+            outputs = self.face_align_net.run([inp])[0]
         out = outputs[:, :-1, :, :]
 
         pred = calculate_points(out).reshape(-1, 2)
