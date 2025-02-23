@@ -76,17 +76,21 @@ def load_audio(file: str, sr: int = SAMPLE_RATE):
         # Requires the ffmpeg CLI and `ffmpeg-python` package to be installed.
         out, _ = (
             ffmpeg.input(file, threads=0)
-            .output("-", format="f32le", acodec="pcm_f32le", ac=1, ar=sr)
+            .output("-", format="f32le", acodec="pcm_f32le", ac=2, ar=sr)
             .run(cmd=["ffmpeg", "-nostdin"], capture_stdout=True, capture_stderr=True)
         )
 
-        audio = np.frombuffer(out, np.float32).flatten()
+        audio = np.copy(np.frombuffer(out, np.float32)).reshape(-1, 2).T
     else:
         # prepare input data
-        audio, source_sr = librosa.load(file, sr=None)
+        audio, source_sr = librosa.load(file, sr=None, mono=False)
         # Resample the wav if needed
         if source_sr is not None and source_sr != sr:
             audio = librosa.resample(audio, orig_sr=source_sr, target_sr=sr)
+
+        if audio.ndim == 1:
+            audio = audio[None, :]
+            audio = np.broadcast_to(audio, (2, audio.shape[-1]))
 
     return audio
 
@@ -260,14 +264,12 @@ def apply_model(
 
 
 def predict(models, audio):
-    wav = np.load("wav.npy")
-    # padded_mix = np.load("padded_mix.npy")
+    wav = audio
 
     ref = wav.mean(axis=0)
     wav -= ref.mean()
     wav /= ref.std() + 1e-8
     mix = wav[None, :]
-    audio_length = wav.shape[1]
 
     shifts = 1
     split = True
