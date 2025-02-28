@@ -576,7 +576,7 @@ If you would like to try on your computer:
 | Model | Reference | Exported From | Supported Ailia Version | Blog |
 |------------:|:------------:|:------------:|:------------:|:------------:|
 |[bert_zero_shot_classification](/natural_language_processing/bert_zero_shot_classification) | [huggingface/transformers](https://github.com/huggingface/transformers) | Pytorch | 1.2.5 and later |
-|[zero_shot_classification_japanese](/natural_language_processing/zero_shot_classification_japanese) | [MoritzLaurer/multilingual-MiniLMv2-L12-mnli-xnli](https://huggingface.co/MoritzLaurer/multilingual-MiniLMv2-L12-mnli-xnli) | Pytorch | 1.2.10 and later |
+|[multilingual-minilmv2](/natural_language_processing/multilingual-minilmv2) | [MoritzLaurer/multilingual-MiniLMv2-L12-mnli-xnli](https://huggingface.co/MoritzLaurer/multilingual-MiniLMv2-L12-mnli-xnli) | Pytorch | 1.2.10 and later |
 
 ## Network intrusion detection
 
