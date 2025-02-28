@@ -27,7 +27,7 @@ MODEL_LISTS = ['minilm_l6', 'minilm_l12']
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = get_base_parser('zero_shot_classification_japanese', None, None)
+parser = get_base_parser('multilingual-minilmv2', None, None)
 parser.add_argument(
     '--sentence', '-s', metavar='TEXT', default=SENTENCE,
     help='input sentence'
@@ -61,7 +61,7 @@ args = update_parser(parser, check_input_type=False)
 # ======================
 WEIGHT_PATH = args.arch + ".onnx"
 MODEL_PATH = WEIGHT_PATH + ".prototxt"
-REMOTE_PATH = "https://storage.googleapis.com/ailia-models/zero_shot_classification_japanese/"
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/multilingual-minilmv2/"
 
 # ======================
 # Utils
