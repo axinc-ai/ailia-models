@@ -1,4 +1,6 @@
-# Zero Shot Classification in Japanese
+# multilingual-MiniLMv2
+
+This multilingual model can perform natural language inference (NLI) on 100+ languages and is therefore also suitable for multilingual zero-shot classification.
 
 ### input
 A `SENTENCE`, `CANDIDATE_LABELS` and `HYPOTHESIS_TEMPLATE`.
@@ -10,7 +12,7 @@ Probability scores for each label.
 Set the `SENTENCE`, `CANDIDATE_LABELS` and `HYPOTHESIS_TEMPLATE` as an argument.
 
 ```bash
-$ python3 zero_shot_classification_japanese.py -s "今日、新しいiPhoneが発売されました" -c "スマートフォン, エンタメ, スポーツ" -t "This example is {}."
+$ python3 multilingual-minilmv2.py -s "今日、新しいiPhoneが発売されました" -c "スマートフォン, エンタメ, スポーツ" -t "This example is {}."
 ...
 + idx=0
   category=0[スマートフォン ]
