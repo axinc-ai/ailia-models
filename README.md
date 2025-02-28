@@ -573,6 +573,7 @@ If you would like to try on your computer:
 |[fugumt-ja-en](/natural_language_processing/fugumt-ja-en) | [Fugu-Machine Translator](https://github.com/s-taka/fugumt)   | Pytorch | 1.2.10 abd later |
 
 ### Zero shot classification
+
 | Model | Reference | Exported From | Supported Ailia Version | Blog |
 |------------:|:------------:|:------------:|:------------:|:------------:|
 |[bert_zero_shot_classification](/natural_language_processing/bert_zero_shot_classification) | [huggingface/transformers](https://github.com/huggingface/transformers) | Pytorch | 1.2.5 and later |
