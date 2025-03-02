@@ -16,7 +16,7 @@ class LipsyncPipeline:
     def __init__(
         self,
         vae_encoder,
-        # vae_decoder,
+        vae_decoder,
         tokenizer,
         unet,
         scheduler,
@@ -25,12 +25,31 @@ class LipsyncPipeline:
         super().__init__()
 
         self.vae_encoder = vae_encoder
+        self.vae_decoder = vae_decoder
         self.tokenizer = tokenizer
         self.unet = unet
         self.scheduler = scheduler
         self.use_onnx = use_onnx
 
-        # self.vae_scale_factor = 8
+        self.vae_scale_factor = 8
+        self.scaling_factor = 0.18215
+        self.shift_factor = 0
+
+    def decode_latents(self, latents):
+        latents = latents / self.scaling_factor + self.shift_factor
+
+        # b c f h w -> (b f) c h w
+        b, c, f, h, w = latents.shape
+        latents = latents.transpose(0, 2, 1, 3, 4)
+        latents = latents.reshape(b * f, c, h, w)
+
+        if not self.use_onnx:
+            output = self.vae_decoder.predict([latents])
+        else:
+            output = self.vae_decoder.run(None, {"latents": latents})
+        decoded_latents = output[0]
+
+        return decoded_latents
 
     def prepare_latents(
         self,
@@ -71,10 +90,9 @@ class LipsyncPipeline:
         # resize the mask to latents shape as we concatenate the mask to the latents
         # we do that before converting to dtype to avoid breaking in case we're using cpu_offload
         # and half precision
-        vae_scale_factor = 8
         batch, channel, height, width = mask.shape
-        new_height = height // vae_scale_factor
-        new_width = width // vae_scale_factor
+        new_height = height // self.vae_scale_factor
+        new_width = width // self.vae_scale_factor
         resized = np.zeros((batch, channel, new_height, new_width), dtype=mask.dtype)
         for b in range(batch):
             for c in range(channel):
@@ -94,15 +112,16 @@ class LipsyncPipeline:
             output = self.vae_encoder.run(None, {"x": masked_image})
         moments = output[0]
 
+        # sample from the latent distribution
         mean, logvar = np.split(moments, 2, axis=1)
         logvar = np.clip(logvar, -30.0, 20.0)
         std = np.exp(0.5 * logvar)
         sample = np.random.randn(*mean.shape)
         masked_image_latents = mean + std * sample
 
-        shift_factor = 0
-        scaling_factor = 0.18215
-        masked_image_latents = (masked_image_latents - shift_factor) * scaling_factor
+        masked_image_latents = (
+            masked_image_latents - self.shift_factor
+        ) * self.scaling_factor
 
         # assume batch size = 1
         # f c h w -> 1 c f h w
@@ -116,6 +135,32 @@ class LipsyncPipeline:
             else masked_image_latents
         )
         return mask, masked_image_latents
+
+    def prepare_image_latents(self, images, do_classifier_free_guidance):
+        if not self.use_onnx:
+            output = self.vae_encoder.predict([images])
+        else:
+            output = self.vae_encoder.run(None, {"x": images})
+        moments = output[0]
+
+        # sample from the latent distribution
+        mean, logvar = np.split(moments, 2, axis=1)
+        logvar = np.clip(logvar, -30.0, 20.0)
+        std = np.exp(0.5 * logvar)
+        sample = np.random.randn(*mean.shape)
+        image_latents = mean + std * sample
+
+        image_latents = (image_latents - self.shift_factor) * self.scaling_factor
+
+        # f c h w -> 1 c f h w
+        image_latents = image_latents.transpose(1, 0, 2, 3)[None]
+        image_latents = (
+            np.concatenate([image_latents] * 2)
+            if do_classifier_free_guidance
+            else image_latents
+        )
+
+        return image_latents
 
     def forward(
         self,
@@ -140,9 +185,12 @@ class LipsyncPipeline:
         # corresponds to doing no classifier free guidance.
         do_classifier_free_guidance = guidance_scale > 1.0
 
-        # # Prepare timesteps
-        # self.scheduler.set_timesteps(num_inference_steps)
-        # timesteps = self.scheduler.timesteps
+        # Prepare timesteps
+        self.scheduler.set_timesteps(num_inference_steps)
+        timesteps = self.scheduler.timesteps
+
+        video_fps = 25
+        num_inferences = 15
 
         # Prepare latent variables
         # all_latents = self.prepare_latents(
@@ -157,6 +205,7 @@ class LipsyncPipeline:
         # )
 
         # Denoising loop
+        synced_video_frames = []
         for i in tqdm.tqdm(range(num_inferences), desc="Doing inference..."):
             audio_embeds = np.stack(
                 whisper_chunks[i * num_frames : (i + 1) * num_frames]
@@ -178,6 +227,7 @@ class LipsyncPipeline:
                 np.stack(masked_pixel_values_list),
                 np.stack(masks_list),
             )
+            pixel_values = pixel_values.astype(np.float16)
             masked_pixel_values = masked_pixel_values.astype(np.float16)
 
             # Prepare mask latent variables
@@ -196,6 +246,9 @@ class LipsyncPipeline:
             )
 
             # Denoising loop
+            num_warmup_steps = (
+                len(timesteps) - num_inference_steps * self.scheduler.order
+            )
             with self.progress_bar(total=num_inference_steps) as progress_bar:
                 for j, t in enumerate(timesteps):
                     # expand the latents if we are doing classifier free guidance
@@ -217,7 +270,7 @@ class LipsyncPipeline:
                             image_latents,
                         ],
                         axis=1,
-                    )
+                    ).astype(np.float16)
 
                     # predict the noise residual
                     timestep = np.array(t, dtype=int)
@@ -250,7 +303,19 @@ class LipsyncPipeline:
                     # compute the previous noisy sample x_t -> x_t-1
                     latents = self.scheduler.step(noise_pred, t, latents)
 
-        return
+                    # call the callback, if provided
+                    if j == len(timesteps) - 1 or (
+                        (j + 1) > num_warmup_steps
+                        and (j + 1) % self.scheduler.order == 0
+                    ):
+                        progress_bar.update()
+
+            # Recover the pixel values
+            decoded_latents = self.decode_latents(latents)
+            decoded_latents = decoded_latents * (1 - masks) + pixel_values * masks
+            synced_video_frames.append(decoded_latents)
+
+        return np.concatenate(synced_video_frames)
 
     def progress_bar(self, iterable=None, total=None):
         from tqdm.auto import tqdm

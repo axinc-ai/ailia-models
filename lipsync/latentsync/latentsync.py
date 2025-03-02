@@ -1,6 +1,10 @@
 import sys
+from logging import getLogger
 
+import cv2
 import numpy as np
+import soundfile as sf
+import tqdm
 
 import ailia
 
@@ -9,10 +13,8 @@ sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models, check_and_download_file  # noqa
 
-# logger
-from logging import getLogger  # noqa
-
 import df
+from image_processor import AlignRestore
 
 logger = getLogger(__name__)
 
@@ -57,20 +59,78 @@ args = update_parser(parser, check_input_type=False)
 
 
 # ======================
+# Secondary Functions
+# ======================
+
+
+def write_video(video_output_path: str, video_frames: np.ndarray, fps: int):
+    height, width = video_frames[0].shape[:2]
+    out = cv2.VideoWriter(
+        video_output_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height)
+    )
+    for frame in video_frames:
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        out.write(frame)
+
+    out.release()
+
+
+def restore_video(faces, video_frames, boxes, affine_matrices):
+    import torch
+    import torchvision
+    from einops import rearrange
+
+    logger.info(f"Restoring {len(faces)} faces...")
+
+    restorer = AlignRestore()
+    video_frames = video_frames[: faces.shape[0]]
+
+    out_frames = []
+    for index, face in enumerate(tqdm.tqdm(faces)):
+        x1, y1, x2, y2 = boxes[index]
+        height = int(y2 - y1)
+        width = int(x2 - x1)
+        face = torchvision.transforms.functional.resize(
+            face, size=(height, width), antialias=True
+        )
+        face = rearrange(face, "c h w -> h w c")
+        face = (face / 2 + 0.5).clamp(0, 1)
+        face = (face * 255).to(torch.uint8).cpu().numpy()
+
+        out_frame = restorer.restore_img(
+            video_frames[index], face, affine_matrices[index]
+        )
+        out_frames.append(out_frame)
+
+    return np.stack(out_frames, axis=0)
+
+
+# ======================
 # Main functions
 # ======================
 
 
-def recognize_offline(pipe: df.LipsyncPipeline):
+def recognize_from_video(pipe: df.LipsyncPipeline):
     logger.info("Start inference...")
 
-    pipe.forward(
+    synced_video_frames = pipe.forward(
         num_frames=16,
         num_inference_steps=20,
         guidance_scale=1.5,
         height=256,
         width=256,
     )
+    synced_video_frames = restore_video(
+        synced_video_frames, original_video_frames, boxes, affine_matrices
+    )
+
+    video_fps = 25
+    audio_sample_rate = 16000
+    audio_samples_remain_length = int(
+        synced_video_frames.shape[0] / video_fps * audio_sample_rate
+    )
+    audio_samples = audio_samples[:audio_samples_remain_length].cpu().numpy()
+
 
     # img_savepath = get_savepath(args.savepath, "", ext=".png")
     # logger.info(f"saved at : {img_savepath}")
@@ -107,6 +167,12 @@ def main():
             env_id=env_id,
             memory_mode=memory_mode,
         )
+        vae_decoder = ailia.Net(
+            MODEL_VAE_DEC_PATH,
+            WEIGHT_VAE_DEC_PATH,
+            env_id=env_id,
+            memory_mode=memory_mode,
+        )
     else:
         import onnxruntime
 
@@ -115,6 +181,9 @@ def main():
         net = onnxruntime.InferenceSession(WEIGHT_UNET_PATH, providers=providers)
         vae_encoder = onnxruntime.InferenceSession(
             WEIGHT_VAE_ENC_PATH, providers=providers
+        )
+        vae_decoder = onnxruntime.InferenceSession(
+            WEIGHT_VAE_DEC_PATH, providers=providers
         )
 
     args.disable_ailia_tokenizer = True
@@ -125,30 +194,29 @@ def main():
     else:
         raise NotImplementedError
 
-    # scheduler = df.schedulers.EulerAncestralDiscreteScheduler.from_config(
-    #     {
-    #         "num_train_timesteps": 1000,
-    #         "timestep_spacing": "trailing",
-    #         "beta_start": 0.00085,
-    #         "beta_end": 0.012,
-    #         "beta_schedule": "scaled_linear",
-    #         "trained_betas": None,
-    #         "steps_offset": 1,
-    #         "prediction_type": "epsilon",
-    #     }
-    # )
-    scheduler = None
+    scheduler = df.schedulers.DDIMScheduler.from_config(
+        {
+            "beta_end": 0.012,
+            "trained_betas": None,
+            "beta_start": 0.00085,
+            "set_alpha_to_one": False,
+            "clip_sample": False,
+            "steps_offset": 1,
+            "num_train_timesteps": 1000,
+            "beta_schedule": "scaled_linear",
+        }
+    )
 
     pipe = df.LipsyncPipeline(
         vae_encoder=vae_encoder,
-        tokenizer=tokenizer,
+        vae_decoder=vae_decoder,
         unet=net,
         scheduler=scheduler,
         use_onnx=args.onnx,
     )
 
     # generate
-    recognize_offline(pipe)
+    recognize_from_video(pipe)
 
 
 if __name__ == "__main__":
