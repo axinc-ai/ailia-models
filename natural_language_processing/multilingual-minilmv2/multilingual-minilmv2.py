@@ -92,7 +92,7 @@ def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     ailia_model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
-    candidate_labels = re.split(r'\s*,\s*', CANDIDATE_LABELS) # Delete spaces before and after commas
+    candidate_labels = re.split(r'\s*,\s*', args.candidate_labels) # Delete spaces before and after commas
 
     if args.disable_ailia_tokenizer:
         from transformers import AutoTokenizer
