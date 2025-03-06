@@ -1,10 +1,10 @@
 # Adapted from https://github.com/guoyww/AnimateDiff/blob/main/animatediff/pipelines/pipeline_animation.py
 
-from typing import List, Optional, Tuple, Union
+from typing import Optional
 from logging import getLogger
 
+import cv2
 import numpy as np
-import scipy
 import tqdm
 
 from image_processor import preprocess_fixed_mask_image
@@ -17,7 +17,6 @@ class LipsyncPipeline:
         self,
         vae_encoder,
         vae_decoder,
-        tokenizer,
         unet,
         scheduler,
         use_onnx: bool = False,
@@ -26,7 +25,6 @@ class LipsyncPipeline:
 
         self.vae_encoder = vae_encoder
         self.vae_decoder = vae_decoder
-        self.tokenizer = tokenizer
         self.unet = unet
         self.scheduler = scheduler
         self.use_onnx = use_onnx
@@ -54,29 +52,22 @@ class LipsyncPipeline:
     def prepare_latents(
         self,
         batch_size,
+        num_frames,
         num_channels_latents,
         height,
         width,
-        dtype,
-        latents=None,
     ):
-        shape = (
+        latents = np.random.randn(
             batch_size,
             num_channels_latents,
+            1,
             height // self.vae_scale_factor,
             width // self.vae_scale_factor,
         )
-
-        if latents is None:
-            latents = np.random.randn(*shape).astype(dtype)
-        elif latents.shape != shape:
-            raise ValueError(
-                f"Unexpected latents shape, got {latents.shape}, expected {shape}"
-            )
+        latents = np.repeat(latents, num_frames, axis=2)
 
         # scale the initial noise by the standard deviation required by the scheduler
-        latents = latents * np.float64(self.scheduler.init_noise_sigma)
-
+        latents = latents * self.scheduler.init_noise_sigma
         return latents
 
     def prepare_mask_latents(
@@ -91,17 +82,13 @@ class LipsyncPipeline:
         # we do that before converting to dtype to avoid breaking in case we're using cpu_offload
         # and half precision
         batch, channel, height, width = mask.shape
-        new_height = height // self.vae_scale_factor
-        new_width = width // self.vae_scale_factor
-        resized = np.zeros((batch, channel, new_height, new_width), dtype=mask.dtype)
+        target_h = height // self.vae_scale_factor
+        target_w = width // self.vae_scale_factor
+        resized = np.zeros((batch, channel, target_h, target_w), dtype=mask.dtype)
         for b in range(batch):
-            for c in range(channel):
-                resized[b, c] = scipy.ndimage.zoom(
-                    mask[b, c],
-                    (new_height / height, new_width / width),
-                    order=1,
-                    mode="grid-constant",
-                    grid_mode=True,
+            for c in range(mask.shape[1]):
+                resized[b, c] = cv2.resize(
+                    mask[b, c], (target_w, target_h), interpolation=cv2.INTER_NEAREST
                 )
         mask = resized
 
@@ -164,22 +151,22 @@ class LipsyncPipeline:
 
     def forward(
         self,
+        faces,
+        whisper_chunks,
         num_frames: int = 16,
         height: Optional[int] = None,
         width: Optional[int] = None,
         num_inference_steps: int = 20,
         guidance_scale: float = 1.5,
-        # negative_prompt: Optional[Union[str, List[str]]] = None,
-        # num_images_per_prompt: int = 1,
-        # latents: Optional[np.ndarray] = None,
-        # prompt_embeds: Optional[np.ndarray] = None,
-        # negative_prompt_embeds: Optional[np.ndarray] = None,
-        # pooled_prompt_embeds: Optional[np.ndarray] = None,
-        # negative_pooled_prompt_embeds: Optional[np.ndarray] = None,
-        # original_size: Optional[Tuple[int, int]] = None,
-        # crops_coords_top_left: Tuple[int, int] = (0, 0),
-        # target_size: Optional[Tuple[int, int]] = None,
     ):
+        # Define call parameters
+        batch_size = 1
+        sample_size = 64
+
+        # Default height and width to unet
+        height = height or sample_size * self.vae_scale_factor
+        width = width or sample_size * self.vae_scale_factor
+
         # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
         # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
         # corresponds to doing no classifier free guidance.
@@ -189,20 +176,13 @@ class LipsyncPipeline:
         self.scheduler.set_timesteps(num_inference_steps)
         timesteps = self.scheduler.timesteps
 
-        video_fps = 25
-        num_inferences = 15
+        num_inferences = min(len(faces), len(whisper_chunks)) // num_frames
 
         # Prepare latent variables
-        # all_latents = self.prepare_latents(
-        #     batch_size,
-        #     num_frames * num_inferences,
-        #     num_channels_latents,
-        #     height,
-        #     width,
-        #     weight_dtype,
-        #     device,
-        #     generator,
-        # )
+        num_channels_latents = 4
+        all_latents = self.prepare_latents(
+            batch_size, num_frames * num_inferences, num_channels_latents, height, width
+        ).astype(np.float16)
 
         # Denoising loop
         synced_video_frames = []

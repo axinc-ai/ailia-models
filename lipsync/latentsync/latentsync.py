@@ -1,22 +1,32 @@
+import os
+import shutil
 import sys
+import tempfile
 from logging import getLogger
 
 import cv2
 import numpy as np
+import librosa
 import soundfile as sf
 import tqdm
 
+import torch
+import subprocess
+
 import ailia
+
+from image_processor import ImageProcessor
 
 # import original modules
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models, check_and_download_file  # noqa
 
+from affine_transform import AlignRestore
 import df
-from image_processor import AlignRestore
 
 logger = getLogger(__name__)
+
 
 # ======================
 # Parameters
@@ -61,6 +71,37 @@ args = update_parser(parser, check_input_type=False)
 # ======================
 # Secondary Functions
 # ======================
+
+
+def read_video(video_path):
+    with tempfile.TemporaryDirectory() as temp_dir:
+        file_path = os.path.join(temp_dir, "video.mp4")
+        command = f"ffmpeg -loglevel error -y -nostdin -i {video_path} -r 25 -crf 18 {file_path}"
+        subprocess.run(command, shell=True)
+        video_path = file_path
+
+        cap = cv2.VideoCapture(video_path)
+        try:
+            if not cap.isOpened():
+                raise Exception("Could not open video: %s" % video_path)
+
+            frames = []
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # BGR -> RGB
+                frames.append(frame_rgb)
+        finally:
+            cap.release()
+            shutil.rmtree(video_path, ignore_errors=True)
+
+    return np.array(frames)
+
+
+def read_audio(audio_path: str, audio_sample_rate: int = 16000):
+    audio_samples, _ = librosa.load(audio_path, sr=audio_sample_rate, mono=True)
+    return audio_samples
 
 
 def write_video(video_output_path: str, video_frames: np.ndarray, fps: int):
@@ -110,10 +151,39 @@ def restore_video(faces, video_frames, boxes, affine_matrices):
 # ======================
 
 
+def affine_transform_video(video_path):
+    video_frames = read_video(video_path)
+
+    image_processor = ImageProcessor()
+
+    faces = []
+    boxes = []
+    affine_matrices = []
+    logger.info(f"Affine transforming {len(video_frames)} faces...")
+    for frame in tqdm.tqdm(video_frames):
+        face, box, affine_matrix = image_processor.affine_transform(frame)
+        faces.append(face)
+        boxes.append(box)
+        affine_matrices.append(affine_matrix)
+
+    faces = np.stack(faces)
+    return faces, video_frames, boxes, affine_matrices
+
+
 def recognize_from_video(pipe: df.LipsyncPipeline):
+    video_path = "demo1_video.mp4"
+    audio_path = "demo1_audio.wav"
+
     logger.info("Start inference...")
 
+    faces, original_video_frames, boxes, affine_matrices = affine_transform_video(
+        video_path
+    )
+    audio_samples = read_audio(audio_path)
+
     synced_video_frames = pipe.forward(
+        faces,
+        whisper_chunks,
         num_frames=16,
         num_inference_steps=20,
         guidance_scale=1.5,
@@ -129,8 +199,7 @@ def recognize_from_video(pipe: df.LipsyncPipeline):
     audio_samples_remain_length = int(
         synced_video_frames.shape[0] / video_fps * audio_sample_rate
     )
-    audio_samples = audio_samples[:audio_samples_remain_length].cpu().numpy()
-
+    audio_samples = audio_samples[:audio_samples_remain_length]
 
     # img_savepath = get_savepath(args.savepath, "", ext=".png")
     # logger.info(f"saved at : {img_savepath}")
@@ -185,14 +254,6 @@ def main():
         vae_decoder = onnxruntime.InferenceSession(
             WEIGHT_VAE_DEC_PATH, providers=providers
         )
-
-    args.disable_ailia_tokenizer = True
-    if args.disable_ailia_tokenizer:
-        import transformers
-
-        tokenizer = None
-    else:
-        raise NotImplementedError
 
     scheduler = df.schedulers.DDIMScheduler.from_config(
         {
