@@ -103,6 +103,9 @@ parser.add_argument(
     default=256,
     help="max_length for generation",
 )
+parser.add_argument(
+    "--normal", action="store_true", help="use normal model (default : opt model)."
+)
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
 
@@ -115,16 +118,20 @@ FP16 = ""
 if args.fp16:
     FP16 = "_fp16"
 
+OPT = ".opt"
+if args.normal:
+    OPT = ""
+
 WEIGHT_PATH = "Qwen2-VL-2B" + FP16 + ".onnx"
-WEIGHT_VIS_PATH = "Qwen2-VL-2B_vis" + FP16 + ".onnx"
+WEIGHT_VIS_PATH = "Qwen2-VL-2B_vis" + FP16 + OPT + ".onnx"
 MODEL_PATH = "Qwen2-VL-2B" + FP16 + ".onnx.prototxt"
-MODEL_VIS_PATH = "Qwen2-VL-2B_vis" + FP16 + ".onnx.prototxt"
+MODEL_VIS_PATH = "Qwen2-VL-2B_vis" + FP16 + OPT + ".onnx.prototxt"
 if args.fp16:
     PB_PATH = "Qwen2-VL-2B_weights_fp16.pb"
     PB_VIS_PATH = None
 else:
     PB_PATH = "Qwen2-VL-2B_weights.pb"
-    PB_VIS_PATH = "Qwen2-VL-2B_vis_weights.pb"
+    PB_VIS_PATH = "Qwen2-VL-2B_vis_weights" + OPT + ".pb"
 
 
 # ======================
