@@ -131,7 +131,7 @@ if args.fp16:
     PB_VIS_PATH = None
 else:
     PB_PATH = "Qwen2-VL-2B_weights.pb"
-    PB_VIS_PATH = "Qwen2-VL-2B_vis_weights" + OPT + ".pb"
+    PB_VIS_PATH = "Qwen2-VL-2B_vis_weights.pb"
 
 
 # ======================
