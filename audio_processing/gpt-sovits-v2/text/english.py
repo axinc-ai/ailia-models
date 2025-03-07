@@ -146,7 +146,7 @@ def read_dict():
 
 def read_dict_new():
     g2p_dict = {}
-    with open(CMU_DICT_PATH) as f:
+    with open(CMU_DICT_PATH, encoding="utf-8") as f:
         line = f.readline()
         line_index = 1
         while line:
@@ -159,7 +159,7 @@ def read_dict_new():
             line_index = line_index + 1
             line = f.readline()
 
-    with open(CMU_DICT_FAST_PATH) as f:
+    with open(CMU_DICT_FAST_PATH, encoding="utf-8") as f:
         line = f.readline()
         line_index = 1
         while line:
