@@ -24,6 +24,7 @@ from model_utils import check_and_download_models, check_and_download_file  # no
 
 from affine_transform import AlignRestore
 import df
+from audio2feature import Audio2Feature
 
 logger = getLogger(__name__)
 
@@ -117,26 +118,20 @@ def write_video(video_output_path: str, video_frames: np.ndarray, fps: int):
 
 
 def restore_video(faces, video_frames, boxes, affine_matrices):
-    import torch
-    import torchvision
-    from einops import rearrange
-
-    logger.info(f"Restoring {len(faces)} faces...")
-
     restorer = AlignRestore()
     video_frames = video_frames[: faces.shape[0]]
+
+    logger.info(f"Restoring {len(faces)} faces...")
 
     out_frames = []
     for index, face in enumerate(tqdm.tqdm(faces)):
         x1, y1, x2, y2 = boxes[index]
         height = int(y2 - y1)
         width = int(x2 - x1)
-        face = torchvision.transforms.functional.resize(
-            face, size=(height, width), antialias=True
-        )
-        face = rearrange(face, "c h w -> h w c")
-        face = (face / 2 + 0.5).clamp(0, 1)
-        face = (face * 255).to(torch.uint8).cpu().numpy()
+
+        face = np.clip(face / 2 + 0.5, 0, 1)
+        face = (face * 255).astype(np.uint8)
+        face = cv2.resize(face, (width, height), interpolation=cv2.INTER_AREA)
 
         out_frame = restorer.restore_img(
             video_frames[index], face, affine_matrices[index]
@@ -152,9 +147,9 @@ def restore_video(faces, video_frames, boxes, affine_matrices):
 
 
 def affine_transform_video(video_path):
-    video_frames = read_video(video_path)
-
     image_processor = ImageProcessor()
+
+    video_frames = read_video(video_path)
 
     faces = []
     boxes = []
@@ -176,10 +171,23 @@ def recognize_from_video(pipe: df.LipsyncPipeline):
 
     logger.info("Start inference...")
 
-    faces, original_video_frames, boxes, affine_matrices = affine_transform_video(
-        video_path
+    audio_encoder = Audio2Feature(
+        model_path="whisper_tiny.pt", device="cuda", num_frames=16
     )
+
+    (
+        faces,
+        original_video_frames,
+        boxes,
+        affine_matrices,
+    ) = affine_transform_video(video_path)
     audio_samples = read_audio(audio_path)
+
+    video_fps = 25
+    whisper_feature = audio_encoder.audio2feat(audio_path)
+    whisper_chunks = audio_encoder.feature2chunks(
+        feature_array=whisper_feature, fps=video_fps
+    )
 
     synced_video_frames = pipe.forward(
         faces,
@@ -190,11 +198,12 @@ def recognize_from_video(pipe: df.LipsyncPipeline):
         height=256,
         width=256,
     )
+
+    synced_video_frames = synced_video_frames.transpose(0, 2, 3, 1)
     synced_video_frames = restore_video(
         synced_video_frames, original_video_frames, boxes, affine_matrices
     )
 
-    video_fps = 25
     audio_sample_rate = 16000
     audio_samples_remain_length = int(
         synced_video_frames.shape[0] / video_fps * audio_sample_rate
