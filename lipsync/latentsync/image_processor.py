@@ -29,8 +29,7 @@ def load_fixed_mask(resolution):
     return mask_image
 
 
-def preprocess_fixed_mask_image(image):
-    size = 256
+def preprocess_fixed_mask_image(image, size=256):
     image = image.transpose(1, 2, 0)  # CHW -> HWC
     image = np.array(
         Image.fromarray(image).resize((size, size), Image.Resampling.BILINEAR)
@@ -45,8 +44,8 @@ def preprocess_fixed_mask_image(image):
 
 
 class ImageProcessor:
-    def __init__(self):
-        self.resolution = 256
+    def __init__(self, size=256):
+        self.resolution = size
 
         self.restorer = AlignRestore()
         self.smoother = laplacianSmooth()

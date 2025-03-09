@@ -1,5 +1,6 @@
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 from logging import getLogger
@@ -11,7 +12,6 @@ import soundfile as sf
 import tqdm
 
 import torch
-import subprocess
 
 import ailia
 
@@ -24,7 +24,6 @@ from model_utils import check_and_download_models, check_and_download_file  # no
 
 from affine_transform import AlignRestore
 import df
-from audio2feature import Audio2Feature
 
 logger = getLogger(__name__)
 
@@ -40,11 +39,14 @@ WEIGHT_VAE_DEC_PATH = "vae_decoder.onnx"
 MODEL_VAE_DEC_PATH = "vae_decoder.onnx.prototxt"
 WEIGHT_VAE_ENC_PATH = "vae_encoder.onnx"
 MODEL_VAE_ENC_PATH = "vae_encoder.onnx.prototxt"
+WEIGHT_AUDIO_ENC_PATH = "whisper_tiny.onnx"
+MODEL_AUDIO_ENC_PATH = "whisper_tiny.onnx.prototxt"
 
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/latentsync/"
 
-IMAGE_SIZE = 512
-SAVE_IMAGE_PATH = "output.png"
+VIDEO_PATH = "demo1_video.mp4"
+WAV_PATH = "demo1_audio.wav"
+SAVE_VIDEO_PATH = "output.mp4"
 
 # ======================
 # Arguemnt Parser Config
@@ -52,9 +54,25 @@ SAVE_IMAGE_PATH = "output.png"
 
 parser = get_base_parser(
     "LatentSync: Audio Conditioned Latent Diffusion Models for Lip Sync",
-    None,
-    SAVE_IMAGE_PATH,
-    fp16_support=False,
+    WAV_PATH,
+    SAVE_VIDEO_PATH,
+    input_ftype="audio",
+)
+parser.add_argument(
+    "-v",
+    "--video",
+    metavar="VIDEO",
+    default=VIDEO_PATH,
+    help="Input Video",
+)
+parser.add_argument(
+    "--inference_steps", type=int, default=20, help="Inference steps. 10-50 range."
+)
+parser.add_argument(
+    "--guidance_scale",
+    type=float,
+    default=1.5,
+    help="Guidance scale. 1.0-3.5 range, 0.5 step.",
 )
 parser.add_argument(
     "--seed",
@@ -62,11 +80,9 @@ parser.add_argument(
     default=None,
     help="random seed",
 )
-parser.add_argument(
-    "--disable_ailia_tokenizer", action="store_true", help="disable ailia tokenizer."
-)
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser, check_input_type=False)
+args.input = parser.parse_args().input
 
 
 # ======================
@@ -146,8 +162,8 @@ def restore_video(faces, video_frames, boxes, affine_matrices):
 # ======================
 
 
-def affine_transform_video(video_path):
-    image_processor = ImageProcessor()
+def affine_transform_video(video_path, size=256):
+    image_processor = ImageProcessor(size=size)
 
     video_frames = read_video(video_path)
 
@@ -166,35 +182,29 @@ def affine_transform_video(video_path):
 
 
 def recognize_from_video(pipe: df.LipsyncPipeline):
-    video_path = "demo1_video.mp4"
-    audio_path = "demo1_audio.wav"
+    audio_path = args.input
+    video_path = args.video
+    inference_steps = args.inference_steps
+    guidance_scale = args.guidance_scale
 
     logger.info("Start inference...")
-
-    audio_encoder = Audio2Feature(
-        model_path="whisper_tiny.pt", device="cuda", num_frames=16
-    )
 
     (
         faces,
         original_video_frames,
         boxes,
         affine_matrices,
-    ) = affine_transform_video(video_path)
-    audio_samples = read_audio(audio_path)
+    ) = affine_transform_video(video_path, size=256)
 
     video_fps = 25
-    whisper_feature = audio_encoder.audio2feat(audio_path)
-    whisper_chunks = audio_encoder.feature2chunks(
-        feature_array=whisper_feature, fps=video_fps
-    )
-
+    audio_samples = read_audio(audio_path)
     synced_video_frames = pipe.forward(
         faces,
-        whisper_chunks,
+        audio_samples,
         num_frames=16,
-        num_inference_steps=20,
-        guidance_scale=1.5,
+        video_fps=video_fps,
+        num_inference_steps=inference_steps,
+        guidance_scale=guidance_scale,
         height=256,
         width=256,
     )
@@ -210,9 +220,24 @@ def recognize_from_video(pipe: df.LipsyncPipeline):
     )
     audio_samples = audio_samples[:audio_samples_remain_length]
 
-    # img_savepath = get_savepath(args.savepath, "", ext=".png")
-    # logger.info(f"saved at : {img_savepath}")
-    # cv2.imwrite(img_savepath, image)
+    video_savepath = get_savepath(args.savepath, "", ext=".mp4")
+    with tempfile.TemporaryDirectory() as temp_dir:
+        tmp_video = os.path.join(temp_dir, "video.mp4")
+        tmp_audio = os.path.join(temp_dir, "audio.wav")
+        try:
+            write_video(tmp_video, synced_video_frames, fps=video_fps)
+            sf.write(tmp_audio, audio_samples, audio_sample_rate)
+
+            command = (
+                f"ffmpeg -y -loglevel error -nostdin -i {tmp_video} -i {tmp_audio}"
+                f" -c:v libx264 -c:a aac -q:v 0 -q:a 0 {video_savepath}"
+            )
+            subprocess.run(command, shell=True)
+        finally:
+            shutil.rmtree(tmp_video, ignore_errors=True)
+            shutil.rmtree(tmp_audio, ignore_errors=True)
+
+        logger.info(f"saved at : {video_savepath}")
 
     logger.info("Script finished successfully.")
 
@@ -221,6 +246,8 @@ def main():
     check_and_download_models(WEIGHT_UNET_PATH, MODEL_UNET_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_VAE_ENC_PATH, MODEL_VAE_ENC_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_VAE_DEC_PATH, MODEL_VAE_DEC_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_AUDIO_ENC_PATH, MODEL_AUDIO_ENC_PATH, REMOTE_PATH)
+    check_and_download_file(WEIGHT_UNET_PB_PATH, REMOTE_PATH)
 
     seed = args.seed
     if seed is not None:
@@ -251,6 +278,12 @@ def main():
             env_id=env_id,
             memory_mode=memory_mode,
         )
+        audio_encoder = ailia.Net(
+            MODEL_AUDIO_ENC_PATH,
+            WEIGHT_AUDIO_ENC_PATH,
+            env_id=env_id,
+            memory_mode=memory_mode,
+        )
     else:
         import onnxruntime
 
@@ -262,6 +295,8 @@ def main():
         )
         vae_decoder = onnxruntime.InferenceSession(
             WEIGHT_VAE_DEC_PATH, providers=providers
+        audio_encoder = onnxruntime.InferenceSession(
+            WEIGHT_AUDIO_ENC_PATH, providers=providers
         )
 
     scheduler = df.schedulers.DDIMScheduler.from_config(
@@ -278,6 +313,7 @@ def main():
     )
 
     pipe = df.LipsyncPipeline(
+        audio_encoder=audio_encoder,
         vae_encoder=vae_encoder,
         vae_decoder=vae_decoder,
         unet=net,

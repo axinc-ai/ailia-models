@@ -8,6 +8,8 @@ import numpy as np
 import tqdm
 
 from image_processor import preprocess_fixed_mask_image
+from audio2feature import Audio2Feature
+
 
 logger = getLogger(__name__)
 
@@ -15,6 +17,7 @@ logger = getLogger(__name__)
 class LipsyncPipeline:
     def __init__(
         self,
+        audio_encoder,
         vae_encoder,
         vae_decoder,
         unet,
@@ -23,6 +26,7 @@ class LipsyncPipeline:
     ):
         super().__init__()
 
+        self.audio_encoder = audio_encoder
         self.vae_encoder = vae_encoder
         self.vae_decoder = vae_decoder
         self.unet = unet
@@ -152,8 +156,9 @@ class LipsyncPipeline:
     def forward(
         self,
         faces,
-        whisper_chunks,
+        audio_samples,
         num_frames: int = 16,
+        video_fps: int = 25,
         height: Optional[int] = None,
         width: Optional[int] = None,
         num_inference_steps: int = 20,
@@ -176,6 +181,15 @@ class LipsyncPipeline:
         self.scheduler.set_timesteps(num_inference_steps)
         timesteps = self.scheduler.timesteps
 
+        audio_encoder = Audio2Feature(
+            self.audio_encoder, num_frames=16, use_onnx=self.use_onnx
+        )
+
+        whisper_feature = audio_encoder.audio2feat(audio_samples)
+        whisper_chunks = audio_encoder.feature2chunks(
+            feature_array=whisper_feature, fps=video_fps
+        )
+
         num_inferences = min(len(faces), len(whisper_chunks)) // num_frames
 
         # Prepare latent variables
@@ -190,7 +204,6 @@ class LipsyncPipeline:
             audio_embeds = np.stack(
                 whisper_chunks[i * num_frames : (i + 1) * num_frames]
             )
-            # audio_embeds = audio_embeds.to(device, dtype=weight_dtype)
             if do_classifier_free_guidance:
                 null_audio_embeds = np.zeros_like(audio_embeds)
                 audio_embeds = np.concatenate([null_audio_embeds, audio_embeds])
@@ -198,7 +211,10 @@ class LipsyncPipeline:
             latents = all_latents[:, :, i * num_frames : (i + 1) * num_frames]
 
             # prepare_masks_and_masked_images
-            results = [preprocess_fixed_mask_image(image) for image in inference_faces]
+            results = [
+                preprocess_fixed_mask_image(image, size=height)
+                for image in inference_faces
+            ]
             pixel_values_list, masked_pixel_values_list, masks_list = list(
                 zip(*results)
             )

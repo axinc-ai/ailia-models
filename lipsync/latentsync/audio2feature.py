@@ -2,19 +2,20 @@
 
 import numpy as np
 
-from whisper import load_model
+from whisper.transcribe import transcribe as transcribe_function
 
 
 class Audio2Feature:
     def __init__(
         self,
-        model_path,
-        device=None,
+        model,
         num_frames=16,
+        use_onnx: bool = False,
     ):
-        self.model = load_model(model_path, device)
+        self.model = model
         self.num_frames = num_frames
-        self.embedding_dim = self.model.dims.n_audio_state
+        self.embedding_dim = 384
+        self.use_onnx = use_onnx
 
     def get_sliced_feature(
         self, feature_array, vid_idx, audio_feat_length=[2, 2], fps=25
@@ -52,7 +53,7 @@ class Audio2Feature:
         i = 0
         while True:
             start_idx = int(i * whisper_idx_multiplier)
-            selected_feature, selected_idx = self.get_sliced_feature(
+            selected_feature, _ = self.get_sliced_feature(
                 feature_array=feature_array,
                 vid_idx=i,
                 audio_feat_length=audio_feat_length,
@@ -65,9 +66,9 @@ class Audio2Feature:
 
         return whisper_chunks
 
-    def audio2feat(self, audio_path):
+    def audio2feat(self, audio):
         # get the sample rate of the audio
-        result = self.model.transcribe(audio_path)
+        result = transcribe_function(self.model, audio, use_onnx=self.use_onnx)
         embed_list = []
         for emb in result["segments"]:
             encoder_embeddings = emb["encoder_embeddings"]
