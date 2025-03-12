@@ -92,7 +92,7 @@ def create_parser():
         help='Flag to enable optimized code'
     )
     parser.add_argument(
-        '--save_format', metavar="FORMAT", default="pkl", choices=("pkl", "npy", "pt"),
+        '--save_format', metavar="FORMAT", default="pt", choices=("pkl", "npy", "pt"),
         help='Choose training file format: pt, npy or pkl.'
     )
     parser.add_argument(
@@ -116,6 +116,7 @@ def setup_optimization(enable_optimization,  optimization_device):
             device = torch.device("mps")
         else:
             device = torch.device("cpu")
+            args.optimization_device="cpu"
 
         weights_torch = gaussian_kernel1d_torch(4, 0, int(4.0 * float(4) + 0.5), device).unsqueeze(0).unsqueeze(0).expand(1, 1, 33)
         logger.info(f"Torch device: {device}")
@@ -333,6 +334,7 @@ def save_training_file(train_feat_file, save_format, train_outputs, enable_optim
     if enable_optimization:
         # Convert numpy arrays to torch tensors for optimized version
         if not isinstance(train_outputs[0], torch.Tensor):
+
             train_outputs_torch = [
                 torch.from_numpy(train_outputs[0]).float().to(device), 
                 train_outputs[1],
