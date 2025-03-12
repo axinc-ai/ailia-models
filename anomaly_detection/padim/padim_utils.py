@@ -4,10 +4,12 @@ import cv2
 from collections import OrderedDict
 import random
 import pickle
+import time
 
 from PIL import Image
 from image_utils import normalize_image  # noqa: E402
 from detector_utils import load_image  # noqa: E402
+
 
 from scipy.spatial.distance import mahalanobis
 from scipy.ndimage import gaussian_filter
@@ -16,6 +18,9 @@ from sklearn.metrics import precision_recall_curve
 
 from skimage import morphology
 from skimage.segmentation import mark_boundaries
+import torch
+import torch.nn.functional as F
+
 
 WEIGHT_RESNET18_PATH = 'resnet18.onnx'
 MODEL_RESNET18_PATH = 'resnet18.onnx.prototxt'
@@ -56,6 +61,48 @@ def embedding_concat(x, y):
 
     return a
 
+def embedding_concat_optimizded(x, y, device):
+    B, C1, H1, W1 = x.shape
+    _, C2, H2, W2 = y.shape
+
+    assert H1 == W1
+
+    s = H1 // H2
+    # Chesboard pattern downscaling
+    sel = torch.from_numpy(np.asarray([
+        np.array([i for i in range(i, H1, s)]) for i in range(s)
+    ])).to(device)
+    index3 = sel[torch.repeat_interleave(torch.arange(s, device=device), s)]
+    index4 = sel[torch.tile(torch.arange(s, device=device), (s,))]
+    #a = x[:, :, index3[:, None].T, index4.T].permute(0, 1, 4, 2, 3)
+    a = x[:, :, index3[:, None].permute(2, 1, 0), index4.permute(1, 0)].permute(0, 1, 4, 2, 3)
+    # Concatenation
+    z = torch.cat((
+        a, 
+        torch.tile(y[:, :, None, :, :], (1, 1, s * s, 1, 1))
+    ), axis=1)
+    # Downsizing and reshaping
+    z = z.reshape(B, -1, s, s, H2, W2).permute(0, 1, 4, 2, 5, 3).reshape(B, -1, H1, W1) 
+    return z
+
+def embedding_concat_numpy(x, y):
+    B, C1, H1, W1 = x.shape
+    _, C2, H2, W2 = y.shape
+    assert H1 == W1
+    s = H1 // H2
+    #Chesboard pattern downscaling
+    sel = np.asarray([np.array([i for i in range(i, H1, s)]) for i in range(s)])
+    index3= sel[np.repeat(np.arange(s), s)]
+    index4= sel[np.tile(np.arange(s), s)]
+    a=x[:, :, index3[:, None].T, index4.T].transpose((0, 1, 4, 2, 3))
+    #concatination
+    z=np.concatenate((a, np.tile((y[:, :, None, :, :]), (1, 1, s*s, 1, 1))), axis=1)#.reshape((B, -1, H2 , W2))
+    _, C3, _, _, _ = z.shape #(1, 448, 16, 28, 28)
+    #downsizing and rescaling
+    z=z.reshape((B, C3, s, s, H2,W2)).transpose((0, 1, 4, 2, 5, 3)).reshape(B, C3, H1, W1)
+    
+    return z
+
 
 def preprocess(img, size, crop_size, mask=False, keep_aspect = True):
     h, w = img.shape[:2]
@@ -69,7 +116,7 @@ def preprocess(img, size, crop_size, mask=False, keep_aspect = True):
     else:
         size = (size, size)
     img = np.array(Image.fromarray(img).resize(
-        size, resample=Image.ANTIALIAS if not mask else Image.NEAREST))
+        size, resample=Image.LANCZOS if not mask else Image.NEAREST))
 
     # center crop
     h, w = img.shape[:2]
@@ -139,11 +186,22 @@ def preprocess_aug(img, size, crop_size, mask=False, keep_aspect = True, angle_r
         return img
 
 
-def postprocess(outputs):
+def postprocess(outputs, training_c=False):
+    embedding_vectors = outputs['layer1']
+    for layer_name in ['layer2', 'layer3']:
+        if training_c:
+            embedding_vectors = embedding_concat_numpy(embedding_vectors, outputs[layer_name])
+        else:
+            embedding_vectors = embedding_concat(embedding_vectors, outputs[layer_name])
+
+        
+    return embedding_vectors
+
+def postprocess_optimized(outputs, device):
     # Embedding concat
     embedding_vectors = outputs['layer1']
     for layer_name in ['layer2', 'layer3']:
-        embedding_vectors = embedding_concat(embedding_vectors, outputs[layer_name])
+        embedding_vectors = embedding_concat_optimizded(embedding_vectors, outputs[layer_name], device)
 
     return embedding_vectors
 
@@ -277,6 +335,114 @@ def training(net, params, size, crop_size, keep_aspect, batch_size, train_dir, a
     train_outputs = [mean, cov, cov_inv, idx]
     return train_outputs
 
+
+def training_optimized(net, params, size, crop_size, keep_aspect, batch_size, train_dir, aug, aug_num, seed, logger):
+    # set seed
+    random.seed(seed)
+    idx = random.sample(range(0, params["t_d"]), params["d"])
+
+    if os.path.isdir(train_dir):
+        train_imgs = sorted([
+            os.path.join(train_dir, f) for f in os.listdir(train_dir)
+            if f.endswith('.png') or f.endswith('.jpg') or f.endswith('.bmp')
+        ])
+        if len(train_imgs) == 0:
+            logger.error("train images not found in '%s'" % train_dir)
+            sys.exit(-1)
+    else:
+        logger.info("capture 200 frames from video")
+        train_imgs = capture_training_frames_from_video(train_dir)
+
+    if not aug:
+        logger.info('extract train set features without augmentation')
+        aug_num = 1
+    else:
+        logger.info('extract train set features with augmentation')
+        aug_num = aug_num
+    mean = None
+    N = 0
+    for i_aug in range(aug_num):
+        for i_img in range(0, len(train_imgs), batch_size):
+            # prepare input data
+            imgs = []
+            if not aug:
+                logger.info('from (%s ~ %s) ' %
+                            (i_img,
+                             min(len(train_imgs) - 1,
+                                            i_img + batch_size)))
+            else:
+                logger.info('from (%s ~ %s) on augmentation lap %d' %
+                            (i_img,
+                             min(len(train_imgs) - 1,
+                                            i_img + batch_size), i_aug))
+            for image_path in train_imgs[i_img:i_img + batch_size]:
+                if type(image_path) is str:
+                    img = load_image(image_path)
+                    img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+                else:
+                    img = cv2.cvtColor(image_path, cv2.COLOR_BGR2RGB)
+                if not aug:
+                    img = preprocess(img, size, crop_size, keep_aspect=keep_aspect)
+                else:
+                    img = preprocess_aug(img, size, crop_size, keep_aspect=keep_aspect)
+                imgs.append(img)
+
+            # countup N
+            N += len(imgs)
+
+            imgs = np.vstack(imgs)
+
+            logger.debug(f'input images shape: {imgs.shape}')
+            net.set_input_shape(imgs.shape)
+
+            # inference
+            _ = net.predict(imgs)
+
+            train_outputs = OrderedDict([
+                ('layer1', []), ('layer2', []), ('layer3', [])
+            ])
+            for key, name in zip(train_outputs.keys(), params["feat_names"]):
+                train_outputs[key].append(net.get_blob_data(name))
+            for k, v in train_outputs.items():
+                train_outputs[k] = v[0]
+
+            embedding_vectors = postprocess(train_outputs, training_c=True)
+
+            # randomly select d dimension
+            embedding_vectors = embedding_vectors[:, idx, :, :]
+
+            # reshape 2d pixels to 1d features
+            B, C, H, W = embedding_vectors.shape
+            embedding_vectors = embedding_vectors.reshape(B, C, H * W)
+
+            # initialize mean and covariance matrix
+            if (mean is None):
+                mean = np.zeros((C, H * W), dtype=np.float32)
+                cov = np.zeros((C, C, H * W), dtype=np.float32)
+
+            # calculate multivariate Gaussian distribution
+            # (add up mean and covariance matrix)
+            mean += np.sum(embedding_vectors, axis=0)
+            for i in range(H * W):
+                # https://github.com/numpy/numpy/blob/v1.21.0/numpy/lib/function_base.py#L2324-L2543
+                m = embedding_vectors[:, :, i]
+                m = m - (mean[:, [i]].T / N)
+                cov[:, :, i] += m.T @ m
+
+    # devide mean by N
+    mean = mean / N
+    # devide covariance by N-1, and calculate inverse
+    I = np.identity(C)
+    for i in range(H * W):
+        cov[:, :, i] = (cov[:, :, i] / (N - 1)) + 0.01 * I
+
+    cov_inv = np.zeros(cov.shape)
+    for i in range(H * W):
+        cov_inv[:, :, i] = np.linalg.inv(cov[:, :, i])
+    
+    train_outputs = [mean, cov, cov_inv, idx]
+    return train_outputs
+
 def infer(net, params, train_outputs, img, crop_size):
     # prepare input data
     imgs = []
@@ -323,6 +489,142 @@ def infer(net, params, train_outputs, img, crop_size):
     dist_tmp = gaussian_filter(dist_tmp, sigma=4)
 
     return dist_tmp
+    
+
+def batched_einsum(einsum_str, inv_cov_matrices, differences, batch_size):
+    num_batches = inv_cov_matrices.size(0) // batch_size
+    results = []
+
+    for i in range(num_batches):
+        start_idx = i * batch_size
+        end_idx = start_idx + batch_size
+        batched_inv_cov = inv_cov_matrices[start_idx:end_idx]
+        result = torch.einsum(einsum_str, batched_inv_cov, differences)
+        results.append(result)
+    
+    return torch.cat(results, dim=0)
+
+
+
+def infer_optimized(net, params, train_outputs, img, crop_size, device, logger, weights_torch=None, batch_size = 2):
+    # prepare input data
+    imgs = []
+    imgs.append(img)
+    imgs = np.vstack(imgs)
+
+    # inference
+    start_time = time.time()
+    print("predict")
+    print(img.shape)
+    net.set_input_shape(imgs.shape)
+    _ = net.predict(imgs)
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    logger.info(f"input_inference: {elapsed_time} sec")
+    
+    start_time = time.time()
+    test_outputs = OrderedDict([
+        ('layer1', []), ('layer2', []), ('layer3', [])
+    ])
+    for key, name in zip(test_outputs.keys(), params["feat_names"]):
+        test_outputs[key].append(net.get_blob_data(name))
+    for k, v in test_outputs.items():
+        test_outputs[k] = torch.from_numpy(v[0]).to(device)
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    logger.info(f"SetToDictionary: {elapsed_time} sec")
+
+    start_time = time.time()
+    embedding_vectors = postprocess_optimized(test_outputs, device)
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    logger.info(f"PostProcess_Optimized: {elapsed_time} sec")
+
+    # randomly select d dimension
+    idx = train_outputs[3]
+    embedding_vectors = embedding_vectors[:, idx, :, :]
+
+    # reshape 2d pixels to 1d features
+    B, C, H, W = embedding_vectors.shape
+    embedding_vectors = embedding_vectors.view(B, C, H * W)
+
+    # calculate distance matrix
+    start_time = time.time()
+    mean_vectors = train_outputs[0]
+    inv_cov_matrices = train_outputs[2]
+    samples = embedding_vectors[0]
+    if str(device) not in str(mean_vectors.device):
+        logger.info(f"Changing device from {mean_vectors.device} to {device}")
+        mean_vectors = mean_vectors.to("cpu").to(device)
+        samples = samples.to("cpu").to(device)
+        inv_cov_matrices = inv_cov_matrices.to("cpu").to(device)
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    logger.info(f"matrix_device_transfer: {elapsed_time} sec")
+    
+    start_time = time.time()
+    # Step 1: Compute the difference between each sample and its corresponding mean
+    differences = samples - mean_vectors
+
+    # Step 2: Apply the inverse covariance matrix in batches
+    # バッチサイズを適宜設定
+    if batch_size>1: 
+        transformed_differences = batched_einsum('bjk,jk->bk', inv_cov_matrices, differences, batch_size)
+    else:
+        transformed_differences = torch.einsum('ijk,jk->ik', inv_cov_matrices, differences)
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    logger.info(f"einsum: {elapsed_time} sec")
+    
+    # Step 3: Compute the Mahalanobis distance
+    start_time = time.time()
+    dist_tmp = torch.sqrt(torch.sum(differences * transformed_differences, dim=0)).to(device)
+
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    logger.info(f"mahalanobis: {elapsed_time} sec")
+    
+    # upsample
+    dist_tmp = dist_tmp.view(1, -1).view(H, W)
+    start_time = time.time()
+    dist_tmp = F.interpolate(dist_tmp.unsqueeze(0).unsqueeze(0), size=(crop_size, crop_size), mode='bilinear', align_corners=False).squeeze(0)
+    dist_tmp = gausian_filter_torch(dist_tmp, weights_torch, mode='reflect')
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    logger.info(f"upsample_gaussianfilter: {elapsed_time} sec")
+
+    return dist_tmp
+
+# Assuming other parts of the code (e.g., net, params, train_outputs, img, device, logger, weights_torch) are defined elsewhere
+
+
+
+
+def gaussian_kernel1d_torch(sigma, order, radius, device):
+    """
+    Computes a 1-D Gaussian convolution kernel.
+    """
+    if order < 0:
+        raise ValueError('order must be non-negative')
+    exponent_range = torch.arange(order + 1, device=device)
+    sigma2 = sigma * sigma
+    x = torch.arange(-radius, radius + 1, dtype=torch.float64, device=device)
+    phi_x = torch.exp(-0.5 / sigma2 * x ** 2)
+    phi_x = phi_x / phi_x.sum()
+
+    if order == 0:
+        return phi_x
+    
+def gausian_filter_torch(input, weights,  output=None, mode='constant', cval=0.0, origin=0):
+ 
+  input=input.permute(2, 0,1 ).to(dtype=torch.float64)
+  input_padded=F.pad(input, pad=(16, 16), mode='reflect')
+  output1=torch.nn.functional.conv1d(input_padded, weights.to(dtype=torch.float64)  ) #torch.Size([448, 1, 448])
+  
+  input2=output1.permute(2, 1,0 )
+  input_padded2=F.pad(input2, pad=(16, 16), mode='reflect', )
+  output2=torch.nn.functional.conv1d(input_padded2, weights.to(dtype=torch.float64) ).permute(1, 0,2 ) 
+  return output2
 
 
 def normalize_scores(score_map, crop_size, roi_img = None):
@@ -343,6 +645,27 @@ def normalize_scores(score_map, crop_size, roi_img = None):
 
     return scores
 
+def normalize_scores_torch(score_map, crop_size, roi_img=None):
+    """
+    score_map is list of torch tensors
+    crop size int
+    """
+    # Convert list of tensors to a single tensor
+    score_map = torch.stack(score_map)
+
+    # Handle ROI (Region of Interest)
+    if roi_img is not None:
+        roi_img = (roi_img > 0.5).float()  # Threshold to binary mask
+        for i in range(score_map.shape[0]):
+            score_map[i] *= roi_img[0, 0]  # Element-wise multiplication
+
+    # Normalization using min-max scaling (avoiding division by zero)
+    max_score = score_map.max()
+    min_score = score_map.min()
+    scores = (score_map - min_score) / torch.clamp(max_score - min_score, min=1e-8)
+
+    return scores
+
 def calculate_anormal_scores(score_map, crop_size):
     N = len(score_map)
     score_map = np.vstack(score_map)
@@ -352,7 +675,22 @@ def calculate_anormal_scores(score_map, crop_size):
     anormal_scores = np.zeros((score_map.shape[0]))
     for i in range(score_map.shape[0]):
         anormal_scores[i] = score_map[i].max()
+    return anormal_scores
+
+def calculate_anormal_scores_torch(score_map, crop_size):
+    N = len(score_map)
+
+
+    # Stack the score maps into a single tensor
+    score_map = torch.vstack(score_map)
+    score_map = score_map.unsqueeze(0).view(N, crop_size, crop_size)
+
+    # Calculate anormal scores
+    anormal_scores = np.zeros((N))
+    for i in range(score_map.shape[0]):
+        anormal_scores[i] = score_map[i].max().cpu().numpy()
     
+
     return anormal_scores
 
 
@@ -423,5 +761,54 @@ def pack_visualize(heat_map, mask, vis_img, scores, crop_size):
     frame[:,0:crop_size,:] = heat_map
     frame[:,crop_size:crop_size*2,:] = mask
     frame[:,crop_size*2:crop_size*3,:] = vis_img
+
+    return frame
+
+
+
+def pack_visualize_gui(heat_map, mask, vis_img, scores, crop_size):
+    """
+    Creates a composite image with heat_map and mask on top, and vis_img centered below.
+
+    Args:
+        heat_map (np.ndarray): Heatmap image.
+        mask (np.ndarray): Mask image.
+        vis_img (np.ndarray): Visualization image.
+        scores (np.ndarray): Scores used for normalizing the heatmap.
+        crop_size (int): Size of the input images.
+
+    Returns:
+        np.ndarray: Composite image.
+    """
+
+    # Convert vis_img to BGR format
+    vis_img = (vis_img * 255).astype(np.uint8)
+    vis_img = cv2.cvtColor(vis_img, cv2.COLOR_RGB2BGR)
+
+    # Convert mask to BGR format
+    mask = mask.astype(np.uint8)
+    mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+
+    # Normalize and color the heatmap
+    heat_map = (heat_map - scores.min() * 255) / (scores.max() * 255 - scores.min() * 255)
+    heat_map = (heat_map * 255).astype(np.uint8)
+    heat_map = cv2.applyColorMap(heat_map, cv2.COLORMAP_JET)
+
+    # Calculate the height of the final image
+    final_height = crop_size * 2
+
+    # Calculate the width of the final image
+    final_width = crop_size * 2
+
+    # Create the final frame
+    frame = np.zeros((final_height, final_width, 3), dtype=np.uint8)
+
+    # Place heat_map and mask on the top row
+    frame[0:crop_size, 0:crop_size, :] = heat_map
+    frame[0:crop_size, crop_size:crop_size * 2, :] = mask
+
+    # Center vis_img in the bottom row
+    start_x = (final_width - crop_size) // 2
+    frame[crop_size:crop_size * 2, start_x:start_x + crop_size, :] = vis_img
 
     return frame

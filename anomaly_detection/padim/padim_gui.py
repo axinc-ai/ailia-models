@@ -1,751 +1,727 @@
-# PaDiM GUI launcher
-
 import os
 import cv2
-import numpy
+import numpy as np
 import shutil
 import sys
+sys.path.append('../../util')
 import glob
 import ailia
-
-from PIL import Image, ImageTk
-
-sys.path.append('../../util')
-from padim_utils import *
-from model_utils import check_and_download_models  # noqa: E402
-import webcamera_utils  # noqa: E402
-
-# for macOS, please install "brew install python-tk@3.9"
 import tkinter as tk
-from tkinter import ttk
-import tkinter.filedialog
-
+from tkinter import ttk, filedialog, messagebox
+from PIL import Image, ImageTk
+import pickle
+import torch
+import threading
 import log_init
-from logging import getLogger  # noqa: E402
+from logging import getLogger
+# Import ThemedTk from ttkthemes to use the Arc theme.
+from ttkthemes import ThemedTk
 
-from arg_utils import get_base_parser, update_parser  # noqa: E402
+
+# Append paths for utility modules
+from padim_utils import *
+from model_utils import check_and_download_models
+import webcamera_utils
+from arg_utils import get_base_parser, update_parser
 
 logger = getLogger(__name__)
-
-parser = get_base_parser('PaDiM GUI', None, None)
-args = update_parser(parser)
-
-# ======================
-# Global settings
-# ======================
-
-input_index = 0
-output_index = 0
-result_index = 0
-model_index = 0
-slider_index = 50
-
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/padim/'
 
-train_folder = None
-test_folder = None
-test_type = "folder"
-test_roi = None
-score_cache = {}
+# Modified helper function to create a combobox with limited width
+def create_limited_combobox(parent, values, state, label_text, default_index=0):
+    width = len(label_text) - 5  # width measured in characters
+    cb = ttk.Combobox(parent, values=values, state=state, width=width)
+    cb.current(default_index)
+    return cb
 
-# ======================
-# List box cursor changed
-# ======================
+class PaDiMApp(ThemedTk):
+    def __init__(self):
+        # Initialize the ThemedTk with the 'arc' theme.
+        super().__init__(theme="arc")
+        self.title("PaDiM GUI")
+        # Set window size to 80% of the screen size
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        width = int(screen_width * 0.8)
+        height = int(screen_height * 0.8)
+        self.geometry(f"{width}x{height}")
 
-def input_changed(event):
-    global input_index
-    selection = event.widget.curselection()
-    if selection:
-        input_index = selection[0]
-    else:
-        input_index = 0   
-    load_detail(train_list[input_index], True)
+        # Initialize state variables
+        self.train_folder = "train"
+        self.test_folder = None
+        self.test_type = "folder"
+        self.test_roi = None
+        self.score_cache = {}
 
-def output_changed(event):
-    global output_index
-    selection = event.widget.curselection()
-    if selection:
-        output_index = selection[0]
-    else:
-        output_index = 0   
-    load_detail(test_list[output_index], True)
+        self.setup_menu()
+        self.setup_status_bar()
+        self.setup_gui()
+        # Set the default optimization device based on CUDA availability
+        self.set_default_optimization_device()
+        self.load_initial_lists()
+        # Adjust slider length after GUI build to fit within right frame
+        self.after(100, self.adjust_slider_length)
 
-def result_changed(event):
-    global result_index
-    selection = event.widget.curselection()
-    if selection:
-        result_index = selection[0]
-    else:
-        result_index = 0   
-    load_detail(result_list[result_index], False)
+    def set_default_optimization_device(self):
+        """Checks if CUDA is available and sets the Optimization Device combobox accordingly."""
+        # Device list is assumed to be ["cpu", "cuda:0", "mps"]
+        if torch.cuda.is_available():
+            self.device_combobox.current(1)  # Set to "cuda:0"
+        else:
+            self.device_combobox.current(0)  # Set to "cpu"
 
-def model_changed(event):
-    global model_index
-    selection = event.widget.curselection()
-    if selection:
-        model_index = selection[0]
-    else:
-        model_index = 0   
+    def adjust_slider_length(self):
+        right_width = self.right_frame.winfo_width()
+        new_length = right_width - 10
+        if new_length < 50:
+            new_length = 50
+        self.slider.config(length=new_length)
 
-def slider_changed(event):
-    global scale, slider_index
-    slider_index = scale.get()
+    def setup_menu(self):
+        menu_bar = tk.Menu(self)
+        file_menu = tk.Menu(menu_bar, tearoff=0)
+        file_menu.add_command(label="Open Train Folder", command=self.train_folder_dialog)
+        file_menu.add_command(label="Open Train Video", command=self.train_file_dialog)
+        file_menu.add_command(label="Open Train Camera", command=self.train_camera_dialog)
+        file_menu.add_separator()
+        file_menu.add_command(label="Open Test Folder", command=self.test_folder_dialog)
+        file_menu.add_command(label="Open Test Video", command=self.test_file_dialog)
+        file_menu.add_command(label="Open Test Camera", command=self.test_camera_dialog)
+        file_menu.add_separator()
+        file_menu.add_command(label="Save Results", command=self.save_dialog)
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", command=self.quit)
+        menu_bar.add_cascade(label="File", menu=file_menu)
+        self.config(menu=menu_bar)
 
-# ======================
-# List box double click
-# ======================
+    def setup_status_bar(self):
+        self.status_var = tk.StringVar()
+        self.status_var.set("Ready")
+        status_bar = ttk.Label(self, textvariable=self.status_var, relief=tk.SUNKEN, anchor="w")
+        status_bar.pack(side=tk.BOTTOM, fill=tk.X)
 
-def open_file_by_os(filepath):
-    import subprocess, os, platform
-    if platform.system() == 'Darwin':       # macOS
-        subprocess.call(('open', filepath))
-    elif platform.system() == 'Windows':    # Windows
-        os.startfile(filepath)
-    else:                                   # linux variants
-        subprocess.call(('xdg-open', filepath))
+    def update_status(self, message):
+        self.status_var.set(message)
+        self.update_idletasks()
 
-def input_double_click(event):
-    global input_index
-    selection = event.widget.curselection()
-    if selection:
-        input_index = selection[0]
-    else:
-        input_index = 0   
-    open_file_by_os(train_list[input_index])
+    def setup_gui(self):
+        # Create main frame with three columns: left (fixed), center (expandable), right (fixed)
+        main_frame = ttk.Frame(self, padding=10)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        main_frame.columnconfigure(0, weight=0)
+        main_frame.columnconfigure(1, weight=2)
+        main_frame.columnconfigure(2, weight=0)
+        main_frame.rowconfigure(0, weight=1)
 
-def output_double_click(event):
-    global output_index
-    selection = event.widget.curselection()
-    if selection:
-        output_index = selection[0]
-    else:
-        output_index = 0   
-    open_file_by_os(test_list[output_index])
+        # --------------------
+        # Left Frame: File Selection
+        # --------------------
+        self.left_frame = ttk.Frame(main_frame)
+        self.left_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        ttk.Label(self.left_frame, text="Train Images").pack(anchor="w")
+        # Scrollable train listbox
+        train_scroll_frame = ttk.Frame(self.left_frame)
+        train_scroll_frame.pack(fill=tk.BOTH, expand=True, pady=2)
+        self.train_listbox = tk.Listbox(train_scroll_frame, height=10, exportselection=False)
+        train_scroll = ttk.Scrollbar(train_scroll_frame, orient=tk.VERTICAL, command=self.train_listbox.yview)
+        self.train_listbox.config(yscrollcommand=train_scroll.set)
+        self.train_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        train_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.train_listbox.bind("<<ListboxSelect>>", self.on_train_select)
+        self.train_listbox.bind("<Double-Button-1>", self.on_train_double_click)
+        train_buttons = ttk.Frame(self.left_frame)
+        train_buttons.pack(fill=tk.X, pady=5)
+        ttk.Button(train_buttons, text="Open Folder", command=self.train_folder_dialog).pack(side=tk.LEFT, padx=2)
+        ttk.Button(train_buttons, text="Open Video", command=self.train_file_dialog).pack(side=tk.LEFT, padx=2)
+        ttk.Button(train_buttons, text="Open Camera", command=self.train_camera_dialog).pack(side=tk.LEFT, padx=2)
+        ttk.Label(self.left_frame, text="Test Images/Video").pack(anchor="w", pady=(10, 0))
+        # Scrollable test listbox
+        test_scroll_frame = ttk.Frame(self.left_frame)
+        test_scroll_frame.pack(fill=tk.BOTH, expand=True, pady=2)
+        self.test_listbox = tk.Listbox(test_scroll_frame, height=10, exportselection=False)
+        test_scroll = ttk.Scrollbar(test_scroll_frame, orient=tk.VERTICAL, command=self.test_listbox.yview)
+        self.test_listbox.config(yscrollcommand=test_scroll.set)
+        self.test_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        test_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.test_listbox.bind("<<ListboxSelect>>", self.on_test_select)
+        self.test_listbox.bind("<Double-Button-1>", self.on_test_double_click)
+        test_buttons = ttk.Frame(self.left_frame)
+        test_buttons.pack(fill=tk.X, pady=5)
+        ttk.Button(test_buttons, text="Open Folder", command=self.test_folder_dialog).pack(side=tk.LEFT, padx=2)
+        ttk.Button(test_buttons, text="Open Video", command=self.test_file_dialog).pack(side=tk.LEFT, padx=2)
+        ttk.Button(test_buttons, text="Open Camera", command=self.test_camera_dialog).pack(side=tk.LEFT, padx=2)
 
-def result_double_click(event):
-    global result_index
-    selection = event.widget.curselection()
-    if selection:
-        result_index = selection[0]
-    else:
-        result_index = 0
-    open_file_by_os(result_list[result_index])
+        # Limit left frame width to the width of its three buttons
+        self.update_idletasks()
+        btn1 = ttk.Button(self.left_frame, text="Open Folder")
+        btn2 = ttk.Button(self.left_frame, text="Open Video")
+        btn3 = ttk.Button(self.left_frame, text="Open Camera")
+        left_width = btn1.winfo_reqwidth() + btn2.winfo_reqwidth() + btn3.winfo_reqwidth() + 10
+        self.left_frame.config(width=left_width)
+        self.left_frame.grid_propagate(False)
+        main_frame.columnconfigure(0, minsize=left_width)
 
-# ======================
-# Change file
-# ======================
+        # --------------------
+        # Center Frame: Image Preview
+        # --------------------
+        self.center_frame = ttk.Frame(main_frame)
+        self.center_frame.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+        self.center_frame.rowconfigure(0, weight=1)
+        self.center_frame.columnconfigure(0, weight=1)
+        self.canvas = tk.Canvas(self.center_frame, bg="black")
+        self.canvas.grid(row=0, column=0, sticky="nsew")
+        # Centering function is in load_detail()
 
-CANVAS_W = 480
-CANVAS_H = 160
+        # --------------------
+        # Right Frame: Results, Actions, ROI Preview, and Settings
+        # --------------------
+        self.right_frame = ttk.Frame(main_frame)
+        self.right_frame.grid(row=0, column=2, sticky="nsew", padx=5, pady=5)
+        ttk.Label(self.right_frame, text="Result Images").pack(anchor="w")
+        # Scrollable result listbox
+        result_scroll_frame = ttk.Frame(self.right_frame)
+        result_scroll_frame.pack(fill=tk.BOTH, expand=False, pady=2)
+        self.result_listbox = tk.Listbox(result_scroll_frame, height=10, exportselection=False)
+        result_scroll = ttk.Scrollbar(result_scroll_frame, orient=tk.VERTICAL, command=self.result_listbox.yview)
+        self.result_listbox.config(yscrollcommand=result_scroll.set)
+        self.result_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        result_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.result_listbox.bind("<<ListboxSelect>>", self.on_result_select)
+        self.result_listbox.bind("<Double-Button-1>", self.on_result_double_click)
+        actions_frame = ttk.Frame(self.right_frame)
+        actions_frame.pack(fill=tk.X, pady=5)
+        self.train_button = ttk.Button(actions_frame, text="Train", command=self.threaded_train)
+        self.train_button.pack(side=tk.LEFT, padx=2)
+        self.test_button = ttk.Button(actions_frame, text="Test", command=self.threaded_test)
+        self.test_button.pack(side=tk.LEFT, padx=2)
+        self.save_button = ttk.Button(actions_frame, text="Save Images", command=self.save_dialog)
+        self.save_button.pack(side=tk.LEFT, padx=2)
+        # ROI Preview moved 
+        roi_frame_right = ttk.LabelFrame(self.right_frame, text="ROI Preview")
+        roi_frame_right.pack(fill=tk.X, pady=(5, 5), padx=5)
+        self.canvas_roi = tk.Canvas(roi_frame_right, bg="black", width=140, height=140)
+        self.canvas_roi.pack(side=tk.LEFT, padx=5, pady=5)
+        ttk.Button(roi_frame_right, text="Select ROI", command=self.test_roi_dialog).pack(side=tk.LEFT, padx=5, pady=5)
+        settings_frame = ttk.LabelFrame(self.right_frame, text="Settings")
+        settings_frame.pack(fill=tk.BOTH, expand=True, pady=10, padx=5)
 
-def create_photo_image(path,w=CANVAS_W,h=CANVAS_H):
-    image_bgr = cv2.imread(path)
-    if image_bgr is None:
-        capture = cv2.VideoCapture(path)
-        ret, image_bgr = capture.read()
-        capture.release()
-    #image_bgr = cv2.resize(image_bgr,(w,h))
-    image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB) # imreadはBGRなのでRGBに変換
-    image_pil = Image.fromarray(image_rgb) # RGBからPILフォーマットへ変換
-    image_pil.thumbnail((w,h), Image.ANTIALIAS)
-    image_tk  = ImageTk.PhotoImage(image_pil) # ImageTkフォーマットへ変換
-    return image_tk
+        # Reduce spacing between widgets in settings_frame
+        pad_x = 1
+        pad_y = 1
 
-def load_canvas_image(path, is_train):
-    global canvas, canvas_item, image_tk
-    if is_train:
-        image_tk = create_photo_image(path,w=CANVAS_H,h=CANVAS_H)
-    else:
-        image_tk = create_photo_image(path)
-    if canvas_item == None:
-        canvas_item = canvas.create_image(0, 0, image=image_tk, anchor=tk.NW)
-    else:
-        canvas.itemconfig(canvas_item,image=image_tk)
+        # Row 0: Keep Aspect and Center Crop 
+        self.keep_aspect = tk.BooleanVar(value=True)
+        self.center_crop = tk.BooleanVar(value=True)
+        ttk.Checkbutton(settings_frame, text="Keep Aspect", variable=self.keep_aspect).grid(row=0, column=0, sticky="w", padx=pad_x, pady=pad_y)
+        ttk.Checkbutton(settings_frame, text="Center Crop", variable=self.center_crop).grid(row=0, column=1, sticky="w", padx=pad_x, pady=pad_y)
+        # Row 1: Feature Extractor Model combobox
+        model_label = "Feature Extractor Model"
+        ttk.Label(settings_frame, text=model_label).grid(row=1, column=0, columnspan=2, sticky="w", padx=pad_x, pady=(5, pad_y))
+        self.model_list = ["resnet18 (224)", "resnet18 (448)", "wide_resnet50_2 (224)"]
+        self.model_combobox = create_limited_combobox(settings_frame, self.model_list, "readonly", model_label, default_index=1)
+        self.model_combobox.grid(row=2, column=0, columnspan=2, sticky="w", padx=pad_x, pady=pad_y)
+        # Row 2: Enable Optimization checkbox
+        self.enable_optimization = tk.BooleanVar(value=True)
+        ttk.Checkbutton(settings_frame, text="Enable Optimization", variable=self.enable_optimization).grid(row=3, column=0, columnspan=2, sticky="w", padx=pad_x, pady=pad_y)
+        # Row 3: Trained File Format and Optimization Device comboboxes 
+        file_format_label = "Trained File Format"
+        ttk.Label(settings_frame, text=file_format_label).grid(row=4, column=0, sticky="w", padx=pad_x, pady=(5, pad_y))
+        self.file_format_list = ["pkl", "pt", "npy"]
+        self.file_format_combobox = create_limited_combobox(settings_frame, self.file_format_list, "readonly", file_format_label, default_index=1)
+        self.file_format_combobox.grid(row=5, column=0, sticky="w", padx=pad_x, pady=pad_y)
+        device_label = "Optimization Device"
+        ttk.Label(settings_frame, text=device_label).grid(row=4, column=1, sticky="w", padx=pad_x, pady=(5, pad_y))
+        self.device_list = ["cpu", "cuda:0", "mps"]
+        self.device_combobox = create_limited_combobox(settings_frame, self.device_list, "readonly", device_label, default_index=0)
+        self.device_combobox.grid(row=5, column=1, sticky="w", padx=pad_x, pady=pad_y)
+        # Row 4: Threshold slider with centered label
+        ttk.Label(settings_frame, text="Threshold", anchor="center").grid(row=6, column=0, columnspan=2, sticky="ew", padx=pad_x, pady=(5, pad_y))
+        self.threshold = tk.IntVar(value=50)
+        self.slider = tk.Scale(settings_frame, from_=0, to=100, orient=tk.HORIZONTAL,
+                               variable=self.threshold, showvalue=True, length=300, sliderlength=30)
+        self.slider.grid(row=7, column=0, columnspan=2, padx=pad_x, pady=pad_y)
 
-def load_roi_image(path):
-    global canvas_roi, canvas_roi_item, image_tk_roi
-    image_tk_roi = create_photo_image(path,w=CANVAS_H,h=CANVAS_H)
-    if canvas_roi_item == None:
-        canvas_roi_item = canvas_roi.create_image(0, 0, image=image_tk_roi, anchor=tk.NW)
-    else:
-        canvas_roi.itemconfig(canvas_roi_item,image=image_tk_roi)
+        # Limit right frame width to the width of its three action buttons
+        self.update_idletasks()
+        rbtn1 = ttk.Button(self.right_frame, text="Train")
+        rbtn2 = ttk.Button(self.right_frame, text="Test")
+        rbtn3 = ttk.Button(self.right_frame, text="Save Images")
+        right_width = rbtn1.winfo_reqwidth() + rbtn2.winfo_reqwidth() + rbtn3.winfo_reqwidth() + 10
+        self.right_frame.config(width=right_width)
+        self.right_frame.grid_propagate(False)
+        main_frame.columnconfigure(2, minsize=right_width)
+        # Also limit the settings frame to the right frame width
+        settings_frame.config(width=right_width)
+        settings_frame.grid_propagate(False)
 
-def load_detail(image_path, is_train):
-    image_exist = False
-    for ext in [".jpg",".png"]:
+    def load_initial_lists(self):
+        self.train_list = self.get_training_file_list()
+        self.test_list = self.get_test_file_list()
+        self.result_list = []
+        self.train_listbox.delete(0, tk.END)
+        for f in self.train_list:
+            self.train_listbox.insert(tk.END, os.path.basename(f))
+        if self.train_list:
+            self.train_listbox.selection_set(0)
+            self.on_train_select(None)
+        self.test_listbox.delete(0, tk.END)
+        for f in self.test_list:
+            self.test_listbox.insert(tk.END, os.path.basename(f))
+
+    def on_train_select(self, event):
+        selection = self.train_listbox.curselection()
+        if selection:
+            index = selection[0]
+            self.load_detail(self.train_list[index])
+
+    def on_test_select(self, event):
+        selection = self.test_listbox.curselection()
+        if selection:
+            index = selection[0]
+            self.load_detail(self.test_list[index])
+
+    def on_result_select(self, event):
+        selection = self.result_listbox.curselection()
+        if selection:
+            index = selection[0]
+            self.load_detail(self.result_list[index])
+
+    def on_train_double_click(self, event):
+        selection = self.train_listbox.curselection()
+        if selection:
+            index = selection[0]
+            self.open_file_by_os(self.train_list[index])
+
+    def on_test_double_click(self, event):
+        selection = self.test_listbox.curselection()
+        if selection:
+            index = selection[0]
+            self.open_file_by_os(self.test_list[index])
+
+    def on_result_double_click(self, event):
+        selection = self.result_listbox.curselection()
+        if selection:
+            index = selection[0]
+            self.open_file_by_os(self.result_list[index])
+
+    def open_file_by_os(self, filepath):
+        try:
+            import subprocess, platform
+            if platform.system() == 'Darwin':
+                subprocess.call(('open', filepath))
+            elif platform.system() == 'Windows':
+                os.startfile(filepath)
+            else:
+                subprocess.call(('xdg-open', filepath))
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    def create_photo_image(self, path, canvas=None):
+        if canvas is None:
+            canvas = self.canvas
+        canvas.update_idletasks()
+        w = canvas.winfo_width() or 480
+        h = canvas.winfo_height() or 160
+        image_bgr = cv2.imread(path)
+        if image_bgr is None:
+            cap = cv2.VideoCapture(path)
+            ret, image_bgr = cap.read()
+            cap.release()
+        image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
+        image_pil = Image.fromarray(image_rgb)
+        image_pil.thumbnail((w, h), Image.LANCZOS)
+        return ImageTk.PhotoImage(image_pil)
+
+    def load_detail(self, image_path):
         if os.path.exists(image_path):
-            load_canvas_image(image_path, is_train)
-            image_exist = True
-            break
+            try:
+                img_tk = self.create_photo_image(image_path, canvas=self.canvas)
+                self.canvas.delete("all")
+                # Center the image on the preview canvas
+                canvas_width = self.canvas.winfo_width()
+                canvas_height = self.canvas.winfo_height()
+                self.canvas.create_image(canvas_width/2, canvas_height/2, image=img_tk, anchor="center")
+                self.canvas.image = img_tk
+            except Exception as e:
+                self.update_status("Error loading image: " + str(e))
 
+    def train_file_dialog(self):
+        file_path = filedialog.askopenfilename(filetypes=[("Image/Video Files", "*")])
+        if file_path:
+            self.train_folder = file_path
+            self.train_list = [file_path]
+            self.train_listbox.delete(0, tk.END)
+            self.train_listbox.insert(tk.END, os.path.basename(file_path))
+            self.load_detail(file_path)
 
-# ======================
-# Run model
-# ======================
+    def train_folder_dialog(self):
+        folder_path = filedialog.askdirectory()
+        if folder_path:
+            self.train_folder = folder_path
+            self.train_list = self.get_training_file_list()
+            self.train_listbox.delete(0, tk.END)
+            for f in self.train_list:
+                self.train_listbox.insert(tk.END, os.path.basename(f))
+            if self.train_list:
+                self.load_detail(self.train_list[0])
 
-def get_keep_aspect():
-    global valueKeepAspect
-    return valueKeepAspect.get()
+    def train_camera_dialog(self):
+        self.train_folder = "camera"
+        camera_list = self.get_camera_list()
+        if not camera_list:
+            messagebox.showerror("Error", "No camera detected.")
+            return
+        self.train_list = camera_list
+        self.train_listbox.delete(0, tk.END)
+        for f in self.train_list:
+            self.train_listbox.insert(tk.END, f)
+        self.load_detail(self.train_list[0])
 
-def get_image_resize():
-    global valueCenterCrop
-    image_resize = get_image_crop_size()
-    if valueCenterCrop.get():
-        return get_image_crop_size() + (256 - 224)
-    return image_resize
+    def test_file_dialog(self):
+        file_path = filedialog.askopenfilename(filetypes=[("Image/Video Files", "*")])
+        if file_path:
+            self.test_folder = file_path
+            self.test_list = [file_path]
+            self.test_listbox.delete(0, tk.END)
+            self.test_listbox.insert(tk.END, os.path.basename(file_path))
+            self.load_detail(file_path)
+            self.test_type = "video"
 
-def get_image_crop_size():
-    global model_index
-    return get_model_resolution_list()[model_index]
+    def test_folder_dialog(self):
+        folder_path = filedialog.askdirectory()
+        if folder_path:
+            self.test_folder = folder_path
+            self.test_list = self.get_test_file_list()
+            self.test_listbox.delete(0, tk.END)
+            for f in self.test_list:
+                self.test_listbox.insert(tk.END, os.path.basename(f))
+            if self.test_list:
+                self.load_detail(self.test_list[0])
+            self.test_type = "folder"
 
-def get_model():
-    global model_index
-    return get_model_list()[model_index]
+    def test_camera_dialog(self):
+        self.test_folder = "camera"
+        camera_list = self.get_camera_list()
+        if not camera_list:
+            messagebox.showerror("Error", "No camera detected.")
+            return
+        self.test_list = camera_list
+        self.test_listbox.delete(0, tk.END)
+        for f in self.test_list:
+            self.test_listbox.insert(tk.END, f)
+        self.load_detail(self.test_list[0])
+        self.test_type = "video"
 
-def get_model_id():
-    global model_index
-    return get_model_id_list()[model_index]
+    def test_roi_dialog(self):
+        file_path = filedialog.askopenfilename(filetypes=[("Image Files", "*")])
+        if file_path:
+            self.test_roi = file_path
+            img_tk = self.create_photo_image(file_path, canvas=self.canvas_roi)
+            self.canvas_roi.delete("all")
+            self.canvas_roi.create_image(0, 0, image=img_tk, anchor=tk.NW)
+            self.canvas_roi.image = img_tk
 
-def train_button_clicked():
-    global train_folder
-    print("begin training")
+    def save_dialog(self):
+        folder_path = filedialog.askdirectory()
+        if folder_path:
+            try:
+                shutil.copytree('result', folder_path, dirs_exist_ok=True)
+                self.update_status("Results saved to " + folder_path)
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
 
-    # model files check and download
-    weight_path, model_path, params = get_params(get_model_id())
-    check_and_download_models(weight_path, model_path, REMOTE_PATH)
+    def get_camera_list(self):
+        index = 0
+        cameras = []
+        while True:
+            cap = cv2.VideoCapture(index)
+            if cap.isOpened():
+                cameras.append("camera:" + str(index))
+            else:
+                cap.release()
+                break
+            cap.release()
+            index += 1
+        return cameras
 
-    # create net instance
-    net = ailia.Net(model_path, weight_path, env_id=args.env_id)
+    def get_file_list(self, folder):
+        files = glob.glob(os.path.join(folder, "*.jpg"))
+        files.extend(glob.glob(os.path.join(folder, "*.png")))
+        files.extend(glob.glob(os.path.join(folder, "*.bmp")))
+        return sorted(files)
 
-    # training
-    batch_size = 32
-    train_dir = train_folder
-    if train_dir == "camera":
-        global train_list, input_index
-        train_dir = train_list[input_index].split(":")[1]
-    aug = False
-    aug_num = 0
-    seed = 1024
-    train_outputs = training(net, params, get_image_resize(), get_image_crop_size(), get_keep_aspect(), batch_size, train_dir, aug, aug_num, seed, logger)
+    def get_training_file_list(self):
+        if self.train_folder and os.path.isdir(self.train_folder):
+            return self.get_file_list(self.train_folder)
+        return []
 
-    # save learned distribution
-    train_feat_file = "train.pkl"
-    #train_dir = args.train_dir
-    #train_feat_file = "%s.pkl" % os.path.basename(train_dir)
-    logger.info('saving train set feature to: %s ...' % train_feat_file)
-    with open(train_feat_file, 'wb') as f:
-        pickle.dump(train_outputs, f)
-    logger.info('saved.')
+    def get_test_file_list(self):
+        if self.test_folder and os.path.isdir(self.test_folder):
+            return self.get_file_list(self.test_folder)
+        return ["bottle_000.png"]
 
-    global score_cache
-    score_cache = {}
+    def threaded_train(self):
+        thread = threading.Thread(target=self.train_button_clicked)
+        thread.start()
 
-def test_button_clicked():
-    global score_cache
-    global valueKeepAspect, valueCenterCrop
-    print("begin test")
+    def threaded_test(self):
+        thread = threading.Thread(target=self.test_button_clicked)
+        thread.start()
 
-    if "keep_aspect" in score_cache:
-        if score_cache["keep_aspect"] != get_keep_aspect() or score_cache["image_resize"] != get_image_resize() or score_cache["model"] != get_model():
-            score_cache = {}
-    score_cache["keep_aspect"] = get_keep_aspect()
-    score_cache["image_resize"] = get_image_resize()
-    score_cache["model"] = get_model()
+    def train_button_clicked(self):
+        self.update_status("Training started...")
+        self.disable_buttons()
+        try:
+            selected_model = self.model_combobox.get().split()[0]
+            self.weight_path, self.model_path, self.params = get_params(selected_model)
+            check_and_download_models(self.weight_path, self.model_path, REMOTE_PATH)
+            self.net = ailia.Net(self.model_path, self.weight_path, env_id=self.args.env_id)
+            batch_size = 4
+            train_dir = self.train_folder if self.train_folder != "camera" else self.train_list[0].split(":")[1]
+            aug = False
+            aug_num = 0
+            seed = 1024
+            train_outputs = training_optimized(
+                self.net, self.params, self.get_image_resize(), self.get_image_crop_size(),
+                self.keep_aspect.get(), batch_size, train_dir, aug, aug_num, seed, logger
+            )
+            self.trained_model_save(train_outputs)
+            self.update_status("Training completed.")
+        except Exception as e:
+            messagebox.showerror("Training Error", str(e))
+            self.update_status("Training failed.")
+        finally:
+            self.enable_buttons()
 
-    # model files check and download
-    weight_path, model_path, params = get_params(get_model_id())
-    check_and_download_models(weight_path, model_path, REMOTE_PATH)
-
-    # create net instance
-    env_id = ailia.get_gpu_environment_id()
-    net = ailia.Net(model_path, weight_path, env_id=env_id)
-
-    # load trained model
-    with open("train.pkl", 'rb') as f:
-        train_outputs = pickle.load(f)
-    
-    threshold = slider_index / 100.0
-
-    if test_type == "folder":
-        test_from_folder(net, params, train_outputs, threshold)
-    else:
-        test_from_video(net, params, train_outputs, threshold)
-
-def test_from_folder(net, params, train_outputs, threshold):
-    # file loop
-    test_imgs = []
-
-    global test_roi
-    if test_roi:
-        roi_img = load_image(test_roi)
-        roi_img = cv2.cvtColor(roi_img, cv2.COLOR_BGRA2RGB)
-        roi_img = preprocess(roi_img, get_image_resize(), keep_aspect=get_keep_aspect(), crop_size=get_image_crop_size(), mask=True)
-    else:
-        roi_img = None
-
-    score_map = []
-    for i_img in range(0, len(test_list)):
-        logger.info('from (%s) ' % (test_list[i_img]))
-
-        image_path = test_list[i_img]
-        img = load_image(image_path)
-        img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
-        img = preprocess(img, get_image_resize(), keep_aspect=get_keep_aspect(), crop_size=get_image_crop_size())
-
-        test_imgs.append(img[0])
-        if image_path in score_cache:
-            dist_tmp = score_cache[image_path].copy()
+    def trained_model_save(self, train_outputs):
+        file_format = self.file_format_combobox.get()
+        if not self.enable_optimization.get():
+            if file_format == "pkl":
+                self.train_feat_file = "train.pkl"
+                logger.info('Saving train set feature to: ' + self.train_feat_file)
+                with open(self.train_feat_file, 'wb') as f:
+                    pickle.dump(train_outputs, f)
+            elif file_format == "npy":
+                for i, output in enumerate(train_outputs):
+                    self.train_feat_file = "train_output_" + str(i) + ".npy"
+                    np.save(self.train_feat_file, output)
+            elif file_format == "pt":
+                self.train_feat_file = "train.pt"
+                torch.save(train_outputs, self.train_feat_file)
         else:
-            dist_tmp = infer(net, params, train_outputs, img, get_image_crop_size())
-            score_cache[image_path] = dist_tmp.copy()
-        score_map.append(dist_tmp)
+            if file_format == "npy":
+                for i, output in enumerate(train_outputs):
+                    self.train_feat_file = "train_output_" + str(i) + ".npy"
+                    np.save(self.train_feat_file, output)
+            train_outputs = [
+                torch.from_numpy(train_outputs[0]).float().to(self.device),
+                train_outputs[1],
+                torch.from_numpy(train_outputs[2]).float().to(self.device),
+                train_outputs[3]
+            ]
+            if file_format == "pkl":
+                self.train_feat_file = "trainOptimized.pkl"
+                with open(self.train_feat_file, 'wb') as f:
+                    pickle.dump(train_outputs, f)
+            elif file_format == "pt":
+                self.train_feat_file = "trainOptimized.pt"
+                torch.save(train_outputs, self.train_feat_file)
+        self.train_outputs = train_outputs
 
-    scores = normalize_scores(score_map, get_image_crop_size(), roi_img)
-    anormal_scores = calculate_anormal_scores(score_map, get_image_crop_size())
+    def test_button_clicked(self):
+        self.update_status("Testing started...")
+        self.disable_buttons()
+        try:
+            if not hasattr(self, "net"):
+                expected_file = None
+                file_format = self.file_format_combobox.get()
+                if file_format == "pkl":
+                    expected_file = "trainOptimized.pkl" if self.enable_optimization.get() else "train.pkl"
+                elif file_format == "pt":
+                    expected_file = "trainOptimized.pt" if self.enable_optimization.get() else "train.pt"
+                if expected_file and os.path.exists(expected_file):
+                    with open(expected_file, "rb") as f:
+                        if file_format == "pkl":
+                            self.train_outputs = pickle.load(f)
+                        elif file_format == "pt":
+                            self.train_outputs = torch.load(f)
+                    selected_model = self.model_combobox.get().split()[0]
+                    self.weight_path, self.model_path, self.params = get_params(selected_model)
+                    self.net = ailia.Net(self.model_path, self.weight_path, env_id=self.args.env_id)
+                else:
+                    ret = messagebox.askyesno("Model Not Trained", "No trained model found. Do you want to train now?")
+                    if ret:
+                        self.train_button_clicked()
+                    else:
+                        self.enable_buttons()
+                        return
+            threshold = self.threshold.get() / 100.0
+            if self.test_type == "folder":
+                self.test_from_folder(threshold)
+            else:
+                self.test_from_video(threshold)
+            self.update_status("Testing completed.")
+        except Exception as e:
+            messagebox.showerror("Testing Error", str(e))
+            self.update_status("Testing failed.")
+        finally:
+            self.enable_buttons()
 
-    # Plot gt image
-    os.makedirs("result", exist_ok=True)
-    global result_list, listsResult, ListboxResult
-    result_list = []
-    for i in range(0, scores.shape[0]):
-        img = denormalization(test_imgs[i])
-        heat_map, mask, vis_img = visualize(img, scores[i], threshold)
-        frame = pack_visualize(heat_map, mask, vis_img, scores, get_image_crop_size())
-        dirname, path = os.path.split(test_list[i])
-        output_path = "result/"+path
-        cv2.imwrite(output_path, frame)       
-        result_list.append(output_path)
-
-    listsResult.set(result_list)
-    load_detail(result_list[0], False)
-    ListboxResult.select_set(0)
-
-def test_from_video(net, params, train_outputs, threshold):
-    result_path = "result.mp4"
-
-    video_path = test_folder
-    if video_path == "camera":
-        global test_list, output_index
-        video_path = test_list[output_index].split(":")[1]
-
-    capture = webcamera_utils.get_capture(video_path)
-    f_h = int(get_image_crop_size())
-    f_w = int(get_image_crop_size()) * 3
-    writer = webcamera_utils.get_writer(result_path, f_h, f_w)
-
-    score_map = []
-
-    frame_shown = False
-    while(True):
-        ret, frame = capture.read()
-        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
-            break
-        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
-            break
-
-        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        img = preprocess(img, get_image_resize(), keep_aspect=get_keep_aspect(), crop_size=get_image_crop_size())
-
-        dist_tmp = infer(net, params, train_outputs, img, get_image_crop_size())
-
-        score_map.append(dist_tmp)
+    def test_from_folder(self, threshold):
+        test_imgs = []
         roi_img = None
-        scores = normalize_scores(score_map, get_image_crop_size(), roi_img)    # min max is calculated dynamically, please set fixed min max value from calibration data for production
+        if self.test_roi:
+            roi_img = load_image(self.test_roi)
+            roi_img = cv2.cvtColor(roi_img, cv2.COLOR_BGRA2RGB)
+            roi_img = preprocess(roi_img, self.get_image_resize(),
+                                 keep_aspect=self.keep_aspect.get(),
+                                 crop_size=self.get_image_crop_size(), mask=True)
+        score_map = []
+        for image_path in self.test_list:
+            logger.info('Processing: ' + image_path)
+            img = load_image(image_path)
+            img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+            img = preprocess(img, self.get_image_resize(), keep_aspect=self.keep_aspect.get(),
+                             crop_size=self.get_image_crop_size())
+            test_imgs.append(img[0])
+            if self.enable_optimization.get():
+                dist_tmp = infer_optimized(self.net, self.params, self.train_outputs,
+                                           img=img, crop_size=self.get_image_crop_size(),
+                                           device=self.device, logger=logger, weights_torch=self.weights_torch)
+                self.score_cache[image_path] = dist_tmp
+            else:
+                dist_tmp = infer(self.net, self.params, self.train_outputs,
+                                 img=img, crop_size=self.get_image_crop_size())
+                self.score_cache[image_path] = dist_tmp.copy()
+            score_map.append(dist_tmp)
+        os.makedirs("result", exist_ok=True)
+        self.result_list = []
+        if self.enable_optimization.get():
+            scores = normalize_scores_torch(score_map, self.get_image_crop_size(), roi_img)
+            scores = np.asarray([scores[i].cpu().numpy()[0] for i in range(len(scores))])
+        else:
+            scores = normalize_scores(score_map, self.get_image_crop_size(), roi_img)
+        for i, test_img in enumerate(test_imgs):
+            img = denormalization(test_img)
+            heat_map, mask, vis_img = visualize(img, scores[i], threshold)
+            frame = pack_visualize_gui(heat_map, mask, vis_img, scores, self.get_image_crop_size())
+            output_path = os.path.join("result", os.path.basename(self.test_list[i]))
+            cv2.imwrite(output_path, frame)
+            self.result_list.append(output_path)
+        self.result_listbox.delete(0, tk.END)
+        for f in self.result_list:
+            self.result_listbox.insert(tk.END, os.path.basename(f))
+        if self.result_list:
+            self.load_detail(self.result_list[0])
 
-        heat_map, mask, vis_img = visualize(denormalization(img[0]), scores[len(scores)-1], threshold)
-        frame = pack_visualize(heat_map, mask, vis_img, scores, get_image_crop_size())
+    def test_from_video(self, threshold):
+        result_path = "result.mp4"
+        # Determine video source: if test_folder equals "camera", use the camera index.
+        video_path = self.test_folder if self.test_folder != "camera" else self.test_list[0].split(":")[1]
+        capture = webcamera_utils.get_capture(video_path)
+        crop_size = self.get_image_crop_size()
+        
+        # Set the expected frame dimensions.
+        frame_height = int(crop_size*1.8)
+        frame_width = int(crop_size*2.8)
 
-        cv2.imshow('frame', frame)
-        frame_shown = True
+        # Initialize the VideoWriter with (width, height).
+        writer = webcamera_utils.get_writer(result_path, frame_height, frame_width)
 
+        while True:
+            ret, frame = capture.read()
+            if not ret or (cv2.waitKey(1) & 0xFF == ord('q')):
+                break
+
+            # Convert captured frame from BGR to RGB for processing.
+            img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            img_preprocessed = preprocess(
+                img,
+                self.get_image_resize(),
+                keep_aspect=self.keep_aspect.get(),
+                crop_size=crop_size
+            )
+            
+            # Perform inference and obtain raw score map.
+            if self.enable_optimization.get():
+                dist_tmp = infer_optimized(
+                    self.net, self.params, self.train_outputs,
+                    img=img_preprocessed, crop_size=crop_size,
+                    device=self.device, logger=logger, weights_torch=self.weights_torch
+                )
+                norm_scores_tensor = normalize_scores_torch([dist_tmp], crop_size, None)
+                score_value = norm_scores_tensor[0].cpu().numpy()[0]
+            else:
+                dist_tmp = infer(
+                    self.net, self.params, self.train_outputs,
+                    img=img_preprocessed, crop_size=crop_size
+                )
+                norm_scores = normalize_scores([dist_tmp], crop_size, None)
+                score_value = norm_scores[0]
+            
+            # Visualize the result: denormalize, create heat map, mask, and final visualization.
+            denorm_img = denormalization(img_preprocessed[0])
+            heat_map, mask, vis_img = visualize(denorm_img, score_value, threshold)
+            frame_out = pack_visualize_gui(heat_map, mask, vis_img, np.asarray([score_value]), crop_size)
+            
+            # Ensure the frame has the exact dimensions expected by the writer.
+            frame_out = cv2.resize(frame_out, (frame_width, frame_height))
+            
+            # Convert from RGB back to BGR before writing (and displaying) since OpenCV expects BGR.
+            #frame_out_bgr = cv2.cvtColor(frame_out, cv2.COLOR_RGB2BGR)
+            
+            cv2.imshow('frame', frame_out)
+            if writer is not None:
+                writer.write(frame_out)
+        
+        capture.release()
         if writer is not None:
-            writer.write(frame)
-
-    capture.release()
-    cv2.destroyAllWindows()
-    if writer is not None:
-        writer.release()
-
-    global result_list, listsResult, ListboxResult
-    result_list = [result_path]
-    listsResult.set(result_list)
-    load_detail(result_list[0], False)
-    ListboxResult.select_set(0)
-
-# ======================
-# Select file
-# ======================
-
-train_folder = "train"
-test_folder = None
-
-def to_file_name(list):
-    new_list = []
-    for file in list:
-        l = file.split("/")
-        new_list.append(l[len(l) - 1])
-    return new_list
-
-def train_file_dialog():
-    global listsInput, ListboxInput, input_index
-    global train_folder
-    global train_list
-    fTyp = [("Image File or Video File", "*")]
-    iDir = os.path.abspath(os.path.dirname(__file__))
-    file_name = tk.filedialog.askopenfilename(filetypes=fTyp, initialdir=iDir)
-    if len(file_name) != 0:
-        train_folder = file_name
-        train_list = [file_name]
-        listsInput.set(train_list)
-        train_index = 0
-        ListboxInput.select_set(0)
-        load_detail(train_list[0], True)
-
-def train_folder_dialog():
-    global listsInput, ListboxInput, input_index
-    global train_folder
-    global train_list
-    iDir = os.path.abspath(os.path.dirname(__file__))
-    file_name = tk.filedialog.askdirectory(initialdir=iDir)
-    if len(file_name) != 0:
-        train_folder = file_name
-        train_list = get_training_file_list()
-        listsInput.set(to_file_name(train_list))
-        train_index = 0
-        ListboxInput.select_set(0)
-        if len(train_list)>=1:
-            load_detail(train_list[0], True)
-
-def train_camera_dialog():
-    global listsInput, ListboxInput, input_index
-    global train_folder
-    global train_list
-    train_folder = "camera"
-    train_list = get_camera_list()
-    listsInput.set(train_list)
-    train_index = 0
-    ListboxInput.select_set(0)
-    load_detail(train_list[0], True)
-
-def test_file_dialog():
-    global listsOutput, ListboxOutput, output_index
-    global test_folder
-    global test_list
-    global test_type
-    fTyp = [("Image File or Video File", "*")]
-    iDir = os.path.abspath(os.path.dirname(__file__))
-    file_name = tk.filedialog.askopenfilename(filetypes=fTyp, initialdir=iDir)
-    if len(file_name) != 0:
-        test_folder = file_name
-        test_list = [file_name]
-        listsOutput.set(test_list)
-        test_index = 0
-        ListboxOutput.select_set(0)
-        if len(test_list)>=1:
-            load_detail(test_list[0], False)
-        test_type = "video"
-
-def test_folder_dialog():
-    global listsOutput, ListboxOutput, output_index
-    global test_folder
-    global test_list
-    global test_type
-    global test_roi
-    iDir = os.path.abspath(os.path.dirname(__file__))
-    file_name = tk.filedialog.askdirectory(initialdir=iDir)
-    if len(file_name) != 0:
-        test_folder = file_name
-        test_list = get_test_file_list()
-        listsOutput.set(to_file_name(test_list))
-        test_index = 0
-        ListboxOutput.select_set(0)
-        load_detail(test_list[0], False)
-        test_type = "folder"
-
-def test_camera_dialog():
-    global listsOutput, ListboxOutput, output_index
-    global test_folder
-    global test_list
-    global test_type
-    test_folder = "camera"
-    test_list = get_camera_list()
-    listsOutput.set(test_list)
-    test_index = 0
-    ListboxOutput.select_set(0)
-    load_detail(test_list[0], False)
-    test_type = "videp"
-
-def test_roi_dialog():
-    global test_roi
-    fTyp = [("Image File", "*")]
-    iDir = os.path.abspath(os.path.dirname(__file__))
-    file_name = tk.filedialog.askopenfilename(filetypes=fTyp, initialdir=iDir)
-    if len(file_name) != 0:
-        test_roi = file_name
-        load_roi_image(test_roi)
-
-def save_dialog():
-    iDir = os.path.abspath(os.path.dirname(__file__))
-    file_name = tk.filedialog.askdirectory(initialdir=iDir)
-    if len(file_name) != 0:
-        ret = shutil.copytree('result', file_name, dirs_exist_ok = True)
-        print("Copy success to " + file_name)
-
-def get_camera_list():
-    index = 0
-    inputs = []
-    while True:
-        cap = cv2.VideoCapture(index)
-        if cap.isOpened():
-            inputs.append("camera:"+str(index))
-        else:
-            break
-        index=index+1
-        cap.release()
-    return inputs
-
-def get_file_list(folder):
-    base_path = folder+"/"
-    files = glob.glob(base_path+"*.jpg")
-    files.extend(glob.glob(base_path+"*.png"))
-    files.extend(glob.glob(base_path+"*.bmp"))
-    image_list = []
-    for image_path in files:
-        image_list.append(image_path)
-    image_list.sort()
-    return image_list
-
-def get_training_file_list():
-    global train_folder
-    return get_file_list(train_folder)
-
-def get_test_file_list():
-    global test_folder
-    if test_folder!=None:
-        return get_file_list(test_folder)
-    return ["bottle_000.png"]
-
-def get_result_file_list():
-    return []
-
-def get_model_list():
-    return ["resnet18 (224)", "resnet18 (448)", "wide_resnet50_2 (224)"]
-
-def get_model_id_list():
-    return ["resnet18", "resnet18", "wide_resnet50_2"]
-
-def get_model_resolution_list():
-    return [224, 448, 224]
-
-# ======================
-# GUI
-# ======================
-
-canvas_item = None
-canvas_roi_item = None
-
-def main():
-    global train_list, test_list, result_list, model_list
-    global listsResult, ListboxResult
-    global canvas, canvas_roi, scale
-    global inputFile, listsInput, input_list, ListboxInput
-    global outputFile, listsOutput, output_list, ListboxOutput
-    global listsModel, ListboxModel
-    global valueKeepAspect, valueCenterCrop
-
-    # rootメインウィンドウの設定
-    root = tk.Tk()
-    root.title("PaDiM GUI")
-    root.geometry("1200x600")
-
-    # メインフレームの作成と設置
-    frame = ttk.Frame(root)
-    frame.pack(padx=20,pady=10)
-
-    # Listboxの選択肢
-    train_list = get_training_file_list()
-    test_list = get_test_file_list()
-    result_list = get_result_file_list()
-    model_list = get_model_list()
-
-    listsInput = tk.StringVar(value=train_list)
-    listsOutput = tk.StringVar(value=test_list)
-    listsResult = tk.StringVar(value=result_list)
-    listsModel = tk.StringVar(value=model_list)
-
-    # 各種ウィジェットの作成
-    ListboxInput = tk.Listbox(frame, listvariable=listsInput, width=20, height=12, selectmode=tk.BROWSE, exportselection=False)
-    ListboxOutput = tk.Listbox(frame, listvariable=listsOutput, width=20, height=12, selectmode=tk.BROWSE, exportselection=False)
-    ListboxResult = tk.Listbox(frame, listvariable=listsResult, width=20, height=12, selectmode=tk.BROWSE, exportselection=False)
-    ListboxModel = tk.Listbox(frame, listvariable=listsModel, width=20, height=6, selectmode=tk.BROWSE, exportselection=False)
-
-    ListboxInput.bind("<<ListboxSelect>>", input_changed)
-    ListboxOutput.bind("<<ListboxSelect>>", output_changed)
-    ListboxResult.bind("<<ListboxSelect>>", result_changed)
-    ListboxModel.bind("<<ListboxSelect>>", model_changed)
-
-    ListboxInput.bind("<Double-Button-1>", input_double_click)
-    ListboxOutput.bind("<Double-Button-1>", output_double_click)
-    ListboxResult.bind("<Double-Button-1>", result_double_click)
-
-    ListboxInput.select_set(input_index)
-    ListboxOutput.select_set(output_index)
-    ListboxResult.select_set(result_index)
-    ListboxModel.select_set(model_index)
-
-    textRun = tk.StringVar(frame)
-    textRun.set("Train")
-
-    textStop = tk.StringVar(frame)
-    textStop.set("Test")
-
-    textTrainFolder = tk.StringVar(frame)
-    textTrainFolder.set("Open folder")
-
-    textTrainVideo = tk.StringVar(frame)
-    textTrainVideo.set("Open video")
-
-    textTrainCamera = tk.StringVar(frame)
-    textTrainCamera.set("Open camera")
-
-    textTestFolder = tk.StringVar(frame)
-    textTestFolder.set("Open folder")
-
-    textTestVideo = tk.StringVar(frame)
-    textTestVideo.set("Open video")
-
-    textTestCamera = tk.StringVar(frame)
-    textTestCamera.set("Open camera")
-
-    textInput = tk.StringVar(frame)
-    textInput.set("Train images")
-
-    textOutput = tk.StringVar(frame)
-    textOutput.set("Test images")
-
-    textResult = tk.StringVar(frame)
-    textResult.set("Result images")
-
-    textModelDetail = tk.StringVar(frame)
-    textModelDetail.set("Preview")
-
-    textRoi = tk.StringVar(frame)
-    textRoi.set("ROI")
-
-    textTestRoi = tk.StringVar(frame)
-    textTestRoi.set("Open roi image")
-
-    textCheckbox = tk.StringVar(frame)
-    textCheckbox.set("Train settings")
-
-    textModel = tk.StringVar(frame)
-    textModel.set("Feature extractor model")
-
-    textTestSettings = tk.StringVar(frame)
-    textTestSettings.set("Test settings")
-
-    textSlider = tk.StringVar(frame)
-    textSlider.set("threshold")
-
-    textSave = tk.StringVar(frame)
-    textSave.set("Save images")
-
-    valueKeepAspect = tkinter.BooleanVar()
-    valueKeepAspect.set(True)
-    valueCenterCrop = tkinter.BooleanVar()
-    valueCenterCrop.set(True)
-    chkKeepAspect = tk.Checkbutton(frame, variable=valueKeepAspect, text='keep aspect')
-    chkCenterCrop = tk.Checkbutton(frame, variable=valueCenterCrop, text='center crop')
-
-    # 各種ウィジェットの作成
-    labelInput = tk.Label(frame, textvariable=textInput)
-    labelOutput = tk.Label(frame, textvariable=textOutput)
-    labelResult = tk.Label(frame, textvariable=textResult)
-    labelModelDetail = tk.Label(frame, textvariable=textModelDetail)
-    labelRoi = tk.Label(frame, textvariable=textRoi)
-    labelCheckbox = tk.Label(frame, textvariable=textCheckbox)
-    labelModel = tk.Label(frame, textvariable=textModel)
-    labelTestSettings = tk.Label(frame, textvariable=textTestSettings)
-    labelSlider = tk.Label(frame, textvariable=textSlider)
-
-    buttonTrain = tk.Button(frame, textvariable=textRun, command=train_button_clicked, width=14)
-    buttonTest = tk.Button(frame, textvariable=textStop, command=test_button_clicked, width=14)
-
-    buttonTrainFolder = tk.Button(frame, textvariable=textTrainFolder, command=train_folder_dialog, width=14)
-    buttonTrainVideo = tk.Button(frame, textvariable=textTrainVideo, command=train_file_dialog, width=14)
-    buttonTrainCamera = tk.Button(frame, textvariable=textTrainCamera, command=train_camera_dialog, width=14)
-
-    buttonTestFolder = tk.Button(frame, textvariable=textTestFolder, command=test_folder_dialog, width=14)
-    buttonTestVideo = tk.Button(frame, textvariable=textTestVideo, command=test_file_dialog, width=14)
-    buttonTestCamera = tk.Button(frame, textvariable=textTestCamera, command=test_camera_dialog, width=14)
-    buttonTestRoi = tk.Button(frame, textvariable=textTestRoi, command=test_roi_dialog, width=14)
-
-    buttonSave = tk.Button(frame, textvariable=textSave, command=save_dialog, width=14)
-
-    canvas = tk.Canvas(frame, bg="black", width=CANVAS_W, height=CANVAS_H)
-    canvas.place(x=0, y=0)
-
-    canvas_roi = tk.Canvas(frame, bg="black", width=CANVAS_H, height=CANVAS_H)
-    canvas_roi.place(x=0, y=0)
-
-    load_detail(test_list[0], False)
-
-    var_scale = tk.DoubleVar()
-    var_scale.set(slider_index)
-    scale = tk.Scale(
-        frame,
-        variable=var_scale,
-        orient=tk.HORIZONTAL,
-        tickinterval=20,
-        length=200,
-    )
-    scale.bind("<ButtonRelease-1>", slider_changed)
-
-    # 各種ウィジェットの設置
-    labelInput.grid(row=0, column=0, sticky=tk.NW, rowspan=1)
-    ListboxInput.grid(row=1, column=0, sticky=tk.NW, rowspan=4)
-    buttonTrainFolder.grid(row=6, column=0, sticky=tk.NW)
-    buttonTrainVideo.grid(row=7, column=0, sticky=tk.NW)
-    buttonTrainCamera.grid(row=8, column=0, sticky=tk.NW)
-
-    labelOutput.grid(row=0, column=1, sticky=tk.NW)
-    ListboxOutput.grid(row=1, column=1, sticky=tk.NW, rowspan=4)
-    buttonTestFolder.grid(row=6, column=1, sticky=tk.NW)
-    buttonTestVideo.grid(row=7, column=1, sticky=tk.NW)
-    buttonTestCamera.grid(row=8, column=1, sticky=tk.NW)
-    labelRoi.grid(row=9, column=1, sticky=tk.NW, columnspan=1)
-    canvas_roi.grid(row=10, column=1, sticky=tk.NW, rowspan=4, columnspan=1)
-    buttonTestRoi.grid(row=15, column=1, sticky=tk.NW)
-
-    labelResult.grid(row=0, column=2, sticky=tk.NW)
-    ListboxResult.grid(row=1, column=2, sticky=tk.NW, rowspan=4)
-    buttonSave.grid(row=6, column=2, sticky=tk.NW)
-
-    labelModelDetail.grid(row=0, column=3, sticky=tk.NW, columnspan=3)
-    canvas.grid(row=1, column=3, sticky=tk.NW, rowspan=4, columnspan=3)
-
-    buttonTrain.grid(row=6, column=3, sticky=tk.NW)
-    buttonTest.grid(row=6, column=4, sticky=tk.NW)
-
-    labelCheckbox.grid(row=8, column=3, sticky=tk.NW)
-    chkKeepAspect.grid(row=9, column=3,  sticky=tk.NW)
-    chkCenterCrop.grid(row=10, column=3,  sticky=tk.NW)
-
-    labelModel.grid(row=11, column=3, sticky=tk.NW)
-    ListboxModel.grid(row=12, column=3, sticky=tk.NW, rowspan=4)
-
-    labelTestSettings.grid(row=8, column=4, sticky=tk.NW, columnspan=3)
-    labelSlider.grid(row=9, column=4, sticky=tk.NW, columnspan=3)
-    scale.grid(row=10, column=4, sticky=tk.NW, columnspan=3)
-
-    # メインフレームの作成と設置
-    frame = ttk.Frame(root)
-    frame.pack(padx=20, pady=10)
-
-    root.mainloop()
+            writer.release()
+        cv2.destroyAllWindows()
+        
+        self.result_list = [result_path]
+        self.result_listbox.delete(0, tk.END)
+        self.result_listbox.insert(tk.END, os.path.basename(result_path))
+        self.load_detail(result_path)
+
+
+    def get_image_crop_size(self):
+        index = self.model_combobox.current()
+        resolutions = [224, 448, 224]
+        return resolutions[index] if index < len(resolutions) else 224
+
+    def get_image_resize(self):
+        crop_size = self.get_image_crop_size()
+        if self.center_crop.get():
+            return crop_size + (256 - 224)
+        return crop_size
+
+    def disable_buttons(self):
+        self.train_button.config(state=tk.DISABLED)
+        self.test_button.config(state=tk.DISABLED)
+        self.save_button.config(state=tk.DISABLED)
+
+    def enable_buttons(self):
+        self.train_button.config(state=tk.NORMAL)
+        self.test_button.config(state=tk.NORMAL)
+        self.save_button.config(state=tk.NORMAL)
+
+    @property
+    def device(self):
+        return torch.device(self.device_combobox.get())
+
+    @property
+    def weights_torch(self):
+        w = gaussian_kernel1d_torch(4, 0, int(4.0 * 4 + 0.5), self.device)
+        return w.unsqueeze(0).unsqueeze(0).expand(1, 1, 33)
+
+    @property
+    def args(self):
+        if not hasattr(self, '_args'):
+            parser = get_base_parser('PaDiM GUI', None, None)
+            self._args = update_parser(parser)
+        return self._args
 
 if __name__ == '__main__':
-    main()
-
-
-
+    app = PaDiMApp()
+    app.mainloop()
