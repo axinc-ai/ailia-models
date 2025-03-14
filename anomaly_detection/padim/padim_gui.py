@@ -7,7 +7,7 @@ sys.path.append('../../util')
 import glob
 import ailia
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, filedialog, messagebox, simpledialog
 from PIL import Image, ImageTk
 import pickle
 import torch
@@ -17,7 +17,6 @@ from logging import getLogger
 # Import ThemedTk from ttkthemes to use the Arc theme.
 from ttkthemes import ThemedTk
 
-
 # Append paths for utility modules
 from padim_utils import *
 from model_utils import check_and_download_models
@@ -26,6 +25,24 @@ from arg_utils import get_base_parser, update_parser
 
 logger = getLogger(__name__)
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/padim/'
+
+# Custom dialog to select from available cameras
+class CameraSelectionDialog(simpledialog.Dialog):
+    def __init__(self, parent, cameras, title="Select Camera"):
+        self.cameras = cameras
+        self.selected = None
+        super().__init__(parent, title=title)
+    
+    def body(self, master):
+        ttk.Label(master, text="Select one of the available cameras:").grid(row=0, column=0, padx=5, pady=5)
+        self.combo = ttk.Combobox(master, values=self.cameras, state="readonly")
+        self.combo.grid(row=1, column=0, padx=5, pady=5)
+        if self.cameras:
+            self.combo.current(0)
+        return self.combo  # initial focus
+
+    def apply(self):
+        self.selected = self.combo.get()
 
 # Modified helper function to create a combobox with limited width
 def create_limited_combobox(parent, values, state, label_text, default_index=0):
@@ -366,15 +383,25 @@ class PaDiMApp(ThemedTk):
                 self.load_detail(self.train_list[0])
 
     def train_camera_dialog(self):
-        self.train_folder = "camera"
-        camera_list = self.get_camera_list()
-        if not camera_list:
+        cameras = self.get_camera_list()
+        if not cameras:
             messagebox.showerror("Error", "No camera detected.")
             return
-        self.train_list = camera_list
+        dialog = CameraSelectionDialog(self, cameras, title="Select Train Camera")
+        if dialog.selected is None:
+            return
+        # Extract index from selected string "camera:<index>"
+        index = dialog.selected.split(":")[1]
+        cap = cv2.VideoCapture(int(index))
+        if not cap.isOpened():
+            messagebox.showerror("Error", f"Camera with index {index} not detected.")
+            cap.release()
+            return
+        cap.release()
+        self.train_folder = "camera"
+        self.train_list = [f"camera:{index}"]
         self.train_listbox.delete(0, tk.END)
-        for f in self.train_list:
-            self.train_listbox.insert(tk.END, f)
+        self.train_listbox.insert(tk.END, f"camera:{index}")
         self.load_detail(self.train_list[0])
 
     def test_file_dialog(self):
@@ -400,15 +427,24 @@ class PaDiMApp(ThemedTk):
             self.test_type = "folder"
 
     def test_camera_dialog(self):
-        self.test_folder = "camera"
-        camera_list = self.get_camera_list()
-        if not camera_list:
+        cameras = self.get_camera_list()
+        if not cameras:
             messagebox.showerror("Error", "No camera detected.")
             return
-        self.test_list = camera_list
+        dialog = CameraSelectionDialog(self, cameras, title="Select Test Camera")
+        if dialog.selected is None:
+            return
+        index = dialog.selected.split(":")[1]
+        cap = cv2.VideoCapture(int(index))
+        if not cap.isOpened():
+            messagebox.showerror("Error", f"Camera with index {index} not detected.")
+            cap.release()
+            return
+        cap.release()
+        self.test_folder = "camera"
+        self.test_list = [f"camera:{index}"]
         self.test_listbox.delete(0, tk.END)
-        for f in self.test_list:
-            self.test_listbox.insert(tk.END, f)
+        self.test_listbox.insert(tk.END, f"camera:{index}")
         self.load_detail(self.test_list[0])
         self.test_type = "video"
 
@@ -667,9 +703,6 @@ class PaDiMApp(ThemedTk):
             # Ensure the frame has the exact dimensions expected by the writer.
             frame_out = cv2.resize(frame_out, (frame_width, frame_height))
             
-            # Convert from RGB back to BGR before writing (and displaying) since OpenCV expects BGR.
-            #frame_out_bgr = cv2.cvtColor(frame_out, cv2.COLOR_RGB2BGR)
-            
             cv2.imshow('frame', frame_out)
             if writer is not None:
                 writer.write(frame_out)
@@ -683,7 +716,6 @@ class PaDiMApp(ThemedTk):
         self.result_listbox.delete(0, tk.END)
         self.result_listbox.insert(tk.END, os.path.basename(result_path))
         self.load_detail(result_path)
-
 
     def get_image_crop_size(self):
         index = self.model_combobox.current()
