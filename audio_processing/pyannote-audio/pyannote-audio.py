@@ -102,8 +102,8 @@ def main(args):
     config["pipeline"]["params"]["embedding"] = WEIGHT_EMBEDDING_PATH
     with open(YAML_PATH, 'w') as f:
         yaml.dump(config, f)
-
-    audio_file = args.input[0]
+    
+    audio_files = args.input
     checkpoint_path = YAML_PATH
     config_yml = checkpoint_path
 
@@ -130,43 +130,46 @@ def main(args):
         
     if args.it:
         pipeline.train(args.it, **kwargs)
-
-    if args.embed:
-        diarization, embeddings = pipeline(audio_file, return_embeddings=True, **kwargs)
-        for s, speaker in enumerate(diarization.labels()):
-            print(speaker, embeddings[s].shape)
-    else:
-        diarization = pipeline(audio_file, **kwargs)
     
-    if args.ig:
-        _, groundtruth = load_rttm(args.ig).popitem()
-        metric = DiarizationErrorRate()
-        result = metric(groundtruth, diarization, detailed=False)
+    if args.ig and len(audio_files) > 1:
+        raise ValueError("If you need diarization error rate, you need set only one audio file")
+    
+    for audio_file in audio_files:
+        if args.embed:
+            diarization, embeddings = pipeline(audio_file, return_embeddings=True, **kwargs)
+            for s, speaker in enumerate(diarization.labels()):
+                print(speaker, embeddings[s].shape)
+        else:
+            diarization = pipeline(audio_file, **kwargs)
+    
+        if args.ig:
+            _, groundtruth = load_rttm(args.ig).popitem()
+            metric = DiarizationErrorRate()
+            result = metric(groundtruth, diarization, detailed=False)
+            
+            mapping = metric.optimal_mapping(groundtruth, diarization)
+            diarization = diarization.rename_labels(mapping=mapping)
+
+            print(diarization)
+            if args.e:
+                print(f'diarization error rate = {100 * result:.1f}%')
+
+            if args.plt:
+                EXCERPT = Segment(0, 30)
+                notebook = Notebook()
+                notebook.crop = EXCERPT
+                repr_annotation(args, diarization, notebook)
+                repr_annotation(args, groundtruth, notebook, ground=True)
         
-        mapping = metric.optimal_mapping(groundtruth, diarization)
-        diarization = diarization.rename_labels(mapping=mapping)
+        else:
+            print(audio_file)
+            print(diarization)
 
-        print(diarization)
-        if args.e:
-            print(f'diarization error rate = {100 * result:.1f}%')
-
-        if args.plt:
-            EXCERPT = Segment(0, 30)
-            notebook = Notebook()
-            notebook.crop = EXCERPT
-            repr_annotation(args, diarization, notebook)
-            repr_annotation(args, groundtruth, notebook, ground=True)
-        return
-    
-    else:
-        print(diarization)
-
-        if args.plt:
-            EXCERPT = Segment(0, 30)
-            notebook = Notebook()
-            notebook.crop = EXCERPT
-            repr_annotation(args, diarization, notebook)
-        return 
+            if args.plt:
+                EXCERPT = Segment(0, 30)
+                notebook = Notebook()
+                notebook.crop = EXCERPT
+                repr_annotation(args, diarization, notebook)
 
 
 if __name__ == "__main__":

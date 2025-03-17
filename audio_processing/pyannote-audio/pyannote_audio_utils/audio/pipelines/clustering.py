@@ -163,7 +163,9 @@ class BaseClustering(Pipeline):
 
         num_clusters = np.max(train_clusters) + 1
         num_chunks, num_speakers, dimension = embeddings.shape
-
+        
+        print("num_clusters", num_clusters)
+        print("num_speakers", num_speakers)
 
         centroids = np.vstack(
             [
@@ -285,7 +287,7 @@ class BaseClustering(Pipeline):
             min_clusters=min_clusters,
             max_clusters=max_clusters,
         )
-
+        print("max_clusters", max_clusters)
         if max_clusters < 2:
             # do NOT apply clustering when min_clusters = max_clusters = 1
             num_chunks, num_speakers, _ = embeddings.shape

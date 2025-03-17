@@ -520,7 +520,7 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
 
         # number of detected clusters is the number of different speakers
         num_different_speakers = np.max(hard_clusters) + 1
-        print(num_different_speakers)
+        print("num_different_speakers", num_different_speakers)
         # detected number of speakers can still be out of bounds
         # (specifically, lower than `min_speakers`), since there could be too few embeddings
         # to make enough clusters with a given minimum cluster size.
@@ -584,6 +584,7 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
                 label: expected_label
                 for label, expected_label in zip(diarization.labels(), self.classes())
             }
+        print(mapping)
 
         diarization = diarization.rename_labels(mapping=mapping)
         # at this point, `diarization` speaker labels are strings (or mix of
