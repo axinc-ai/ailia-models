@@ -358,7 +358,68 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
         )
 
         return self.to_diarization(clustered_segmentations, count)
+    
+    def train(
+        self,
+        file: AudioFile,
+        num_speakers: int = None,
+        min_speakers: int = None,
+        max_speakers: int = None,
+        hook: Optional[Callable] = None,
+    ):
+        hook = self.setup_hook(file, hook=hook)
+        
+        num_speakers, min_speakers, max_speakers = self.set_num_speakers(
+            num_speakers=num_speakers,
+            min_speakers=min_speakers,
+            max_speakers=max_speakers,
+        )
+        print(num_speakers)
+        segmentations = self.get_segmentations(file, hook=hook)
+        hook("segmentation", segmentations)
+        #   shape: (num_chunks, num_frames, local_num_speakers)
 
+        # binarize segmentation
+        
+        binarized_segmentations = segmentations
+        # estimate frame-level number of instantaneous speakers
+        count = self.speaker_count(
+            binarized_segmentations,
+            frames=self._frames,
+            warm_up=(0.0, 0.0),
+        )
+        hook("speaker_counting", count)
+        #   shape: (num_frames, 1)
+        #   dtype: int
+
+        # exit early when no speaker is ever active
+        if np.nanmax(count.data) == 0.0:
+            diarization = Annotation(uri=file["uri"])
+            if return_embeddings:
+                return diarization, np.zeros((0, self._embedding.dimension))
+
+            return diarization
+
+        embeddings = self.get_embeddings(
+            file,
+            binarized_segmentations,
+            exclude_overlap=self.embedding_exclude_overlap,
+            hook=hook,
+        )
+        
+        hook("embeddings", embeddings)
+        #   shape: (num_chunks, local_num_speakers, dimension)
+        print("allpy-train", embeddings.shape)
+        self.clustering.train(
+            embeddings=embeddings,
+            segmentations=binarized_segmentations,
+            num_clusters=num_speakers,
+            min_clusters=min_speakers,
+            max_clusters=max_speakers,
+            file=file,  # <== for oracle clustering
+            frames=self._frames,  # <== for oracle clustering
+        )
+    
     def apply(
         self,
         file: AudioFile,
@@ -409,7 +470,7 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
             min_speakers=min_speakers,
             max_speakers=max_speakers,
         )
-        
+        print(num_speakers)
         segmentations = self.get_segmentations(file, hook=hook)
         hook("segmentation", segmentations)
         #   shape: (num_chunks, num_frames, local_num_speakers)
@@ -444,7 +505,7 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
         
         hook("embeddings", embeddings)
         #   shape: (num_chunks, local_num_speakers, dimension)
-
+        print("allpy", embeddings.shape)
         hard_clusters, _, centroids = self.clustering(
             embeddings=embeddings,
             segmentations=binarized_segmentations,
@@ -459,7 +520,7 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
 
         # number of detected clusters is the number of different speakers
         num_different_speakers = np.max(hard_clusters) + 1
-
+        print(num_different_speakers)
         # detected number of speakers can still be out of bounds
         # (specifically, lower than `min_speakers`), since there could be too few embeddings
         # to make enough clusters with a given minimum cluster size.

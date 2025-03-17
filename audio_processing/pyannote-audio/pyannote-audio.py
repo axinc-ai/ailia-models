@@ -70,6 +70,10 @@ parser.add_argument(
     action='store_true',
     help='execute onnxruntime version'
 )
+parser.add_argument(
+    '--it', '-train_wave', default=None,
+    help='Specify a wav file to train speaker'
+)
 
 args = update_parser(parser)
 
@@ -117,26 +121,22 @@ def main(args):
     if "params" in config:
         pipeline.instantiate(config["params"])
     
+    kwargs = {}
+    if args.num > 0:
+        kwargs["num_speakers"] = args.num
+    elif args.max > 0 or args.min > 0:
+        kwargs["min_speakers"] = args.min
+        kwargs["max_speakers"] = args.max
+        
+    if args.it:
+        pipeline.train(args.it, **kwargs)
+
     if args.embed:
-        if args.num > 0:
-            diarization, embeddings = pipeline(audio_file, return_embeddings=True, num_speakers=args.num)
-            for s, speaker in enumerate(diarization.labels()):
-                print(speaker, embeddings[s].shape)
-        elif args.max > 0 or args.min > 0:
-            diarization, embeddings = pipeline(audio_file, return_embeddings=True, min_speakers=args.min, max_speaker=args.max)
-            for s, speaker in enumerate(diarization.labels()):
-                print(speaker, embeddings[s].shape)
-        else:
-            diarization, embeddings = pipeline(audio_file, return_embeddings=True)
-            for s, speaker in enumerate(diarization.labels()):
-                print(speaker, embeddings[s].shape)
+        diarization, embeddings = pipeline(audio_file, return_embeddings=True, **kwargs)
+        for s, speaker in enumerate(diarization.labels()):
+            print(speaker, embeddings[s].shape)
     else:
-        if args.num > 0:
-            diarization = pipeline(audio_file, num_speakers=args.num)
-        elif args.max > 0 or args.min > 0:
-            diarization = pipeline(audio_file, min_speakers=args.min, max_speaker=args.max)
-        else:
-            diarization = pipeline(audio_file)
+        diarization = pipeline(audio_file, **kwargs)
     
     if args.ig:
         _, groundtruth = load_rttm(args.ig).popitem()

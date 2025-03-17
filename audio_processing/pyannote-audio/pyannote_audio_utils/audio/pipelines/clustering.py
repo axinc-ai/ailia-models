@@ -47,6 +47,8 @@ class BaseClustering(Pipeline):
         self.metric = metric
         self.max_num_embeddings = max_num_embeddings
         self.constrained_assignment = constrained_assignment
+        self.precompute_train_clusters = None
+        self.precompute_train_embeddings = None
 
     def set_num_clusters(
         self,
@@ -128,9 +130,8 @@ class BaseClustering(Pipeline):
     def assign_embeddings(
         self,
         embeddings: np.ndarray,
-        train_chunk_idx: np.ndarray,
-        train_speaker_idx: np.ndarray,
         train_clusters: np.ndarray,
+        train_embeddings: np.ndarray,
         constrained: bool = False,
     ):
         """Assign embeddings to the closest centroid
@@ -163,7 +164,6 @@ class BaseClustering(Pipeline):
         num_clusters = np.max(train_clusters) + 1
         num_chunks, num_speakers, dimension = embeddings.shape
 
-        train_embeddings = embeddings[train_chunk_idx, train_speaker_idx]
 
         centroids = np.vstack(
             [
@@ -191,7 +191,45 @@ class BaseClustering(Pipeline):
         # results than sticking to the original assignment.
 
         return hard_clusters, soft_clusters, centroids
+    
+    def train(self,
+        embeddings: np.ndarray,
+        segmentations: Optional[SlidingWindowFeature] = None,
+        num_clusters: Optional[int] = None,
+        min_clusters: Optional[int] = None,
+        max_clusters: Optional[int] = None,
+        **kwargs):
+        train_embeddings, train_chunk_idx, train_speaker_idx = self.filter_embeddings(
+            embeddings,
+            segmentations=segmentations,
+        )
 
+        num_embeddings, _ = train_embeddings.shape
+
+        num_clusters, min_clusters, max_clusters = self.set_num_clusters(
+            num_embeddings,
+            num_clusters=num_clusters,
+            min_clusters=min_clusters,
+            max_clusters=max_clusters,
+        )
+
+        if max_clusters < 2:
+            # do NOT apply clustering when min_clusters = max_clusters = 1
+            num_chunks, num_speakers, _ = embeddings.shape
+            hard_clusters = np.zeros((num_chunks, num_speakers), dtype=np.int8)
+            soft_clusters = np.ones((num_chunks, num_speakers, 1))
+            centroids = np.mean(train_embeddings, axis=0, keepdims=True)
+            return hard_clusters, soft_clusters, centroids
+
+        train_clusters = self.cluster(
+            train_embeddings,
+            min_clusters,
+            max_clusters,
+            num_clusters=num_clusters,
+        )
+        self.precompute_train_clusters = train_clusters
+        self.precompute_train_embeddings = train_embeddings
+    
     def __call__(
         self,
         embeddings: np.ndarray,
@@ -229,11 +267,15 @@ class BaseClustering(Pipeline):
         centroids : (num_clusters, dimension) array
             Centroid vectors of each cluster
         """
-
-        train_embeddings, train_chunk_idx, train_speaker_idx = self.filter_embeddings(
-            embeddings,
-            segmentations=segmentations,
-        )
+        
+        if self.precompute_train_embeddings is not None:
+            train_embeddings = self.precompute_train_embeddings
+            print("use precompute_train_embeddings")
+        else:
+            train_embeddings, train_chunk_idx, train_speaker_idx = self.filter_embeddings(
+                embeddings,
+                segmentations=segmentations,
+            )
 
         num_embeddings, _ = train_embeddings.shape
 
@@ -251,19 +293,21 @@ class BaseClustering(Pipeline):
             soft_clusters = np.ones((num_chunks, num_speakers, 1))
             centroids = np.mean(train_embeddings, axis=0, keepdims=True)
             return hard_clusters, soft_clusters, centroids
-
-        train_clusters = self.cluster(
-            train_embeddings,
-            min_clusters,
-            max_clusters,
-            num_clusters=num_clusters,
-        )
-
+        if self.precompute_train_clusters is not None:
+            train_clusters = self.precompute_train_clusters
+            print("use precompute_train_clusters")
+        else:
+            train_clusters = self.cluster(
+                train_embeddings,
+                min_clusters,
+                max_clusters,
+                num_clusters=num_clusters,
+            )
+        
         hard_clusters, soft_clusters, centroids = self.assign_embeddings(
             embeddings,
-            train_chunk_idx,
-            train_speaker_idx,
             train_clusters,
+            train_embeddings,
             constrained=self.constrained_assignment,
         )
 
