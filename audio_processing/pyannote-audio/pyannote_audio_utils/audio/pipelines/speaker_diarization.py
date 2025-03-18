@@ -161,6 +161,7 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
         Klustering = Clustering[clustering]
 
         self.clustering = Klustering.value(metric=metric)
+        self.train_mapping = {}
 
 
     def get_segmentations(self, file, hook=None) -> SlidingWindowFeature:
@@ -374,7 +375,6 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
             min_speakers=min_speakers,
             max_speakers=max_speakers,
         )
-        print(num_speakers)
         segmentations = self.get_segmentations(file, hook=hook)
         hook("segmentation", segmentations)
         #   shape: (num_chunks, num_frames, local_num_speakers)
@@ -394,11 +394,7 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
 
         # exit early when no speaker is ever active
         if np.nanmax(count.data) == 0.0:
-            diarization = Annotation(uri=file["uri"])
-            if return_embeddings:
-                return diarization, np.zeros((0, self._embedding.dimension))
-
-            return diarization
+            return 
 
         embeddings = self.get_embeddings(
             file,
@@ -409,8 +405,7 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
         
         hook("embeddings", embeddings)
         #   shape: (num_chunks, local_num_speakers, dimension)
-        print("allpy-train", embeddings.shape)
-        self.clustering.train(
+        num_clusters = self.clustering.train(
             embeddings=embeddings,
             segmentations=binarized_segmentations,
             num_clusters=num_speakers,
@@ -419,6 +414,8 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
             file=file,  # <== for oracle clustering
             frames=self._frames,  # <== for oracle clustering
         )
+        
+        self.train_mapping = {i: j for i, j in zip(range(num_clusters), self.classes())}
     
     def apply(
         self,
@@ -470,7 +467,6 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
             min_speakers=min_speakers,
             max_speakers=max_speakers,
         )
-        print(num_speakers)
         segmentations = self.get_segmentations(file, hook=hook)
         hook("segmentation", segmentations)
         #   shape: (num_chunks, num_frames, local_num_speakers)
@@ -505,7 +501,6 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
         
         hook("embeddings", embeddings)
         #   shape: (num_chunks, local_num_speakers, dimension)
-        print("allpy", embeddings.shape)
         hard_clusters, _, centroids = self.clustering(
             embeddings=embeddings,
             segmentations=binarized_segmentations,
@@ -520,7 +515,6 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
 
         # number of detected clusters is the number of different speakers
         num_different_speakers = np.max(hard_clusters) + 1
-        print("num_different_speakers", num_different_speakers)
         # detected number of speakers can still be out of bounds
         # (specifically, lower than `min_speakers`), since there could be too few embeddings
         # to make enough clusters with a given minimum cluster size.
@@ -576,7 +570,8 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
             # the reference, those extra speakers are missing from `mapping`.
             # we add them back here
             mapping = {key: mapping.get(key, key) for key in diarization.labels()}
-
+        elif len(self.train_mapping) != 0:
+            mapping = self.train_mapping
         else:
             # when reference is not available, rename hypothesized speakers
             # to human-readable SPEAKER_00, SPEAKER_01, ...
@@ -584,7 +579,6 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
                 label: expected_label
                 for label, expected_label in zip(diarization.labels(), self.classes())
             }
-        print(mapping)
 
         diarization = diarization.rename_labels(mapping=mapping)
         # at this point, `diarization` speaker labels are strings (or mix of
