@@ -202,15 +202,6 @@ class BaseClustering(Pipeline):
             min_clusters=min_clusters,
             max_clusters=max_clusters,
         )
-
-        if max_clusters < 2:
-            # do NOT apply clustering when min_clusters = max_clusters = 1
-            num_chunks, num_speakers, _ = embeddings.shape
-            hard_clusters = np.zeros((num_chunks, num_speakers), dtype=np.int8)
-            soft_clusters = np.ones((num_chunks, num_speakers, 1))
-            centroids = np.mean(train_embeddings, axis=0, keepdims=True)
-            return hard_clusters, soft_clusters, centroids
-
         train_clusters = self.cluster(
             train_embeddings,
             min_clusters,
@@ -232,15 +223,21 @@ class BaseClustering(Pipeline):
         num_clusters: Optional[int] = None,
         min_clusters: Optional[int] = None,
         max_clusters: Optional[int] = None,
+        append: bool = False,
         **kwargs):
 
-        self.precompute_centroids = self.create_centroids(
+        centroids = self.create_centroids(
             embeddings,
             segmentations=segmentations,
             num_clusters=num_clusters,
             min_clusters=min_clusters,
             max_clusters=max_clusters,
             **kwargs)
+            
+        if append and self.precompute_centroids is not None:
+            self.precompute_centroids = np.vstack([self.precompute_centroids, centroids])
+        else:
+            self.precompute_centroids = centroids
         return self.precompute_centroids.shape[0]
         
     def __call__(

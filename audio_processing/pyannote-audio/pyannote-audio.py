@@ -7,7 +7,8 @@ from pyannote_audio_utils.core import Segment, Annotation
 from pyannote_audio_utils.core.notebook import Notebook
 from pyannote_audio_utils.database.util import load_rttm
 from pyannote_audio_utils.metrics.diarization import DiarizationErrorRate
-
+from pathlib import Path
+import json
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
@@ -71,8 +72,8 @@ parser.add_argument(
     help='execute onnxruntime version'
 )
 parser.add_argument(
-    '--it', '-train_wave', default=None,
-    help='Specify a wav file to train speaker'
+    '--it', '-train_data', default=None,
+    help='Specify a wav file to train speakers or train set json(dict of wave file path and speaker label)'
 )
 
 args = update_parser(parser)
@@ -129,7 +130,12 @@ def main(args):
         kwargs["max_speakers"] = args.max
         
     if args.it:
-        pipeline.train(args.it, **kwargs)
+        train_data = Path(args.it)
+        if train_data.suffix == ".json":
+            for label, path in json.loads(train_data.read_text()).items():
+                pipeline.train(train_data.parent / path, single_speaker_name=label, **kwargs)
+        else:
+            pipeline.train(train_data, **kwargs)
     
     if args.ig and len(audio_files) > 1:
         raise ValueError("If you need diarization error rate, you need set only one audio file")

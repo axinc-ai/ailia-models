@@ -367,9 +367,11 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
         min_speakers: int = None,
         max_speakers: int = None,
         hook: Optional[Callable] = None,
+        single_speaker_name: Optional[str] = None,
     ):
         hook = self.setup_hook(file, hook=hook)
-        
+        if single_speaker_name is not None:
+            num_speakers = 1
         num_speakers, min_speakers, max_speakers = self.set_num_speakers(
             num_speakers=num_speakers,
             min_speakers=min_speakers,
@@ -413,9 +415,12 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
             max_clusters=max_speakers,
             file=file,  # <== for oracle clustering
             frames=self._frames,  # <== for oracle clustering
+            append=single_speaker_name is not None
         )
-        
-        self.train_mapping = {i: j for i, j in zip(range(num_clusters), self.classes())}
+        if single_speaker_name is not None:
+            self.train_mapping[num_clusters - 1] = single_speaker_name
+        else:
+            self.train_mapping = {i: j for i, j in zip(range(num_clusters), self.classes())}
     
     def apply(
         self,
