@@ -9,6 +9,8 @@ import numpy as np
 import soundfile
 from tqdm import tqdm
 
+import torch
+
 # import original modules
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser
@@ -30,18 +32,20 @@ logger = getLogger(__name__)
 REF_WAV_PATH = "test.wav"
 REF_TEXT = "間もなく、次の駅に到着いたします。お忘れ物のないようお降りください。"
 SAVE_WAV_PATH = "output.wav"
-REMOTE_PATH = "https://storage.googleapis.com/ailia-models/gpt-sovits-v2/"
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/gpt-sovits-v3/"
 WEIGHT_PATH_SSL = "cnhubert.onnx"
 WEIGHT_PATH_T2S_ENCODER = "t2s_encoder.onnx"
 WEIGHT_PATH_T2S_FIRST_DECODER = "t2s_fsdec.onnx"
 WEIGHT_PATH_T2S_STAGE_DECODER = "t2s_sdec.onnx"
 WEIGHT_PATH_VQ = "vq_model.onnx"
+WEIGHT_PATH_DIT = "dit.onnx"
 WEIGHT_PATH_VGAN = "bigvgan_model.onnx"
 MODEL_PATH_SSL = WEIGHT_PATH_SSL + ".prototxt"
 MODEL_PATH_T2S_ENCODER = WEIGHT_PATH_T2S_ENCODER + ".prototxt"
 MODEL_PATH_T2S_FIRST_DECODER = WEIGHT_PATH_T2S_FIRST_DECODER + ".prototxt"
 MODEL_PATH_T2S_STAGE_DECODER = WEIGHT_PATH_T2S_STAGE_DECODER + ".prototxt"
 MODEL_PATH_VQ = WEIGHT_PATH_VQ + ".prototxt"
+MODEL_PATH_DIT = WEIGHT_PATH_DIT + ".prototxt"
 MODEL_PATH_VGAN = WEIGHT_PATH_VGAN + ".prototxt"
 
 
@@ -347,10 +351,75 @@ class T2SModel:
 
 
 class GptSoVits:
-    def __init__(self, t2s: T2SModel, vq, vgan):
+    def __init__(self, t2s: T2SModel, vq, dit, vgan):
         self.t2s = t2s
         self.vq = vq
+        self.dit = dit
         self.vgan = vgan
+
+    def get_spepc(self, audio):
+        maxx = audio.abs().max()
+        if maxx > 1:
+            audio /= min(2, maxx)
+        audio_norm = audio
+        audio_norm = audio_norm.unsqueeze(0)
+        spec = spectrogram_torch(
+            audio_norm,
+            hps.data.filter_length,
+            hps.data.sampling_rate,
+            hps.data.hop_length,
+            hps.data.win_length,
+            center=False,
+        )
+        return spec
+
+    def cfm_inference(
+        self, mu, x_lens, prompt, n_timesteps, temperature=1.0, inference_cfg_rate=0
+    ):
+        """Forward diffusion"""
+        B, T, _ = mu.shape
+        in_channels = 100
+        x = np.random.randn(B, in_channels, T) * temperature
+        prompt_len = prompt.shape[-1]
+        prompt_x = np.zeros_like(x, dtype=mu.dtype)
+        prompt_x[..., :prompt_len] = prompt[..., :prompt_len]
+        x[..., :prompt_len] = 0
+        mu = mu.transpose(0, 2, 1)
+        t = 0
+        d = 1 / n_timesteps
+        for _ in range(n_timesteps):
+            t_tensor = np.ones(x.shape[0], dtype=mu.dtype) * t
+            d_tensor = np.ones(x.shape[0], dtype=mu.dtype) * d
+            if not args.onnx:
+                output = self.dit.run(
+                    {
+                        "x": x,
+                        "cond": prompt_x,
+                        "x_lens": x_lens,
+                        "time": t_tensor,
+                        "dt_base_bootstrap": d_tensor,
+                        "text": mu,
+                    },
+                )
+            else:
+                output = self.dit.run(
+                    None,
+                    {
+                        "x": x,
+                        "cond": prompt_x,
+                        "x_lens": x_lens,
+                        "time": t_tensor,
+                        "dt_base_bootstrap": d_tensor,
+                        "text": mu,
+                    },
+                )
+            v_pred = output[0]
+            v_pred = v_pred.transpose(0, 2, 1)
+            x = x + d * v_pred
+            t = t + d
+            x[:, :, :prompt_len] = 0
+
+        return x
 
     def forward(
         self,
@@ -382,10 +451,101 @@ class GptSoVits:
         if args.benchmark:
             start = int(round(time.time() * 1000))
 
-        # refer = self.get_spepc(ref_audio)
-        refer = np.load("refer.npy")
+        refer = self.get_spepc(ref_audio)
 
-        ge_0 = np.zeros((0, 512, 1))
+        ge_0 = np.zeros((0, 512, 1), dtype=np.float16)
+        if not args.onnx:
+            output = self.vq.run(
+                {
+                    "codes": prompt[None, ...],
+                    "text": ref_seq,
+                    "refer": refer,
+                    "ge": ge_0,
+                },
+            )
+        else:
+            output = self.vq.run(
+                None,
+                {
+                    "codes": prompt[None, ...],
+                    "text": ref_seq,
+                    "refer": refer,
+                    "ge": ge_0,
+                },
+            )
+        fea_ref, ge = output
+
+        ref_audio_24k = librosa.resample(ref_audio, orig_sr=32000, target_sr=24000)
+        mel2 = mel_spectrogram(
+            ref_audio_24k,
+            n_fft=1024,
+            win_size=1024,
+            hop_size=256,
+            num_mels=100,
+            sampling_rate=24000,
+            fmin=0,
+            fmax=None,
+            center=False,
+        )
+
+        spec_min = -12
+        spec_max = 2
+        # norm_spec
+        mel2 = (mel2 - spec_min) / (spec_max - spec_min) * 2 - 1
+
+        T_min = min(mel2.shape[2], fea_ref.shape[2])
+        mel2 = mel2[:, :, :T_min]
+        fea_ref = fea_ref[:, :, :T_min]
+        if T_min > 468:
+            mel2 = mel2[:, :, -468:]
+            fea_ref = fea_ref[:, :, -468:]
+            T_min = 468
+        chunk_len = 934 - T_min
+
+        if not args.onnx:
+            output = self.vq.run(
+                {
+                    "codes": pred_semantic,
+                    "text": text_seq,
+                    "refer": refer,
+                    "ge": ge,
+                },
+            )
+        else:
+            output = self.vq.run(
+                None,
+                {
+                    "codes": pred_semantic,
+                    "text": text_seq,
+                    "refer": refer,
+                    "ge": ge,
+                },
+            )
+        fea_todo, _ = output
+
+        cfm_resss = []
+        idx = 0
+        while True:
+            fea_todo_chunk = fea_todo[:, :, idx : idx + chunk_len]
+            if fea_todo_chunk.shape[-1] == 0:
+                break
+            idx += chunk_len
+            fea = np.concatenate([fea_ref, fea_todo_chunk], axis=2).transpose(0, 2, 1)
+            cfm_res = self.cfm_inference(
+                fea,
+                np.array([fea.shape[1]]),
+                mel2,
+                sample_steps,
+                inference_cfg_rate=0,
+            )
+            cfm_res = cfm_res[:, :, mel2.shape[2] :]
+            mel2 = cfm_res[:, :, -T_min:]
+            fea_ref = fea_todo_chunk[:, :, -T_min:]
+            cfm_resss.append(cfm_res)
+
+        cmf_res = np.concatenate(cfm_resss, axis=2)
+        # denorm_spec
+        cmf_res = (cmf_res + 1) / 2 * (spec_max - spec_min) + spec_min
 
         if not args.onnx:
             output = self.vgan.run(
@@ -401,7 +561,6 @@ class GptSoVits:
         if args.benchmark:
             end = int(round(time.time() * 1000))
             logger.info("\tvits processing time {} ms".format(end - start))
-        return audio1[0]
 
         return audio[0][0]
 
@@ -451,7 +610,7 @@ def generate_voice(ssl, models):
     gpt = T2SModel(
         models["t2s_encoder"], models["t2s_first_decoder"], models["t2s_stage_decoder"]
     )
-    gpt_sovits = GptSoVits(gpt, models["vq"], models["vgan"])
+    gpt_sovits = GptSoVits(gpt, models["vq"], models["dit"], models["vgan"])
     ssl = SSLModel(ssl)
 
     input_audio = args.ref_audio
@@ -555,6 +714,7 @@ def main():
         WEIGHT_PATH_T2S_STAGE_DECODER, MODEL_PATH_T2S_STAGE_DECODER, REMOTE_PATH
     )
     check_and_download_models(WEIGHT_PATH_VQ, MODEL_PATH_VQ, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH_DIT, MODEL_PATH_DIT, REMOTE_PATH)
     check_and_download_models(WEIGHT_PATH_VGAN, MODEL_PATH_VGAN, REMOTE_PATH)
 
     env_id = args.env_id
@@ -596,6 +756,12 @@ def main():
             memory_mode=memory_mode,
             env_id=env_id,
         )
+        dit = ailia.Net(
+            weight=WEIGHT_PATH_DIT,
+            stream=MODEL_PATH_DIT,
+            memory_mode=memory_mode,
+            env_id=env_id,
+        )
         vgan = ailia.Net(
             weight=WEIGHT_PATH_VGAN,
             stream=MODEL_PATH_VGAN,
@@ -616,6 +782,7 @@ def main():
         t2s_first_decoder = onnxruntime.InferenceSession(WEIGHT_PATH_T2S_FIRST_DECODER)
         t2s_stage_decoder = onnxruntime.InferenceSession(WEIGHT_PATH_T2S_STAGE_DECODER)
         vq = onnxruntime.InferenceSession(WEIGHT_PATH_VQ)
+        dit = onnxruntime.InferenceSession(WEIGHT_PATH_DIT)
         vgan = onnxruntime.InferenceSession(WEIGHT_PATH_VGAN)
 
     models = dict(
@@ -624,6 +791,7 @@ def main():
         t2s_first_decoder=t2s_first_decoder,
         t2s_stage_decoder=t2s_stage_decoder,
         vq=vq,
+        dit=dit,
         vgan=vgan,
     )
 
