@@ -9,8 +9,6 @@ import numpy as np
 import soundfile
 from tqdm import tqdm
 
-import torch
-
 # import original modules
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser
@@ -27,26 +25,25 @@ logger = getLogger(__name__)
 # PARAMETERS
 # ======================
 
-# REF_WAV_PATH = "reference_audio_captured_by_ax.wav"
-# REF_TEXT = "水をマレーシアから買わなくてはならない。"
-REF_WAV_PATH = "test.wav"
-REF_TEXT = "間もなく、次の駅に到着いたします。お忘れ物のないようお降りください。"
-SAVE_WAV_PATH = "output.wav"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/gpt-sovits-v3/"
 WEIGHT_PATH_SSL = "cnhubert.onnx"
 WEIGHT_PATH_T2S_ENCODER = "t2s_encoder.onnx"
 WEIGHT_PATH_T2S_FIRST_DECODER = "t2s_fsdec.onnx"
 WEIGHT_PATH_T2S_STAGE_DECODER = "t2s_sdec.onnx"
 WEIGHT_PATH_VQ = "vq_model.onnx"
-WEIGHT_PATH_DIT = "dit.onnx"
+WEIGHT_PATH_CFM = "vq_cfm.onnx"
 WEIGHT_PATH_VGAN = "bigvgan_model.onnx"
 MODEL_PATH_SSL = WEIGHT_PATH_SSL + ".prototxt"
 MODEL_PATH_T2S_ENCODER = WEIGHT_PATH_T2S_ENCODER + ".prototxt"
 MODEL_PATH_T2S_FIRST_DECODER = WEIGHT_PATH_T2S_FIRST_DECODER + ".prototxt"
 MODEL_PATH_T2S_STAGE_DECODER = WEIGHT_PATH_T2S_STAGE_DECODER + ".prototxt"
 MODEL_PATH_VQ = WEIGHT_PATH_VQ + ".prototxt"
-MODEL_PATH_DIT = WEIGHT_PATH_DIT + ".prototxt"
+MODEL_PATH_CFM = WEIGHT_PATH_CFM + ".prototxt"
 MODEL_PATH_VGAN = WEIGHT_PATH_VGAN + ".prototxt"
+
+REF_WAV_PATH = "reference_audio_captured_by_ax.wav"
+REF_TEXT = "水をマレーシアから買わなくてはならない。"
+SAVE_WAV_PATH = "output.wav"
 
 
 # ======================
@@ -90,6 +87,8 @@ parser.add_argument("--onnx", action="store_true", help="use onnx runtime")
 parser.add_argument("--profile", action="store_true", help="use profile model")
 args = update_parser(parser, check_input_type=False)
 
+
+COPY_BLOB_DATA = True
 
 splits = {
     # fmt: off
@@ -169,6 +168,61 @@ def merge_short_text_in_array(texts, threshold):
     return result
 
 
+def get_spepc(audio):
+    maxx = np.abs(audio).max()
+    if maxx > 1:
+        audio /= min(2, maxx)
+    spec = spectrogram(
+        audio,
+        n_fft=2048,
+        win_size=2048,
+        hop_size=640,
+        num_mels=100,
+        sampling_rate=32000,
+        center=False,
+        eps=1e-6,
+        mel_filter=False,
+    )
+    return spec
+
+
+def spectrogram(
+    y,
+    n_fft,
+    num_mels,
+    sampling_rate,
+    hop_size,
+    win_size,
+    fmin=0,
+    fmax=1,
+    center=False,
+    eps=1e-9,
+    mel_filter=True,
+):
+    p = int((n_fft - hop_size) / 2)
+    y = np.pad(y, pad_width=((0, 0), (p, p)), mode="reflect")
+
+    spec = librosa.stft(
+        y,
+        n_fft=n_fft,
+        hop_length=hop_size,
+        win_length=win_size,
+        window="hann",
+        center=center,
+        pad_mode="reflect",
+    )
+    spec = np.sqrt(np.abs(spec) ** 2 + eps)
+
+    if mel_filter:
+        mel_basis = librosa.filters.mel(
+            sr=sampling_rate, n_fft=n_fft, n_mels=num_mels, fmin=fmin, fmax=fmax
+        )
+        spec = np.matmul(mel_basis, spec)
+        spec = np.log(np.clip(spec, a_min=1e-5, a_max=None))
+
+    return spec
+
+
 # ======================
 # Main Logic
 # ======================
@@ -207,7 +261,18 @@ class T2SModel:
 
         if args.benchmark:
             start = int(round(time.time() * 1000))
-        if args.onnx:
+
+        if not args.onnx:
+            x, prompts = self.sess_encoder.run(
+                {
+                    "ref_seq": ref_seq,
+                    "text_seq": text_seq,
+                    "ref_bert": ref_bert,
+                    "text_bert": text_bert,
+                    "ssl_content": ssl_content,
+                }
+            )
+        else:
             x, prompts = self.sess_encoder.run(
                 None,
                 {
@@ -218,16 +283,7 @@ class T2SModel:
                     "ssl_content": ssl_content,
                 },
             )
-        else:
-            x, prompts = self.sess_encoder.run(
-                {
-                    "ref_seq": ref_seq,
-                    "text_seq": text_seq,
-                    "ref_bert": ref_bert,
-                    "text_bert": text_bert,
-                    "ssl_content": ssl_content,
-                }
-            )
+
         if args.benchmark:
             end = int(round(time.time() * 1000))
             logger.info("\tsencoder processing time {} ms".format(end - start))
@@ -236,7 +292,19 @@ class T2SModel:
 
         if args.benchmark:
             start = int(round(time.time() * 1000))
-        if args.onnx:
+
+        if not args.onnx:
+            y, k, v, y_emb, x_example = self.sess_fsdec.run(
+                {
+                    "x": x,
+                    "prompts": prompts,
+                    "top_k": top_k,
+                    "top_p": top_p,
+                    "temperature": temperature,
+                    "repetition_penalty": repetition_penalty,
+                }
+            )
+        else:
             y, k, v, y_emb, x_example = self.sess_fsdec.run(
                 None,
                 {
@@ -248,42 +316,19 @@ class T2SModel:
                     "repetition_penalty": repetition_penalty,
                 },
             )
-        else:
-            y, k, v, y_emb, x_example = self.sess_fsdec.run(
-                {
-                    "x": x,
-                    "prompts": prompts,
-                    "top_k": top_k,
-                    "top_p": top_p,
-                    "temperature": temperature,
-                    "repetition_penalty": repetition_penalty,
-                }
-            )
+
         if args.benchmark:
             end = int(round(time.time() * 1000))
             logger.info("\tfsdec processing time {} ms".format(end - start))
+
+        logger.info(f"T2S Decoding...")
 
         stop = False
         for idx in tqdm(range(1, 1500)):
             if args.benchmark:
                 start = int(round(time.time() * 1000))
-            if args.onnx:
-                y, k, v, y_emb, logits, samples = self.sess_sdec.run(
-                    None,
-                    {
-                        "iy": y,
-                        "ik": k,
-                        "iv": v,
-                        "iy_emb": y_emb,
-                        "ix_example": x_example,
-                        "top_k": top_k,
-                        "top_p": top_p,
-                        "temperature": temperature,
-                        "repetition_penalty": repetition_penalty,
-                    },
-                )
-            else:
-                COPY_INPUT_BLOB_DATA = False
+
+            if not args.onnx:
                 if idx == 1:
                     y, k, v, y_emb, logits, samples = self.sess_sdec.run(
                         {
@@ -303,7 +348,7 @@ class T2SModel:
                     input_blob_idx = self.sess_sdec.get_input_blob_list()
                     output_blob_idx = self.sess_sdec.get_output_blob_list()
                     self.sess_sdec.set_input_blob_data(y, 0)
-                    if COPY_INPUT_BLOB_DATA:
+                    if COPY_BLOB_DATA:
                         kv_shape = (
                             kv_base_shape[0],
                             kv_base_shape[1] + idx - 2,
@@ -329,21 +374,38 @@ class T2SModel:
                     self.sess_sdec.set_input_blob_data(repetition_penalty, 8)
                     self.sess_sdec.update()
                     y = self.sess_sdec.get_blob_data(output_blob_idx[0])
-                    if not COPY_INPUT_BLOB_DATA:
+                    if not COPY_BLOB_DATA:
                         k = self.sess_sdec.get_blob_data(output_blob_idx[1])
                         v = self.sess_sdec.get_blob_data(output_blob_idx[2])
                     y_emb = self.sess_sdec.get_blob_data(output_blob_idx[3])
                     logits = self.sess_sdec.get_blob_data(output_blob_idx[4])
                     samples = self.sess_sdec.get_blob_data(output_blob_idx[5])
+            else:
+                y, k, v, y_emb, logits, samples = self.sess_sdec.run(
+                    None,
+                    {
+                        "iy": y,
+                        "ik": k,
+                        "iv": v,
+                        "iy_emb": y_emb,
+                        "ix_example": x_example,
+                        "top_k": top_k,
+                        "top_p": top_p,
+                        "temperature": temperature,
+                        "repetition_penalty": repetition_penalty,
+                    },
+                )
 
             if args.benchmark:
                 end = int(round(time.time() * 1000))
                 logger.info("\tsdec processing time {} ms".format(end - start))
+
             if early_stop_num != -1 and (y.shape[1] - prefix_len) > early_stop_num:
                 stop = True
             if np.argmax(logits, axis=-1)[0] == EOS or samples[0, 0] == EOS:
                 stop = True
             if stop:
+                tqdm.write(f"T2S Decoding EOS [{prefix_len} -> {y.shape[1]}]")
                 break
         y[0, -1] = 0
 
@@ -351,35 +413,18 @@ class T2SModel:
 
 
 class GptSoVits:
-    def __init__(self, t2s: T2SModel, vq, dit, vgan):
+    def __init__(self, t2s: T2SModel, vq, vq_cfm, vgan):
         self.t2s = t2s
         self.vq = vq
-        self.dit = dit
+        self.vq_cfm = vq_cfm
         self.vgan = vgan
 
-    def get_spepc(self, audio):
-        maxx = audio.abs().max()
-        if maxx > 1:
-            audio /= min(2, maxx)
-        audio_norm = audio
-        audio_norm = audio_norm.unsqueeze(0)
-        spec = spectrogram_torch(
-            audio_norm,
-            hps.data.filter_length,
-            hps.data.sampling_rate,
-            hps.data.hop_length,
-            hps.data.win_length,
-            center=False,
-        )
-        return spec
-
-    def cfm_inference(
-        self, mu, x_lens, prompt, n_timesteps, temperature=1.0, inference_cfg_rate=0
-    ):
+    def cfm_inference(self, mu, x_lens, prompt, n_timesteps, temperature=1.0):
         """Forward diffusion"""
         B, T, _ = mu.shape
         in_channels = 100
         x = np.random.randn(B, in_channels, T) * temperature
+        x = x.astype(mu.dtype)
         prompt_len = prompt.shape[-1]
         prompt_x = np.zeros_like(x, dtype=mu.dtype)
         prompt_x[..., :prompt_len] = prompt[..., :prompt_len]
@@ -387,22 +432,20 @@ class GptSoVits:
         mu = mu.transpose(0, 2, 1)
         t = 0
         d = 1 / n_timesteps
-        for _ in range(n_timesteps):
+        for i in tqdm(range(n_timesteps)):
             t_tensor = np.ones(x.shape[0], dtype=mu.dtype) * t
             d_tensor = np.ones(x.shape[0], dtype=mu.dtype) * d
             if not args.onnx:
-                output = self.dit.run(
-                    {
-                        "x": x,
-                        "cond": prompt_x,
-                        "x_lens": x_lens,
-                        "time": t_tensor,
-                        "dt_base_bootstrap": d_tensor,
-                        "text": mu,
-                    },
-                )
+                self.vq_cfm.set_input_blob_data(x, 0)
+                self.vq_cfm.set_input_blob_data(prompt_x, 1)
+                self.vq_cfm.set_input_blob_data(x_lens, 2)
+                self.vq_cfm.set_input_blob_data(t_tensor, 3)
+                self.vq_cfm.set_input_blob_data(d_tensor, 4)
+                self.vq_cfm.set_input_blob_data(mu, 5)
+                self.vq_cfm.update()
+                v_pred = self.vq_cfm.get_blob_data("output")
             else:
-                output = self.dit.run(
+                output = self.vq_cfm.run(
                     None,
                     {
                         "x": x,
@@ -413,7 +456,7 @@ class GptSoVits:
                         "text": mu,
                     },
                 )
-            v_pred = output[0]
+                v_pred = output[0]
             v_pred = v_pred.transpose(0, 2, 1)
             x = x + d * v_pred
             t = t + d
@@ -435,7 +478,9 @@ class GptSoVits:
         repetition_penalty=1.35,
         speed=1.0,
     ):
-        pred_semantic = self.t2s.forward(
+        sample_steps = 32
+
+        pred_semantic, prompt = self.t2s.forward(
             ref_seq,
             text_seq,
             ref_bert,
@@ -448,12 +493,9 @@ class GptSoVits:
         )
         speed = np.array(speed, dtype=np.float32)
 
-        if args.benchmark:
-            start = int(round(time.time() * 1000))
-
-        refer = self.get_spepc(ref_audio)
-
+        refer = get_spepc(ref_audio).astype(np.float16)
         ge_0 = np.zeros((0, 512, 1), dtype=np.float16)
+
         if not args.onnx:
             output = self.vq.run(
                 {
@@ -476,7 +518,7 @@ class GptSoVits:
         fea_ref, ge = output
 
         ref_audio_24k = librosa.resample(ref_audio, orig_sr=32000, target_sr=24000)
-        mel2 = mel_spectrogram(
+        mel2 = spectrogram(
             ref_audio_24k,
             n_fft=1024,
             win_size=1024,
@@ -523,6 +565,8 @@ class GptSoVits:
             )
         fea_todo, _ = output
 
+        logger.info("vq_model cfm inference...")
+
         cfm_resss = []
         idx = 0
         while True:
@@ -532,11 +576,7 @@ class GptSoVits:
             idx += chunk_len
             fea = np.concatenate([fea_ref, fea_todo_chunk], axis=2).transpose(0, 2, 1)
             cfm_res = self.cfm_inference(
-                fea,
-                np.array([fea.shape[1]]),
-                mel2,
-                sample_steps,
-                inference_cfg_rate=0,
+                fea, np.array([fea.shape[1]]), mel2, sample_steps
             )
             cfm_res = cfm_res[:, :, mel2.shape[2] :]
             mel2 = cfm_res[:, :, -T_min:]
@@ -546,6 +586,8 @@ class GptSoVits:
         cmf_res = np.concatenate(cfm_resss, axis=2)
         # denorm_spec
         cmf_res = (cmf_res + 1) / 2 * (spec_max - spec_min) + spec_min
+
+        logger.info("bigvgan inference...")
 
         if not args.onnx:
             output = self.vgan.run(
@@ -557,10 +599,6 @@ class GptSoVits:
                 {"x": cmf_res},
             )
         audio = output[0]
-
-        if args.benchmark:
-            end = int(round(time.time() * 1000))
-            logger.info("\tvits processing time {} ms".format(end - start))
 
         return audio[0][0]
 
@@ -610,7 +648,7 @@ def generate_voice(ssl, models):
     gpt = T2SModel(
         models["t2s_encoder"], models["t2s_first_decoder"], models["t2s_stage_decoder"]
     )
-    gpt_sovits = GptSoVits(gpt, models["vq"], models["dit"], models["vgan"])
+    gpt_sovits = GptSoVits(gpt, models["vq"], models["vq_cfm"], models["vgan"])
     ssl = SSLModel(ssl)
 
     input_audio = args.ref_audio
@@ -661,7 +699,7 @@ def generate_voice(ssl, models):
     ref_audio = ref_audio[np.newaxis, :]
 
     audio_opt = []
-    for i_text, text in enumerate(texts):
+    for _, text in enumerate(texts):
         # 解决输入目标文本的空行导致报错的问题
         if len(text.strip()) == 0:
             continue
@@ -714,7 +752,7 @@ def main():
         WEIGHT_PATH_T2S_STAGE_DECODER, MODEL_PATH_T2S_STAGE_DECODER, REMOTE_PATH
     )
     check_and_download_models(WEIGHT_PATH_VQ, MODEL_PATH_VQ, REMOTE_PATH)
-    check_and_download_models(WEIGHT_PATH_DIT, MODEL_PATH_DIT, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH_CFM, MODEL_PATH_CFM, REMOTE_PATH)
     check_and_download_models(WEIGHT_PATH_VGAN, MODEL_PATH_VGAN, REMOTE_PATH)
 
     env_id = args.env_id
@@ -756,15 +794,9 @@ def main():
             memory_mode=memory_mode,
             env_id=env_id,
         )
-        dit = ailia.Net(
-            weight=WEIGHT_PATH_DIT,
-            stream=MODEL_PATH_DIT,
-            memory_mode=memory_mode,
-            env_id=env_id,
-        )
-        vgan = ailia.Net(
-            weight=WEIGHT_PATH_VGAN,
-            stream=MODEL_PATH_VGAN,
+        vq_cfm = ailia.Net(
+            weight=WEIGHT_PATH_CFM,
+            stream=MODEL_PATH_CFM,
             memory_mode=memory_mode,
             env_id=env_id,
         )
@@ -773,7 +805,6 @@ def main():
             t2s_encoder.set_profile_mode(True)
             t2s_first_decoder.set_profile_mode(True)
             t2s_stage_decoder.set_profile_mode(True)
-            # vits.set_profile_mode(True)
     else:
         import onnxruntime
 
@@ -782,7 +813,7 @@ def main():
         t2s_first_decoder = onnxruntime.InferenceSession(WEIGHT_PATH_T2S_FIRST_DECODER)
         t2s_stage_decoder = onnxruntime.InferenceSession(WEIGHT_PATH_T2S_STAGE_DECODER)
         vq = onnxruntime.InferenceSession(WEIGHT_PATH_VQ)
-        dit = onnxruntime.InferenceSession(WEIGHT_PATH_DIT)
+        vq_cfm = onnxruntime.InferenceSession(WEIGHT_PATH_CFM)
         vgan = onnxruntime.InferenceSession(WEIGHT_PATH_VGAN)
 
     models = dict(
@@ -791,7 +822,7 @@ def main():
         t2s_first_decoder=t2s_first_decoder,
         t2s_stage_decoder=t2s_stage_decoder,
         vq=vq,
-        dit=dit,
+        vq_cfm=vq_cfm,
         vgan=vgan,
     )
 
