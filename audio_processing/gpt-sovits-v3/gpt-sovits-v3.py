@@ -491,7 +491,6 @@ class GptSoVits:
             temperature=temperature,
             repetition_penalty=repetition_penalty,
         )
-        speed = np.array(speed, dtype=np.float32)
 
         refer = get_spepc(ref_audio).astype(np.float16)
         ge_0 = np.zeros((0, 512, 1), dtype=np.float16)
@@ -503,6 +502,7 @@ class GptSoVits:
                     "text": ref_seq,
                     "refer": refer,
                     "ge": ge_0,
+                    "speed": np.array(1, dtype=np.float32),
                 },
             )
         else:
@@ -513,6 +513,7 @@ class GptSoVits:
                     "text": ref_seq,
                     "refer": refer,
                     "ge": ge_0,
+                    "speed": np.array(1, dtype=np.float32),
                 },
             )
         fea_ref, ge = output
@@ -551,6 +552,7 @@ class GptSoVits:
                     "text": text_seq,
                     "refer": refer,
                     "ge": ge,
+                    "speed": np.array(speed, dtype=np.float32),
                 },
             )
         else:
@@ -561,6 +563,7 @@ class GptSoVits:
                     "text": text_seq,
                     "refer": refer,
                     "ge": ge,
+                    "speed": np.array(speed, dtype=np.float32),
                 },
             )
         fea_todo, _ = output
