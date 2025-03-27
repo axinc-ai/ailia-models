@@ -1,0 +1,6 @@
+SoundFile
+librosa
+nltk
+pyopenjtalk>=0.3.4
+g2p_en
+wordsegment
