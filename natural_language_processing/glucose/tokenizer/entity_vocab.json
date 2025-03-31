@@ -1,6 +1,3 @@
-{
-  "[MASK2]": 3,
-  "[MASK]": 0,
-  "[PAD]": 2,
-  "[UNK]": 1
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:c159053d2913d1d70d2345bb302afabbb97b3edaf526a6d6b8787b25df558db8
+size 62

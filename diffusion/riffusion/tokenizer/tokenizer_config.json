@@ -1,34 +1,3 @@
-{
-  "add_prefix_space": false,
-  "bos_token": {
-    "__type": "AddedToken",
-    "content": "<|startoftext|>",
-    "lstrip": false,
-    "normalized": true,
-    "rstrip": false,
-    "single_word": false
-  },
-  "do_lower_case": true,
-  "eos_token": {
-    "__type": "AddedToken",
-    "content": "<|endoftext|>",
-    "lstrip": false,
-    "normalized": true,
-    "rstrip": false,
-    "single_word": false
-  },
-  "errors": "replace",
-  "model_max_length": 77,
-  "name_or_path": "/home/ooe/.cache/huggingface/hub/models--riffusion--riffusion-model-v1/snapshots/8f2e752c74e8316c6eb4fdaa6598a46ce1d88af5/tokenizer",
-  "pad_token": "<|endoftext|>",
-  "special_tokens_map_file": "./special_tokens_map.json",
-  "tokenizer_class": "CLIPTokenizer",
-  "unk_token": {
-    "__type": "AddedToken",
-    "content": "<|endoftext|>",
-    "lstrip": false,
-    "normalized": true,
-    "rstrip": false,
-    "single_word": false
-  }
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:56be6b473c0ae765044f258337a662ced50851c1ea46d91d5831b484fdaa01fc
+size 908

@@ -1,34 +1,3 @@
-{
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Python: Current File",
-            "type": "python",
-            "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal",
-            "cwd": "${fileDirname}"
-        },
-        {
-            "name": "Python: Camera",
-            "type": "python",
-            "args": ["-v 0"],
-            "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal",
-            "cwd": "${fileDirname}"
-        },
-        {
-            "name": "Python: Benchmark",
-            "type": "python",
-            "args": ["-b"],
-            "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal",
-            "cwd": "${fileDirname}"
-        }
-    ]
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:542f67eecd326f317706163f1751e45c1c526df0882034e04357aab9db2d82da
+size 1035

@@ -1067,7 +1067,7 @@ class Timeline:
             annotation[segment] = next(generator)
 
         return annotation
-
+    
     def _iter_uem(self) -> Iterator[Text]:
         """Generate lines for a UEM file for this timeline
 

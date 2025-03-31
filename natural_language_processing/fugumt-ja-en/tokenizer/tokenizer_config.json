@@ -1,12 +1,3 @@
-{
-  "clean_up_tokenization_spaces": true,
-  "eos_token": "</s>",
-  "model_max_length": 512,
-  "pad_token": "<pad>",
-  "separate_vocabs": false,
-  "source_lang": "ja",
-  "sp_model_kwargs": {},
-  "target_lang": "en",
-  "tokenizer_class": "MarianTokenizer",
-  "unk_token": "<unk>"
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:414e9e7e2492b95fa80f24ccb295645d35c4dd0a74d7ef8b89820c0c7e8ec356
+size 280

@@ -43,6 +43,25 @@ from pyannote_audio_utils.audio.pipelines.utils import SpeakerDiarizationMixin
 AudioFile = Union[Text, Path, Mapping]
 PipelineModel = Union[Text, Mapping]
 
+
+# デバック
+## ========================================================================
+import csv
+
+def write_array_to_csv(filename, data):
+    """2次元配列をCSVファイルに保存する関数
+
+    Args:
+        data (list of list): 保存する2次元配列
+        filename (str): 保存するファイル名
+    """
+    with open(filename, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerows(data)
+    
+## ========================================================================
+
+
 def batchify(iterable, batch_size: int = 32, fillvalue=None):
     """Batchify iterable"""
     # batchify('ABCDEFG', 3) --> ['A', 'B', 'C']  ['D', 'E', 'F']  [G, ]
@@ -51,6 +70,7 @@ def batchify(iterable, batch_size: int = 32, fillvalue=None):
 
 
 class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
+# class SpeakerDiarization(Pipeline):
     """Speaker diarization pipeline
 
     Parameters
@@ -123,7 +143,13 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
         use_auth_token: Union[Text, None] = None,
     ):
         super().__init__()
-
+        
+        # print(segmentation_step) #0.1
+        # print(args)
+        # Namespace(input=['./data/sample.wav'], video=None, savepath=None, benchmark=False, env_id=2, env_list=False, ftype='audio', debug=False, 
+        # profile=False, benchmark_count=5, num=0, max=0, min=0, ig=None, o='output.png', og='output_ground.png', e=False, plt=False, embed=False, onnx=False)
+        # print(args.num) #3
+        
         model = segmentation
         self.segmentation_step = segmentation_step
         self.embedding = embedding
@@ -144,7 +170,16 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
             seg_path=seg_path
         )
         
+        # print(self._segmentation) #<pyannote_audio_utils.audio.core.inference.Inference object at 0x16bb50ac0>
+        # print(self._segmentation.duration) #10.0
+        # print(self._segmentation.step) #1.0
+        
+        
         self._frames: SlidingWindow = self._segmentation.example_output.frames
+        # print(self._frames.duration) #0.01697792869269949
+        # print(self._frames.step) #0.01697792869269949
+        # print(self._frames.start) #0.0
+        # print(self._frames.end) #inf
         
         self.segmentation = ParamDict(
             min_duration_off=Uniform(0.0, 1.0),
@@ -157,7 +192,8 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
         )
         self._audio = Audio(sample_rate=self._embedding.sample_rate, mono="downmix")
 
-        metric = self._embedding.metric        
+        metric = self._embedding.metric  
+        # print(metric)s #cosine    
         Klustering = Clustering[clustering]
 
         self.clustering = Klustering.value(metric=metric)
@@ -178,7 +214,17 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
         
         if hook is not None:
             hook = functools.partial(hook, "segmentation", None)
+            
+        # print(file) #{'audio': './data/sample.wav', 'uri': 'sample'}
         segmentations: SlidingWindowFeature = self._segmentation(file, hook=hook)
+        
+        # print(segmentations.data.shape) #(21, 589, 3)
+        # print(segmentations.sliding_window.duration) #10.0
+        # print(segmentations.sliding_window.step) #1.0
+        # print(segmentations.sliding_window.start) #0.0
+        # print(segmentations.sliding_window.end) #inf
+        
+        # print(segmentations)
 
         return segmentations
 
@@ -213,7 +259,9 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
         # a larger search space).
    
         duration = binary_segmentations.sliding_window.duration
+        # print(duration) #10.0
         num_chunks, num_frames, num_speakers = binary_segmentations.data.shape
+        # print(binary_segmentations.data.shape) #(21, 589, 3)
 
         if exclude_overlap:
             
@@ -239,34 +287,89 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
             clean_segmentations = SlidingWindowFeature(
                 binary_segmentations.data, binary_segmentations.sliding_window
             )
+            
+        # for chunk, masks in binary_segmentations:
+            # print(chunk) #[ 00:00:00.000 -->  00:00:10.000], [ 00:00:01.000 -->  00:00:11.000], [ 00:00:02.000 -->  00:00:12.000]
+            # print(masks) #speakerのラベルが入っている
+            # print(masks.shape) #(589, 3), (589, 3), (589, 3) ...
+        
+        # print(binary_segmentations.data.shape) #(21, 589, 3)
+        # print(clean_segmentations.data.shape) #(21, 589, 3)
+        
+        # write_array_to_csv("clean_segmentations.csv", clean_segmentations.data.reshape(-1, 3))
         
         def iter_waveform_and_mask():
-            for (chunk, masks), (_, clean_masks) in zip(binary_segmentations, clean_segmentations):
+            
+            # デバック用変数
+            all_masks = None  # 全てのmasksを格納するための変数を初期化
+            all_clean_masks = None  # 全てのmasksを格納するための変数を初期化
+            all_used_masks = None  # 全てのmasksを格納するための変数を初期化
+            
+            
+            for (chunk, masks), (_, clean_masks) in zip(binary_segmentations, clean_segmentations): #このfor文は21回呼ばれる
                 # chunk: Segment(t, t + duration)
                 # masks: (num_frames, local_num_speakers) np.ndarray
 
+                # print(chunk) #[ 00:00:00.000 -->  00:00:10.000], [ 00:00:01.000 -->  00:00:11.000], [ 00:00:02.000 -->  00:00:12.000]
+                # print(duration) #10.0, 10.0, 10.0, 10.0, 10.0
                 waveform, _ = self._audio.crop(
                     file,
                     chunk,
                     duration=duration,
                     mode="pad",
                 )
+                # print(waveform.shape) #(1, 160000),(1, 160000),(1, 160000),(1, 160000)... 21個続く
                 # waveform: (1, num_samples) torch.Tensor
 
                 # mask may contain NaN (in case of partial stitching)
                 masks = np.nan_to_num(masks, nan=0.0).astype(np.float32)
                 clean_masks = np.nan_to_num(clean_masks, nan=0.0).astype(np.float32)
+                
+                # print(masks.shape) #(589, 3), (589, 3), (589, 3) ... 21個
+                # デバック===============================================================
+                if all_masks is None:
+                    # all_masksが初期化されていなければ、最初のmasksで初期化
+                    all_masks = masks.T  # 転置しておく (重要: 後で簡単に結合できるように)
+                    all_clean_masks = clean_masks.T
+                else:
+                    # 以降はmasksを転置してall_masksに結合
+                    all_masks = np.concatenate((all_masks, masks.T), axis=0)
+                    all_clean_masks = np.concatenate((all_clean_masks, clean_masks.T), axis=0)
+                # print(all_masks.shape) #(3, 589), (6, 589), (9, 589) ... (63, 589)
+                # write_array_to_csv("masks.csv", all_masks) #OK
+                # write_array_to_csv("clean_masks.csv", all_clean_masks) #OK
+                # ======================================================================
 
-                for mask, clean_mask in zip(masks.T, clean_masks.T):
+                for mask, clean_mask in zip(masks.T, clean_masks.T): #このfor文は3回呼ばれる
                     # mask: (num_frames, ) np.ndarray
+                    # print(mask.shape) #(589,), (589,), (589,), (589,), (589,)...
+                    # print(clean_mask.shape) #(589,), (589,), (589,), (589,), (589,)...
 
                     if np.sum(clean_mask) > min_num_frames:
                         used_mask = clean_mask
+                        # print("clean_mask") こっちが2回呼ばれる
                     else:
                         used_mask = mask
+                        # print("mask") こっちが1回呼ばれる
+                        
+                    # print(waveform.shape) #(1, 160000),(1, 160000),(1, 160000)...
+                    # print(waveform[None].shape) #(1, 1, 160000), (1, 1, 160000), (1, 1, 160000), (1, 1, 160000),  ///
 
-                    # yield waveform[None], torch.from_numpy(used_mask)[None]
+                    # デバック===============================================================
+                    if all_used_masks is None:
+                        # all_masksが初期化されていなければ、最初のmasksで初期化
+                        all_used_masks = used_mask[None]  # 転置しておく (重要: 後で簡単に結合できるように)
+                    else:
+                        # 以降はmasksを転置してall_masksに結合
+                        all_used_masks = np.concatenate((all_used_masks, used_mask[None]), axis=0)
+                    # print(all_used_masks.shape) #(3, 589), (6, 589), (9, 589) ... (63, 589)
+                    # write_array_to_csv("used_masks.csv", all_used_masks) #OK
+                    # ======================================================================
+                        
+                    
                     yield waveform[None], used_mask[None]
+                    # waveformにはチャンクで区切った音声データが入っている
+                    # used_maskには[0,0,1]のように話しているspeakerにフラグが立ったsegmentationの結果が入っている
                     
                     # w: (1, 1, num_samples) torch.Tensor
                     # m: (1, num_frames) torch.Tensor
@@ -277,35 +380,84 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
             fillvalue=(None, None),
         )
         
+        # print(batches) #<itertools.zip_longest object at 0x30b0eeb60>
+        
 
         batch_count = math.ceil(num_chunks * num_speakers / self.embedding_batch_size)
+        # バッチサイズは32
+        # audioファイルをwindowで区切ったのは21
+        # そこにnum_speakers = 3をかけて63になっている
+        # print(batch_count) #2
 
         embedding_batches = []
 
         if hook is not None:
             hook("embeddings", None, total=batch_count, completed=0)
 
+        # print(batches) #<itertools.zip_longest object at 0x31309ed90>
+        # print(self.embedding_batch_size) #32
+        
+        # デバック
+        # print("デバック")
+        # debug_waveform = np.arange(1, 160001).reshape(1, 1, 160000)
+        # debug_masks = np.ones((1, 589))
+        # debug_embedding_batch: np.ndarray = self._embedding(debug_waveform, debug_masks)
+        # print(debug_embedding_batch.shape) #(1, 256)
+        # debug_embeddings = debug_embedding_batch.reshape([num_chunks, -1 , debug_embedding_batch.shape[-1]])
+        # print(debug_embeddings.shape)
+        
+        
         for i, batch in enumerate(batches, 1):
             waveforms, masks = zip(*filter(lambda b: b[0] is not None, batch))
-
+            # print(len(waveforms)) #32 ,31
+            # print(waveforms[0].shape) #(1, 1, 160000)
+            # print(waveforms[1].shape) #(1, 1, 160000)
+            # print(waveforms[2].shape) #(1, 1, 160000)
+            # print(waveforms[0]) #[[ 0. 0. 0. ... -0.021698 -0.02038574 -0.01696777]]], [[[-1.19323730e-02 -6.95800781e-03 -2.59399414e-03 ... -3.66210938e-04 -9.5527344e-05 4.27246094e-04]]]
+            # print(waveforms[1]) #[[ 0. 0. 0. ... -0.021698 -0.02038574 -0.01696777]]], [[[-1.19323730e-02 -6.95800781e-03 -2.59399414e-03 ... -3.66210938e-04 -9.5527344e-05 4.27246094e-04]]]
+            # print(waveforms[2]) #[[ 0. 0. 0. ... -0.021698 -0.02038574 -0.01696777]]], [[[-1.19323730e-02 -6.95800781e-03 -2.59399414e-03 ... -3.66210938e-04 -9.5527344e-05 4.27246094e-04]]]
+            # この3つは全て同じ配列
+            # print(waveforms[3]) #次の3つも同じ
+            # print(waveforms[4])
+            # print(waveforms[5])
+            
+            # print(len(masks)) #32, 31
+            # print(masks[0].shape) #(1, 589)
+            # print(masks[1].shape) #(1, 589)
+            # print(masks[2].shape) #(1, 589)
+            # print(masks[0]) #全部0 #maskにはspeaker1からspeaker3までの話しているかどうかのフラグが入っていそう
+            # print(masks[1]) #後半だけ1
+            # print(masks[2]) #全部0
+            
             waveform_batch = np.vstack(waveforms)
             # (batch_size, 1, num_samples) torch.Tensor
 
             mask_batch = np.vstack(masks)
             # (batch_size, num_frames) torch.Tensor
             
+            # print(waveform_batch.shape) #(32, 1, 160000), (31, 1, 160000)
+            # print(mask_batch.shape) #(32, 589), (31, 589)
+            
+            # ここで推論
             embedding_batch: np.ndarray = self._embedding(
                 waveform_batch, masks=mask_batch
             )
             # (batch_size, dimension) np.ndarray
+            # print(embedding_batch.shape) #(32, 256), (31, 256)
 
             embedding_batches.append(embedding_batch)
 
             if hook is not None:
                 hook("embeddings", embedding_batch, total=batch_count, completed=i)
         
+        # print(len(embedding_batches)) #2
+        
         embedding_batches = np.vstack(embedding_batches)
+        # print(embedding_batches.shape) #(63, 256)
+        # write_array_to_csv("embedding_batches.csv", embedding_batches) #C++と違う
+        
         embeddings = embedding_batches.reshape([num_chunks, -1 , embedding_batches.shape[-1]])
+        # print(embeddings.shape) #(21, 3, 256)
 
         return embeddings
 
@@ -315,6 +467,23 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
         hard_clusters: np.ndarray,
         count: SlidingWindowFeature,
     ) -> SlidingWindowFeature:
+        
+        
+        # print(segmentations.data.shape) #(21, 589, 3)
+        # print(segmentations.sliding_window.duration) #10.0
+        # print(segmentations.sliding_window.step) #1.0
+        # print(segmentations.sliding_window.start) #0.0
+        # print(segmentations.sliding_window.end) #inf
+        
+        # print(hard_clusters.shape) #(21, 3)
+        # write_array_to_csv("hard_clusters.csv", hard_clusters) #
+        
+        # print(count.data.shape) #(1767, 1)
+        # print(count.sliding_window.duration) #0.01697792869269949
+        # print(count.sliding_window.step) #0.01697792869269949
+        # print(count.sliding_window.start) #0.0
+        # print(count.sliding_window.end) #inf
+        
         """Build final discrete diarization out of clustered segmentation
 
         Parameters
@@ -338,10 +507,15 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
         clustered_segmentations = np.NAN * np.zeros(
             (num_chunks, num_frames, num_clusters)
         )
+        
+        
 
         for c, (cluster, (chunk, segmentation)) in enumerate(
             zip(hard_clusters, segmentations)
         ):
+            # print(c)
+            # print(cluster)
+            # print(segmentation)
             # cluster is (local_num_speakers, )-shaped
             # segmentation is (num_frames, local_num_speakers)-shaped
             for k in np.unique(cluster):
@@ -352,10 +526,28 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
                 clustered_segmentations[c, :, k] = np.max(
                     segmentation[:, cluster == k], axis=1
                 )
+                
+                
+        # print(clustered_segmentations.shape) #(21, 589, 3)
+        # write_array_to_csv("clustered_segmentations[0].csv", clustered_segmentations[0])
+        # write_array_to_csv("clustered_segmentations[1].csv", clustered_segmentations[1])
+        # write_array_to_csv("clustered_segmentations[2].csv", clustered_segmentations[2])
+        # write_array_to_csv("clustered_segmentations[20].csv", clustered_segmentations[20]) #C++と違う
+        
+        
 
         clustered_segmentations = SlidingWindowFeature(
             clustered_segmentations, segmentations.sliding_window
         )
+        
+        # debug_result = self.to_diarization(clustered_segmentations, count)
+        # print(debug_result) #<pyannote_audio_utils.core.feature.SlidingWindowFeature object at 0x3168dd2a0>
+        # print(debug_result.data) #floatの配列
+        # print(debug_result.data.shape) #(1767, 3)
+        # print(debug_result.sliding_window.duration) #0.01697792869269949
+        # print(debug_result.sliding_window.step) #0.01697792869269949
+        # print(debug_result.sliding_window.start) #0.0
+        # print(debug_result.sliding_window.end) #inf
 
         return self.to_diarization(clustered_segmentations, count)
 
@@ -404,19 +596,36 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
         # setup hook (e.g. for debugging purposes)
         hook = self.setup_hook(file, hook=hook)
         
+        # print(num_speakers) #None
+        # print(min_speakers) #None
+        # print(max_speakers) #None
         num_speakers, min_speakers, max_speakers = self.set_num_speakers(
             num_speakers=num_speakers,
             min_speakers=min_speakers,
             max_speakers=max_speakers,
         )
+        # print(num_speakers) #None
+        # print(min_speakers) #1
+        # print(max_speakers) #inf
+        
         
         segmentations = self.get_segmentations(file, hook=hook)
+        # print(segmentations.data.shape) #(21, 589, 3) #(2, 589, 3)
         hook("segmentation", segmentations)
         #   shape: (num_chunks, num_frames, local_num_speakers)
 
         # binarize segmentation
         
         binarized_segmentations = segmentations
+        # write_array_to_csv("multilabel_encoding_segmentation.csv", binarized_segmentations.data.reshape(-1, 3))
+        # write_array_to_csv("reshape_segmentation_20.csv", binarized_segmentations[20])
+        
+        # print(binarized_segmentations.data.shape) #(21, 589, 3)
+        # print(self._frames) #<pyannote_audio_utils.core.segment.SlidingWindow object at 0x16b9dd1e0>
+        # print(self._frames.duration) #0.01697792869269949
+        # print(self._frames.step) #0.01697792869269949
+        # print(self._frames.start) #0.0
+        # print(self._frames.end) #inf
         # estimate frame-level number of instantaneous speakers
         count = self.speaker_count(
             binarized_segmentations,
@@ -426,6 +635,8 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
         hook("speaker_counting", count)
         #   shape: (num_frames, 1)
         #   dtype: int
+        # print(count.data.shape) #(1767, 1)
+        save_data(count.data, "python_data/speaker_count.json")
 
         # exit early when no speaker is ever active
         if np.nanmax(count.data) == 0.0:
@@ -435,6 +646,10 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
 
             return diarization
 
+        
+        # print(binarized_segmentations.data.shape) #(21, 589, 3)
+        save_data(binarized_segmentations.data, "python_data/binarized_segmentations.json")
+
         embeddings = self.get_embeddings(
             file,
             binarized_segmentations,
@@ -442,8 +657,20 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
             hook=hook,
         )
         
+        # print(embeddings.shape) #(21, 3, 256)
+        save_data(embeddings, "python_data/embeddings.json")
+        
         hook("embeddings", embeddings)
         #   shape: (num_chunks, local_num_speakers, dimension)
+        
+        # print(num_speakers) #None
+        # print(min_speakers) #1
+        # print(max_speakers) #inf
+        
+        # -num 3 を指定した場合
+        # print(num_speakers) #3
+        # print(min_speakers) #3
+        # print(max_speakers) #3
 
         hard_clusters, _, centroids = self.clustering(
             embeddings=embeddings,
@@ -456,10 +683,17 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
         )
         # hard_clusters: (num_chunks, num_speakers)
         # centroids: (num_speakers, dimension)
+        save_data(hard_clusters, "python_data/hard_clusters.json")
+        save_data(_, "python_data/soft_clusters.json")
+        save_data(centroids, "python_data/centroids.json")
 
         # number of detected clusters is the number of different speakers
         num_different_speakers = np.max(hard_clusters) + 1
-
+        # print(num_different_speakers) #3 #1 #4
+        
+        
+        # print(min_speakers) #4
+        # print(max_speakers) #4
         # detected number of speakers can still be out of bounds
         # (specifically, lower than `min_speakers`), since there could be too few embeddings
         # to make enough clusters with a given minimum cluster size.
@@ -473,24 +707,63 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
                 """
             ))
 
+        # print(count) #<pyannote_audio_utils.core.feature.SlidingWindowFeature object at 0x16e7d9090>
+        # print(count.data.shape) #(1767, 1)
         # during counting, we could possibly overcount the number of instantaneous
         # speakers due to segmentation errors, so we cap the maximum instantaneous number
         # of speakers by the `max_speakers` value
         count.data = np.minimum(count.data, max_speakers).astype(np.int8)
+        # print(count.data.shape) #(1767, 1) #OK
+        # write_array_to_csv("count_data.csv", count.data) #OK
 
         # reconstruct discrete diarization from raw hard clusters
 
         # keep track of inactive speakers
+        # print(binarized_segmentations.data.shape) #(21, 589, 3)
         inactive_speakers = np.sum(binarized_segmentations.data, axis=1) == 0
         #   shape: (num_chunks, num_speakers)
+        # print(inactive_speakers.shape) #(21, 3) OK
+        # print(inactive_speakers) #true,faleの列 OK
+        # write_array_to_csv("inactive_speakers.csv", inactive_speakers) #OK
+        
+        
 
         hard_clusters[inactive_speakers] = -2
+        # print(hard_clusters.shape) #(21, 3) OK
+        # write_array_to_csv("hard_clusters.csv", hard_clusters) #OK
+        
+        save_data(segmentations.data, "python_data/segmentations.json")
+        # print(segmentations.sliding_window.duration) #10.0
+        # print(segmentations.sliding_window.step) #1.0
+        # print(segmentations.sliding_window.start) #0.0
+        # print(segmentations.sliding_window.end) #inf
+        save_data(hard_clusters, "python_data/hard_clusters.json")
+        save_data(count.data, "python_data/count.json")
+        # print(count.sliding_window.duration) #0.01697792869269949
+        # print(count.sliding_window.step) #0.01697792869269949
+        # print(count.sliding_window.start) #0.0
+        # print(count.sliding_window.end) #inf
         discrete_diarization = self.reconstruct(
             segmentations,
             hard_clusters,
             count,
         )
         hook("discrete_diarization", discrete_diarization)
+        # print(discrete_diarization) #<pyannote_audio_utils.core.feature.SlidingWindowFeature object at 0x3281dd2a0>
+        # print(discrete_diarization.data.shape) #(1767, 3)
+        # print(discrete_diarization.sliding_window.duration) #0.01697792869269949
+        # print(discrete_diarization.sliding_window.step) #0.01697792869269949
+        # print(discrete_diarization.sliding_window.start) #0.0
+        # print(discrete_diarization.sliding_window.end) #inf
+        # write_array_to_csv("discrete_diarization.csv", discrete_diarization.data) #/2列目と3列目が入れ替わってるけど良さそう
+        # print(discrete_diarization.sliding_window[0]) # [ 00:00:00.000 -->  00:00:00.016]
+        # print(discrete_diarization.sliding_window[1]) # [ 00:00:00.016 -->  00:00:00.033]
+        # print(discrete_diarization.sliding_window[2]) #[ 00:00:00.033 -->  00:00:00.050]
+        # print(len(discrete_diarization.sliding_window)) #ValueError: infinite sliding window.
+        save_data(discrete_diarization.data, "python_data/discrete_diarization.json")
+        
+        
+        # print(self.segmentation.min_duration_off) #0.0
 
         # convert to continuous diarization
         diarization = self.to_annotation(
@@ -499,6 +772,24 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
             min_duration_off=self.segmentation.min_duration_off,
         )
         diarization.uri = file["uri"]
+        # print(diarization)
+        # [ 00:00:06.714 -->  00:00:07.003] A 2
+        # [ 00:00:07.003 -->  00:00:07.173] B 0
+        # [ 00:00:07.580 -->  00:00:07.597] C 0
+        # [ 00:00:07.597 -->  00:00:08.276] D 2
+        # [ 00:00:08.276 -->  00:00:08.293] E 0
+        # [ 00:00:08.293 -->  00:00:08.310] F 2
+        # [ 00:00:08.310 -->  00:00:09.906] G 0
+        # [ 00:00:09.906 -->  00:00:10.959] H 2
+        # [ 00:00:10.466 -->  00:00:14.745] I 0
+        # [ 00:00:10.959 -->  00:00:10.976] J 1
+        # [ 00:00:14.303 -->  00:00:17.886] K 1
+        # [ 00:00:18.022 -->  00:00:21.502] L 0
+        # [ 00:00:18.157 -->  00:00:18.446] M 1
+        # [ 00:00:21.774 -->  00:00:28.531] N 1
+        # [ 00:00:27.886 -->  00:00:29.991] O 0
+        
+        
 
         # at this point, `diarization` speaker labels are integers
         # from 0 to `num_speakers - 1`, aligned with `centroids` rows.
@@ -517,14 +808,38 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
             mapping = {key: mapping.get(key, key) for key in diarization.labels()}
 
         else:
+            # print("here") #here
             # when reference is not available, rename hypothesized speakers
             # to human-readable SPEAKER_00, SPEAKER_01, ...
             mapping = {
                 label: expected_label
                 for label, expected_label in zip(diarization.labels(), self.classes())
             }
+            
+            # print(diarization.labels()) #[0, 1, 2]
+            # print(self.classes()) #<generator object SpeakerDiarizationMixin.classes at 0x30856c5f0>
 
         diarization = diarization.rename_labels(mapping=mapping)
+        
+        # print(diarization)
+        # [ 00:00:06.714 -->  00:00:07.003] A SPEAKER_02
+        # [ 00:00:07.003 -->  00:00:07.173] B SPEAKER_00
+        # [ 00:00:07.580 -->  00:00:07.597] C SPEAKER_00
+        # [ 00:00:07.597 -->  00:00:08.276] D SPEAKER_02
+        # [ 00:00:08.276 -->  00:00:08.293] E SPEAKER_00
+        # [ 00:00:08.293 -->  00:00:08.310] F SPEAKER_02
+        # [ 00:00:08.310 -->  00:00:09.906] G SPEAKER_00
+        # [ 00:00:09.906 -->  00:00:10.959] H SPEAKER_02
+        # [ 00:00:10.466 -->  00:00:14.745] I SPEAKER_00
+        # [ 00:00:10.959 -->  00:00:10.976] J SPEAKER_01
+        # [ 00:00:14.303 -->  00:00:17.886] K SPEAKER_01
+        # [ 00:00:18.022 -->  00:00:21.502] L SPEAKER_00
+        # [ 00:00:18.157 -->  00:00:18.446] M SPEAKER_01
+        # [ 00:00:21.774 -->  00:00:28.531] N SPEAKER_01
+        # [ 00:00:27.886 -->  00:00:29.991] O SPEAKER_00
+        
+        
+        
         # at this point, `diarization` speaker labels are strings (or mix of
         # strings and integers when reference is available and some hypothesis
         # speakers are not present in the reference)
@@ -535,6 +850,8 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
         if centroids is None:
             return diarization, None
 
+
+        # print(diarization.labels()) #['SPEAKER_00', 'SPEAKER_01', 'SPEAKER_02']
         # The number of centroids may be smaller than the number of speakers
         # in the annotation. This can happen if the number of active speakers
         # obtained from `speaker_count` for some frames is larger than the number
@@ -551,3 +868,39 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
         ]
 
         return diarization, centroids
+
+
+
+
+
+# デバック用に追加
+# JSON形式でデータを保存
+import json
+import os
+def save_data(array, filename):
+    
+    # 保存先のディレクトリを取得
+    directory = os.path.dirname(filename)
+    
+    # ディレクトリが存在しない場合は作成
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+
+    # 元の形状情報を取得
+    original_shape = array.shape
+
+    # 配列をフラット化
+    flattened_array = array.flatten().tolist()  # リストに変換
+
+    # 保存するデータ構造を作成
+    data = {
+        "shape": original_shape,  # 元の形状情報
+        "data": flattened_array   # フラット化されたデータ
+    }
+
+    # JSON形式で保存
+    with open(filename, 'w') as json_file:
+        # json.dump(data, json_file, indent=4)  # インデントを付けて読みやすく保存
+        json.dump(data, json_file, separators=(',', ':'))  # 改行せずに保存
+        # json.dump(data, json_file, separators=(',', ':'), indent=4)

@@ -519,6 +519,11 @@ class SlidingWindow:
              fixed: Optional[float] = None,
              return_ranges: Optional[bool] = False) -> \
             Union[np.ndarray, List[List[int]]]:
+                
+        # print(mode) #loose
+        # print(fixed) #None
+        # print(return_ranges) #True
+        
         """Crop sliding window
 
         Parameters
@@ -637,7 +642,9 @@ class SlidingWindow:
             raise ValueError(msg)
 
         if return_ranges:
+            # print(list(rng)) #[-1, 1768]
             return [list(rng)]
+        
 
         return np.array(range(*rng), dtype=np.int64)
 

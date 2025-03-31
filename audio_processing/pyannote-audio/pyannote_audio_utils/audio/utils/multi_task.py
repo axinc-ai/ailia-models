@@ -52,7 +52,10 @@ def map_with_specifications(
     """
     
     if isinstance(specifications, Specifications):
+        # print("isinstance")
         return func(*iterables, specifications=specifications)
+    
+    # print("noinstance") 呼ばれない
 
     return tuple(
         func(*i, specifications=s) for s, *i in zip(specifications, *iterables)

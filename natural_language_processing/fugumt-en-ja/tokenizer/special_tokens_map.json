@@ -1,5 +1,3 @@
-{
-  "eos_token": "</s>",
-  "pad_token": "<pad>",
-  "unk_token": "<unk>"
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:5e4d1f5e759d74cb1c2fe1d165cfc62b5237aa904de759380cd6f43042eec723
+size 74

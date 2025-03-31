@@ -36,6 +36,48 @@ from pyannote_audio_utils.audio.utils.multi_task import map_with_specifications
 from pyannote_audio_utils.audio.utils.powerset import Powerset
 
 
+# デバック
+## ========================================================================
+import pandas as pd
+"""
+def array_to_csv(output_filepath, data):
+
+    # CSVに変換するためのDataFrameを作成
+    # columns = ['Time'] + [f'Class {i+1}' for i in range(data.shape[2])]
+    batch_size, frame_count, class_count = data.shape
+
+    # すべてのバッチを一つのデータフレームに統合
+    all_frames = []
+    # current_time = 1  # Timeのカウンタを1から開始
+    for batch_index in range(batch_size):
+        for frame_index in range(frame_count):
+            row = list(data[batch_index, frame_index, :])
+            all_frames.append(row)
+            # current_time += 1  # 次のフレームに対してTimeをインクリメント
+
+    # DataFrameを作成
+    df = pd.DataFrame(all_frames, columns=None)
+
+    # CSVファイルとして保存
+    df.to_csv(output_filepath, index=False)
+"""
+    
+import csv
+def write_array_to_csv(filename, data):
+    """2次元配列をCSVファイルに保存する関数
+
+    Args:
+        data (list of list): 保存する2次元配列
+        filename (str): 保存するファイル名
+    """
+    with open(filename, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerows(data)
+    
+## ========================================================================
+    
+
+
 class BaseInference:
     pass
 
@@ -110,6 +152,7 @@ class Inference(BaseInference):
         self.args = args
     
         specifications = Specifications(problem=Problem.MONO_LABEL_CLASSIFICATION, resolution = Resolution.FRAME, classes=['speaker#1', 'speaker#2', 'speaker#3'])
+        # print(specifications)
         
         self.specifications = specifications
         self.audio = Audio(sample_rate=16000, mono="downmix")
@@ -195,20 +238,53 @@ class Inference(BaseInference):
         if self.args.onnx:
             outputs = self.model.run(None, {"input": chunks})[0]
         else:
+            # print(chunks.shape) #(1, 1, 160000), (21, 1, 160000)
             outputs = self.model.predict([chunks])[0]
+        
+        if(chunks.shape[0] == 1):
+            save_data(chunks, "python_data/python_chunks_1.json")
+        if(chunks.shape[0] == 21):
+            save_data(chunks, "python_data/python_chunks_21.json")
+        
+        # print(outputs.shape) #(1, 589, 7), (21, 589, 7)
+        if(outputs.shape[0] == 1):
+            save_data(outputs, "python_data/python_segmentation_1.json")
+        if(outputs.shape[0] == 21):
+            save_data(outputs, "python_data/python_segmentation_21.json")
+        
+        # array_to_csv(outputs, "python_segmentation.csv") #OK
         
         
         def __convert(output: np.ndarray, conversion, **kwargs):
+            # print(output.shape) #(1, 589, 7), (21, 589, 7)
+            # print(conversion) #<pyannote_audio_utils.audio.utils.powerset.Powerset object at 0x14d8e5720>
+            # print(kwargs) #{'specifications': Specifications(problem=<Problem.MONO_LABEL_CLASSIFICATION: 1>, resolution=<Resolution.FRAME: 1>, duration=10.0, min_duration=None, warm_up=(0.0, 0.0), classes=['speaker#1', 'speaker#2', 'speaker#3'], powerset_max_classes=2, permutation_invariant=True)}
             return conversion(output)
+        
+        # print(map_with_specifications(self.specifications, __convert, outputs, self.conversion).shape) #(1, 589, 3), (21, 589, 3)
+        tmp_result = map_with_specifications(self.specifications, __convert, outputs, self.conversion)
+        if(tmp_result.shape[0] == 1):
+            save_data(tmp_result, "python_data/python_map_with_specifications_1.json")
+        if(tmp_result.shape[0] == 21):
+            save_data(tmp_result, "python_data/python_map_with_specifications_21.json")
+            
+        # ここでつまり，__convert(output = outputs, conversion = , **kwargs):
+        
+        # 可視化して気づいたが，ここでは7クラスの確率だったものを，3人のうち話している人が1で話していない人が0という形式に変更している
+        # array_to_csv(map_with_specifications(self.specifications, __convert, outputs, self.conversion), "python_segmentation_convert.csv")
         
         return map_with_specifications(self.specifications, __convert, outputs, self.conversion)
     
     @cached_property
     def example_output(self) -> Union[Output, Tuple[Output]]:
         """Example output"""
+        # print("example_output")
+        
         example_input_array = np.random.randn(1, 1, self.audio.get_num_samples(self.specifications.duration)).astype(np.float32)
+        # print(example_input_array.shape) #(1, 1, 160000)
         
         example_outputs = self.infer(example_input_array)
+        # print(example_outputs.shape) #(1, 589, 3)
             
         def __example_output(
             example_output: np.ndarray,
@@ -227,6 +303,10 @@ class Inference(BaseInference):
                 dimension=dimension,
                 frames=frames,
             )
+            
+        # print(map_with_specifications(self.specifications, __example_output, example_outputs)) #Output(num_frames=589, dimension=3, frames=<pyannote_audio_utils.core.segment.SlidingWindow object at 0x3241d8820>)
+        # print(map_with_specifications(self.specifications, __example_output, example_outputs).frames) #<pyannote_audio_utils.core.segment.SlidingWindow object at 0x16f95c490>
+        # print(map_with_specifications(self.specifications, __example_output, example_outputs).frames.duration) #0.01697792869269949
 
         return map_with_specifications(
             self.specifications, __example_output, example_outputs
@@ -258,11 +338,16 @@ class Inference(BaseInference):
             Model output. Shape is (num_chunks, dimension) for chunk-level tasks,
             and (num_frames, dimension) for frame-level tasks.
         """
+        
+        # print("slide")
 
         window_size: int = self.audio.get_num_samples(self.duration)
         step_size: int = round(self.step * sample_rate)
+        # print(window_size) #160000
+        # print(step_size) #16000
         
         _, num_samples = waveform.shape
+        # print(waveform.shape) #(1, 480000)
         
         def __frames(
             example_output, specifications: Optional[Specifications] = None
@@ -277,6 +362,7 @@ class Inference(BaseInference):
             __frames,
             self.example_output,
         )
+        # print(frames) #<pyannote_audio_utils.core.segment.SlidingWindow object at 0x157ba5870>
 
         
         # prepare complete chunks
@@ -289,15 +375,21 @@ class Inference(BaseInference):
                 step_size * waveform.strides[1],
                 waveform.strides[1],
             )
+            # print(strides) #(3840000, 128000, 8)
             
             return np.lib.stride_tricks.as_strided(waveform, shape=shape, strides=strides)
         
         if num_samples >= window_size:
+            # print(waveform.shape) #(1, 480000)
+            # print(window_size) #160000
+            # print(step_size) #16000
             chunks: np.ndarray = (unfold_numpy(waveform, window_size, step_size)).transpose(1, 0, 2)
             num_chunks = chunks.shape[0]
             
         else:
             num_chunks = 0
+        
+        # print(chunks.shape) #(21, 1, 160000)
         
         # prepare last incomplete chunk
         
@@ -324,11 +416,18 @@ class Inference(BaseInference):
             output.append(batch_output)
             return
 
-        
+        # print(num_chunks) #21
+        # print(chunks.shape) #(21, 1, 160000)
+        # print(self.batch_size) #32
         # slide over audio chunks in batch
         for c in np.arange(0, num_chunks, self.batch_size):
+            # print(c) #0
+            # batch_size = 32だけど，chunks.shape = (21, 1, 160000) だから21番目まで入る
             batch: np.ndarray = chunks[c : c + self.batch_size]
+            # print(batch.shape) #(21, 1, 160000)
+            
             batch_outputs: Union[np.ndarray, Tuple[np.ndarray]] = self.infer(batch)
+            # print(batch_outputs.shape) #(21, 589, 3)
 
             _ = map_with_specifications(
                 self.specifications, __append_batch, outputs, batch_outputs
@@ -340,6 +439,7 @@ class Inference(BaseInference):
         
         # process orphan last chunk
         if has_last_chunk:
+            # print("has_last_chunk") #何もprintされないため，このif文は呼び出されていない
             last_outputs = self.infer(last_chunk[None])
 
             _ = map_with_specifications(
@@ -354,10 +454,18 @@ class Inference(BaseInference):
 
         def __vstack(output: List[np.ndarray], **kwargs) -> np.ndarray:
             return np.vstack(output)
+        
+        # print(len(outputs)) #1
+        # print(len(outputs[0])) #21
+        # print(len(outputs[0][0])) #589
+        # print(len(outputs[0][0][0])) #3
 
         outputs: Union[np.ndarray, Tuple[np.ndarray]] = map_with_specifications(
             self.specifications, __vstack, outputs
         )
+        
+        # print(outputs.shape) #(21, 589, 3)
+        
         
         def __aggregate(
             outputs: np.ndarray,
@@ -413,6 +521,10 @@ class Inference(BaseInference):
         """
 
         waveform, sample_rate = self.audio(file)
+        # TODO
+        save_data(waveform, "python_data/waveform.json")
+        # ここのwaveformをjson or csvで出力する
+        print(sample_rate) #16000
         
         if self.window == "sliding":
             return self.slide(waveform, sample_rate, hook=hook)
@@ -463,9 +575,20 @@ class Inference(BaseInference):
                 duration=frames.duration,
                 step=frames.step,
             )
+        
+        # print(scores.data.shape) #(21, 589, 1), (21, 589, 3)
+        # 後半はto_daiarization関数で呼ばれたもの
+        # print(scores.data[0])
 
         masks = 1 - np.isnan(scores)
         scores.data = np.nan_to_num(scores.data, copy=True, nan=0.0)
+        # print(masks.data.shape) #(21, 589, 1), (21, 589, 3)
+        # print(masks.sliding_window.duration) #10.0
+        # print(masks.sliding_window.step) #1.0
+        # print(masks.sliding_window.start) #0.0
+        # print(masks.sliding_window.end) #inf
+        
+        
 
         # Hamming window used for overlap-add aggregation
         hamming_window = (
@@ -473,6 +596,9 @@ class Inference(BaseInference):
             if hamming
             else np.ones((num_frames_per_chunk, 1))
         )
+        # print(hamming_window.shape) #(589, 1), (589, 1)
+        # print(hamming_window) #全部1
+        
 
         # anything before warm_up_left (and after num_frames_per_chunk - warm_up_right)
         # will not be used in the final aggregation
@@ -489,6 +615,12 @@ class Inference(BaseInference):
             warm_up[1] / scores.sliding_window.duration * num_frames_per_chunk
         )
         warm_up_window[num_frames_per_chunk - warm_up_right :] = epsilon
+        
+        # print(warm_up_window.shape) #(589, 1)
+        # print(warm_up_right) #0
+        # print(warm_up_left) #0
+        # print(warm_up_window) #全部1
+
 
         # aggregated_output[i] will be used to store the sum of all predictions
         # for frame #i
@@ -500,9 +632,12 @@ class Inference(BaseInference):
             )
             + 1
         )
+        # print(num_frames) #1767, 1767
+        
         aggregated_output: np.ndarray = np.zeros(
             (num_frames, num_classes), dtype=np.float32
         )
+        # print(aggregated_output.shape) #(1767, 1), (1767, 3)
 
         # overlapping_chunk_count[i] will be used to store the number of chunks
         # that contributed to frame #i
@@ -522,7 +657,9 @@ class Inference(BaseInference):
             # score ~ (num_frames_per_chunk, num_classes)-shaped np.ndarray
             # mask ~ (num_frames_per_chunk, num_classes)-shaped np.ndarray
             
+            # print(chunk.start) #OK
             start_frame = frames.closest_frame(chunk.start)
+            # print(start_frame) #OK
             aggregated_output[start_frame : start_frame + num_frames_per_chunk] += (
                 score * mask * hamming_window * warm_up_window
             )
@@ -538,12 +675,28 @@ class Inference(BaseInference):
                 mask,
             )
         
+        # print(aggregated_output.shape) #(1767, 1), (1767, 1)
+        # print(overlapping_chunk_count.shape) #(1767, 1), (1767, 1)
+        # print(aggregated_mask.shape) #(1767, 1), (1767, 1))
+        # if(aggregated_output.shape[1] == 1): 
+        #     write_array_to_csv("aggregated_output.csv", aggregated_output) #OK
+        #     write_array_to_csv("overlapping_chunk_count.csv", overlapping_chunk_count) #OK
+        #     write_array_to_csv("aggregated_mask.csv", aggregated_mask) #OK
+        
+        
+        
         if skip_average:
             average = aggregated_output
         else:
             average = aggregated_output / np.maximum(overlapping_chunk_count, epsilon)
 
         average[aggregated_mask == 0.0] = missing
+        
+        # print(average.shape) #(1767, 1), (1767, 3) #OK
+        # if(average.shape[1] == 1):
+        #     write_array_to_csv("average.csv", average)  #OK
+        # print(type(average)) #<class 'numpy.ndarray'>
+            
 
         return SlidingWindowFeature(average, frames)
 
@@ -568,6 +721,7 @@ class Inference(BaseInference):
             (num_chunks, trimmed_num_frames, num_speakers)-shaped scores
         """
         
+        # print(warm_up) #(0.0, 0.0)
 
         assert (
             scores.data.ndim == 3
@@ -575,9 +729,15 @@ class Inference(BaseInference):
         _, num_frames, _ = scores.data.shape
 
         chunks = scores.sliding_window
+        # print(chunks.duration) #10.0
+        # print(chunks.step) #1.0
+        # print(chunks.start) #0.0
+        # print(chunks.end) #inf
 
         num_frames_left = round(num_frames * warm_up[0])
         num_frames_right = round(num_frames * warm_up[1])
+        # print(num_frames_left) #0
+        # print(num_frames_right) #0
 
         num_frames_step = round(num_frames * chunks.step / chunks.duration)
         if num_frames - num_frames_left - num_frames_right < num_frames_step:
@@ -592,5 +752,44 @@ class Inference(BaseInference):
             step=chunks.step,
             duration=(1 - warm_up[0] - warm_up[1]) * chunks.duration,
         )
+        
+        # print(new_data.shape) #(21, 589, 3)
+        # print(new_chunks) #<pyannote_audio_utils.core.segment.SlidingWindow object at 0x30f5342e0>
 
         return SlidingWindowFeature(new_data, new_chunks)
+
+
+
+
+
+# デバック用に追加
+# JSON形式でデータを保存
+import json
+import os
+def save_data(array, filename):
+    
+    # 保存先のディレクトリを取得
+    directory = os.path.dirname(filename)
+    
+    # ディレクトリが存在しない場合は作成
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+
+    # 元の形状情報を取得
+    original_shape = array.shape
+
+    # 配列をフラット化
+    flattened_array = array.flatten().tolist()  # リストに変換
+
+    # 保存するデータ構造を作成
+    data = {
+        "shape": original_shape,  # 元の形状情報
+        "data": flattened_array   # フラット化されたデータ
+    }
+
+    # JSON形式で保存
+    with open(filename, 'w') as json_file:
+        # json.dump(data, json_file, indent=4)  # インデントを付けて読みやすく保存
+        json.dump(data, json_file, separators=(',', ':'))  # 改行せずに保存
+        # json.dump(data, json_file, separators=(',', ':'), indent=4)

@@ -849,6 +849,11 @@ class Annotation:
 
     # annotation[segment, track] = label
     def __setitem__(self, key: Key, label: Label):
+        
+        # print(type(key)) #<class 'tuple'>
+        # print(key) #(<Segment(7.0034, 7.17317)>, 0), (<Segment(7.58065, 7.59762)>, 0)...
+        # print(type(label)) #<class 'int'>
+        # print(label) #0 or 1 or 2
         """Add new or update existing track
 
         >>> annotation[segment, track] = label
@@ -889,6 +894,10 @@ class Annotation:
         # mark new label as modified
         self._tracks[segment][track] = label
         self._labelNeedsUpdate[label] = True
+        
+        
+        # print(label) # 0, 0, 0, 0, ... 1, 1, ... 2, 2, 0, 0 ...
+        # print(self._tracks) #SortedDict({<Segment(7.0034, 7.17317)>: {0: 0}, <Segment(7.58065, 7.59762)>: {0: 0}})...
 
     def empty(self) -> "Annotation":
         """Return an empty copy
@@ -1213,11 +1222,15 @@ class Annotation:
         """
 
         renamed = self.__class__(uri=self.uri, modality=self.modality)
+        
+        # print(renamed) #何も表示されない
 
         if generator == "string":
             generator = string_generator()
         elif generator == "int":
             generator = int_generator()
+            
+        # print(generator) #<generator object string_generator at 0x16fb5c660>
 
         # TODO speed things up by working directly with annotation internals
         for s, _, label in self.itertracks(yield_label=True):

@@ -259,13 +259,30 @@ class Binarize:
         active : Annotation
             Binarized scores.
         """
+        
+        # print(scores.data.shape) #(1767, 3)
 
         num_frames, num_classes = scores.data.shape
         frames = scores.sliding_window
+        # print(type(frames)) #<class 'pyannote_audio_utils.core.segment.SlidingWindow'>
+        # print(type(frames[0])) #<class 'pyannote_audio_utils.core.segment.Segment'>
         timestamps = [frames[i].middle for i in range(num_frames)]
+        # print(num_frames) #1767
+        # print(num_classes) #3
+        # print(frames) #<pyannote_audio_utils.core.segment.SlidingWindow object at 0x30bb73fd0>
+        # print(len(timestamps)) #1767
+        # print(timestamps) #[0.008488964346349746, 0.025466893039049237, 0.042444821731748725, 0.05942275042444822,...
 
         # annotation meant to store 'active' regions
         active = Annotation()
+        
+        
+        # print(scores.data.T)
+        # [[0. 0. 0. ... 1. 1. 1.]
+        # [0. 0. 0. ... 0. 0. 0.]
+        # [0. 0. 0. ... 0. 0. 0.]]
+        
+        # print(scores.labels) #None
 
         for k, k_scores in enumerate(scores.data.T):
 
@@ -274,11 +291,17 @@ class Binarize:
             # initial state
             start = timestamps[0]
             is_active = k_scores[0] > self.onset
+            
+            # print(k) #0, 1, 2
+            # print(k_scores) #[0. 0. 0. ... 1. 1. 1.], [0. 0. 0. ... 0. 0. 0.], [0. 0. 0. ... 0. 0. 0.]
+            # print(is_active) #False, False, False
+            # print(start) #0.008488964346349746, 0.008488964346349746, 0.008488964346349746
 
             for t, y in zip(timestamps[1:], k_scores[1:]):
 
                 # currently active
                 if is_active:
+                    # print("here") #ここは呼ばれない
                     # switching from active to inactive
                     if y < self.offset:
                         region = Segment(start - self.pad_onset, t + self.pad_offset)
@@ -297,6 +320,25 @@ class Binarize:
             if is_active:
                 region = Segment(start - self.pad_onset, t + self.pad_offset)
                 active[region, k] = label
+                
+                
+        # print(active)   
+        # [ 00:00:06.714 -->  00:00:07.003] 2 2
+        # [ 00:00:07.003 -->  00:00:07.173] 0 0
+        # [ 00:00:07.580 -->  00:00:07.597] 0 0
+        # [ 00:00:07.597 -->  00:00:08.276] 2 2
+        # [ 00:00:08.276 -->  00:00:08.293] 0 0
+        # [ 00:00:08.293 -->  00:00:08.310] 2 2
+        # [ 00:00:08.310 -->  00:00:09.906] 0 0
+        # [ 00:00:09.906 -->  00:00:10.959] 2 2
+        # [ 00:00:10.466 -->  00:00:14.745] 0 0
+        # [ 00:00:10.959 -->  00:00:10.976] 1 1
+        # [ 00:00:14.303 -->  00:00:17.886] 1 1
+        # [ 00:00:18.022 -->  00:00:21.502] 0 0
+        # [ 00:00:18.157 -->  00:00:18.446] 1 1
+        # [ 00:00:21.774 -->  00:00:28.531] 1 1
+        # [ 00:00:27.886 -->  00:00:29.991] 0 0     
+        
 
         # because of padding, some active regions might be overlapping: merge them.
         # also: fill same speaker gaps shorter than min_duration_off
@@ -308,6 +350,23 @@ class Binarize:
             for segment, track in list(active.itertracks()):
                 if segment.duration < self.min_duration_on:
                     del active[segment, track]
+                    
+        # print(active)
+        # [ 00:00:06.714 -->  00:00:07.003] 2 2
+        # [ 00:00:07.003 -->  00:00:07.173] 0 0
+        # [ 00:00:07.580 -->  00:00:07.597] 0 0
+        # [ 00:00:07.597 -->  00:00:08.276] 2 2
+        # [ 00:00:08.276 -->  00:00:08.293] 0 0
+        # [ 00:00:08.293 -->  00:00:08.310] 2 2
+        # [ 00:00:08.310 -->  00:00:09.906] 0 0
+        # [ 00:00:09.906 -->  00:00:10.959] 2 2
+        # [ 00:00:10.466 -->  00:00:14.745] 0 0
+        # [ 00:00:10.959 -->  00:00:10.976] 1 1
+        # [ 00:00:14.303 -->  00:00:17.886] 1 1
+        # [ 00:00:18.022 -->  00:00:21.502] 0 0
+        # [ 00:00:18.157 -->  00:00:18.446] 1 1
+        # [ 00:00:21.774 -->  00:00:28.531] 1 1
+        # [ 00:00:27.886 -->  00:00:29.991] 0 0
 
         return active
 
@@ -354,6 +413,9 @@ class Peak:
 
         precision = frames.step
         order = max(1, int(np.rint(self.min_duration / precision)))
+        
+        
+        
         indices = scipy.signal.argrelmax(scores[:], order=order)[0]
 
         peak_time = np.array(

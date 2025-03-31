@@ -128,7 +128,9 @@ def main(args):
                 print(speaker, embeddings[s].shape)
         else:
             diarization, embeddings = pipeline(audio_file, return_embeddings=True)
+            # print(embeddings.shape) #(3, 256)
             for s, speaker in enumerate(diarization.labels()):
+
                 print(speaker, embeddings[s].shape)
     else:
         if args.num > 0:

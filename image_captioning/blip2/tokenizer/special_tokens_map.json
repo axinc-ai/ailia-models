@@ -1,30 +1,3 @@
-{
-  "bos_token": {
-    "content": "</s>",
-    "lstrip": false,
-    "normalized": true,
-    "rstrip": false,
-    "single_word": false
-  },
-  "eos_token": {
-    "content": "</s>",
-    "lstrip": false,
-    "normalized": true,
-    "rstrip": false,
-    "single_word": false
-  },
-  "pad_token": {
-    "content": "<pad>",
-    "lstrip": false,
-    "normalized": true,
-    "rstrip": false,
-    "single_word": false
-  },
-  "unk_token": {
-    "content": "</s>",
-    "lstrip": false,
-    "normalized": true,
-    "rstrip": false,
-    "single_word": false
-  }
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:edbf5e1520a90884935090c0cfb0e50e7c9c138906936d43bee1496f3af22094
+size 548

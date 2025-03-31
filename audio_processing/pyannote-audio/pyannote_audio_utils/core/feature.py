@@ -67,6 +67,7 @@ class SlidingWindowFeature(np.lib.mixins.NDArrayOperatorsMixin):
 
     def __len__(self):
         """Number of feature vectors"""
+        # print(self.data.shape[0]) #1767, 1767
         return self.data.shape[0]
 
     @property
@@ -138,6 +139,12 @@ class SlidingWindowFeature(np.lib.mixins.NDArrayOperatorsMixin):
         fixed: Optional[float] = None,
         return_data: bool = True,
     ) -> Union[np.ndarray, "SlidingWindowFeature"]:
+        
+        # print(mode) #loose
+        # print(fixed) #None
+        # print(return_data) #false
+        
+        
         """Extract frames
 
         Parameters
@@ -237,6 +244,9 @@ class SlidingWindowFeature(np.lib.mixins.NDArrayOperatorsMixin):
             duration=self.sliding_window.duration,
             step=self.sliding_window.step,
         )
+        
+        # print(self.labels) #None
+        # print(data.shape) #(1767, 3), (1767, 1)
 
         return SlidingWindowFeature(data, sliding_window, labels=self.labels)
 
