@@ -281,12 +281,20 @@ def recognize_from_image(models):
     logger.info(f"Negative coordinate: {neg_points}")
     logger.info(f"Box coordinate: {lf if box is not None else ''}{box}")
 
+    coord_list = []
+    label_list = []
     if box is not None:
-        coord_list = box
-        label_list = [2, 3]
-    else:
-        coord_list = np.array(pos_points + neg_points)
-        label_list = np.array([1 for _ in pos_points] + [0 for _ in neg_points])
+        coord_list.append(box)
+        label_list.append(np.array([2, 3]))
+    if pos_points:
+        coord_list.append(np.array(pos_points))
+        label_list.append(np.ones(len(pos_points)))
+    if neg_points:
+        coord_list.append(np.array(neg_points))
+        label_list.append(np.zeros(len(neg_points)))
+
+    coord_list = np.concatenate(coord_list, axis=0)
+    label_list = np.concatenate(label_list, axis=0)
 
     for image_path in args.input:
         logger.info(image_path)
@@ -319,14 +327,16 @@ def recognize_from_image(models):
 
         masks, scores = output
 
-        if box is not None:
-            mask = np.expand_dims(masks[0], axis=0)
-            res_img = show_mask(mask, img)
-            res_img = show_box(box, res_img)
-        else:
-            mask = np.expand_dims(masks[scores.argmax()], axis=0)
-            res_img = show_mask(mask, img)
+        mask = np.expand_dims(masks[scores.argmax()], axis=0)
+        res_img = show_mask(mask, img)
+
+        sel = label_list < 2
+        coord_list = coord_list[sel]
+        label_list = label_list[sel]
+        if 0 < len(label_list):
             res_img = show_points(coord_list, label_list, res_img)
+        if box is not None:
+            res_img = show_box(box, res_img)
 
         # plot result
         savepath = get_savepath(args.savepath, image_path, ext=".png")
