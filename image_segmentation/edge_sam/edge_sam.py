@@ -67,6 +67,13 @@ parser.add_argument(
     nargs=4,
     help="Box coordinate specified by x1,y1,x2,y2.",
 )
+parser.add_argument(
+    "--num_multimask_outputs",
+    type=int,
+    default=1,
+    choices=(1, 3, 4),
+    help="number of output masks",
+)
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 parser.add_argument("--gui", action="store_true", help="Open mouse click GUI.")
 args = update_parser(parser)
@@ -222,7 +229,7 @@ def postprocess_masks(
     return mask
 
 
-def predict(models, img, point_coords, point_labels):
+def predict(models, img, point_coords, point_labels, num_multimask_outputs=1):
     im_h, im_w, _ = img.shape
     img = img[:, :, ::-1]  # BGR -> RGB
     img, input_size = preprocess(img)
@@ -256,8 +263,19 @@ def predict(models, img, point_coords, point_labels):
     mask_threshold = 0.0
     masks = masks > mask_threshold
 
-    masks = masks.squeeze(0)
-    scores = scores.squeeze(0)
+    # Select the correct mask or masks for output
+    if num_multimask_outputs == 4:
+        mask_slice = slice(0, None)
+    elif num_multimask_outputs == 3:
+        mask_slice = slice(1, None)
+    elif num_multimask_outputs == 1:
+        mask_slice = slice(0, 1)
+    else:
+        raise ValueError
+
+    masks = masks[:, mask_slice, :, :].squeeze(0)
+    scores = scores[:, mask_slice].squeeze(0)
+
     return masks, scores
 
 
@@ -265,6 +283,7 @@ def recognize_from_image(models):
     pos_points = args.pos
     neg_points = args.neg
     box = args.box
+    num_multimask_outputs = args.num_multimask_outputs
 
     if pos_points is None:
         if neg_points is None and box is None:
@@ -310,7 +329,9 @@ def recognize_from_image(models):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                output = predict(models, img, coord_list, label_list)
+                output = predict(
+                    models, img, coord_list, label_list, num_multimask_outputs
+                )
                 end = int(round(time.time() * 1000))
                 estimation_time = end - start
 
@@ -323,7 +344,7 @@ def recognize_from_image(models):
                 f"\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms"
             )
         else:
-            output = predict(models, img, coord_list, label_list)
+            output = predict(models, img, coord_list, label_list, num_multimask_outputs)
 
         masks, scores = output
 
