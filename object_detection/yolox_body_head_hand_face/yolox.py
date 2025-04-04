@@ -63,13 +63,6 @@ parser.add_argument(
     help='ONNX/TFLite file path for YOLOX.',
 )
 parser.add_argument(
-    '-v',
-    '--video',
-    type=str,
-    default="0",
-    help='Video file path or camera index.',
-)
-parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
@@ -623,7 +616,8 @@ def recognize_from_image(model):
             logger.info(f'\taverage time {total_time / (args.benchmark_count-1)} ms')
         else:
             output = model(raw_img)
-            res_img = write_image_texts(raw_img, output)
+            
+        res_img = write_image_texts(raw_img, output)
 
         # plot result
         savepath = get_savepath(args.savepath, image_path)
@@ -691,7 +685,6 @@ def main():
     logger.info('Checking encode_image model...')
     # check_and_download_models(WEIGHT_IMAGE_PATH, MODEL_IMAGE_PATH, REMOTE_PATH)
 
-    print(args)
     env_id = args.env_id
     if not args.onnx:
         # ailia
