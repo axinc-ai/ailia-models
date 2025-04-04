@@ -42,6 +42,7 @@ logger = getLogger(__name__)
 # ======================
 IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.jpg'
+CLASS_SCORE_THRETHOLD = 0.35
 
 # ======================
 # Arguemnt Parser Config
@@ -200,7 +201,8 @@ class AbstractModel(ABC):
                 reduce_constant=True, ignore_input_with_initializer=True,
                 reduce_interstage=False, reuse_interstage=False)
             
-            ailia.Net(model_path, env_id=env_id, memory_mode=memory_mode)
+            self._interpreter = ailia.Net(model_path, env_id=env_id, memory_mode=memory_mode)
+            self._model = self._interpreter.run(None)
         
 
         # elif self._runtime in ['tflite_runtime', 'tensorflow']:
@@ -251,14 +253,6 @@ class AbstractModel(ABC):
                     )
             ]
             return outputs
-        # elif self._runtime in ['tflite_runtime', 'tensorflow']:
-        #     outputs = [
-        #         output for output in \
-        #             self._model(
-        #                 **datas
-        #             ).values()
-        #     ]
-        #     return outputs
 
     @abstractmethod
     def _preprocess(
@@ -643,7 +637,6 @@ def recognize_from_video(model):
         video_writer = None
 
     # frame read and exec segmentation
-    frame_shown = False
 
     while (True):
         ret, frame = video_capture.read()
@@ -666,14 +659,6 @@ def recognize_from_video(model):
         if video_writer is not None:
             video_writer.write(res_img)
 
-        # write prediction
-        if args.write_prediction is not None:
-            savepath = get_savepath(args.savepath, video_name, post_fix = '_%s' % (str(frame_count).zfill(frame_digit) + '_res'), ext='.png')
-            ext = args.write_prediction
-            pred_file = "%s.%s" % (savepath.rsplit('.', 1)[0], ext)
-            write_predictions(pred_file, detect_object, frame, category=COCO_CATEGORY, file_type=ext)
-            frame_count += 1
-
     capture.release()
     cv2.destroyAllWindows()
     if writer is not None:
@@ -691,14 +676,14 @@ def main():
         model = YOLOX(
             runtime='ailia',
             model_path=args.model,
-            class_score_th=0.35,
+            class_score_th=CLASS_SCORE_THRETHOLD,
             env_id=env_id
         )
     else:
         model = YOLOX(
             runtime='onnx',
             model_path=args.model,
-            class_score_th=0.35,
+            class_score_th=CLASS_SCORE_THRETHOLD,
             env_id=env_id
         )
 
