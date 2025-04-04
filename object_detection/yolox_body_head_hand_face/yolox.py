@@ -17,7 +17,6 @@ import time
 import numpy as np
 from enum import Enum
 from dataclasses import dataclass
-from argparse import ArgumentParser
 from typing import Tuple, Optional, List, Dict
 import importlib.util
 from abc import ABC, abstractmethod
@@ -29,8 +28,6 @@ sys.path.append('../../util')
 from logging import getLogger
 
 import webcamera_utils
-from detector_utils import (load_image, plot_results, reverse_letterbox,
-                            write_predictions)
 from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models
 from arg_utils import get_base_parser, get_savepath, update_parser
@@ -499,10 +496,9 @@ def draw_dashed_rectangle(
     draw_dashed_line(image, bottom_right, bl_br, color, thickness, dash_length)
     draw_dashed_line(image, bl_br, top_left, color, thickness, dash_length)
 
-def write_image_texts(debug_image, boxes):
+
+def write_image_texts(debug_image, boxes, elapsed_time):
     debug_image_w = debug_image.shape[1]
-    start_time = time.perf_counter()
-    elapsed_time = time.perf_counter() - start_time
     cv2.putText(
         debug_image,
         f'{elapsed_time*1000:.2f} ms',
@@ -602,29 +598,28 @@ def recognize_from_image(model):
             total_time = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
+                start_time = time.perf_counter()
                 output = model(raw_img)
+                elapsed_time = time.perf_counter() - start_time
                 end = int(round(time.time() * 1000))
                 if i != 0:
                     total_time = total_time + (end - start)
                 logger.info(f'\tailia processing time {end - start} ms')
             logger.info(f'\taverage time {total_time / (args.benchmark_count-1)} ms')
         else:
+            start_time = time.perf_counter()
             output = model(raw_img)
-            
-        res_img = write_image_texts(raw_img, output)
+            elapsed_time = time.perf_counter() - start_time
+        
+        res_img = write_image_texts(raw_img, output, elapsed_time)
 
         # plot result
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
 
-        # write prediction
-        if args.write_prediction is not None:
-            ext = args.write_prediction
-            pred_file = "%s.%s" % (savepath.rsplit('.', 1)[0], ext)
-            write_predictions(pred_file, detect_object, res_img, category=COCO_CATEGORY, file_type=ext)
-
     logger.info('Script finished successfully.')
+
 
 def recognize_from_video(model):
     video_capture = webcamera_utils.get_capture(args.video)
@@ -637,6 +632,7 @@ def recognize_from_video(model):
         video_writer = None
 
     # frame read and exec segmentation
+    frame_shown = False
 
     while (True):
         ret, frame = video_capture.read()
@@ -648,9 +644,11 @@ def recognize_from_video(model):
         raw_img = frame
 
         debug_image = copy.deepcopy(raw_img)
+        start_time = time.perf_counter()
         boxes = model(debug_image)
+        elapsed_time = time.perf_counter() - start_time
         
-        res_img = write_image_texts(debug_image, boxes)
+        res_img = write_image_texts(debug_image, boxes, elapsed_time)
 
         cv2.imshow('frame', res_img)
         frame_shown = True
