@@ -177,29 +177,37 @@ class AbstractModel(ABC):
             self._input_shapes = [
                 input.shape for input in self._interpreter.get_inputs()
             ]
+            print(self._input_shapes)
             self._input_names = [
                 input.name for input in self._interpreter.get_inputs()
             ]
+            print(self._input_names)
             self._input_dtypes = [
                 self._onnx_dtypes_to_np_dtypes[input.type] for input in self._interpreter.get_inputs()
             ]
+            print(self._input_dtypes)
             self._output_shapes = [
                 output.shape for output in self._interpreter.get_outputs()
             ]
+            print(self._output_shapes)
             self._output_names = [
                 output.name for output in self._interpreter.get_outputs()
             ]
+            print(self._output_names)
             self._model = self._interpreter.run
             self._swap = (2, 0, 1)
             self._h_index = 2
             self._w_index = 3
         elif self._runtime == 'ailia':
+            print(input)
             memory_mode = ailia.get_memory_mode(
                 reduce_constant=True, ignore_input_with_initializer=True,
                 reduce_interstage=False, reuse_interstage=False)
             
-            self._interpreter = ailia.Net(model_path, env_id=env_id, memory_mode=memory_mode)
-            self._model = self._interpreter.run(None)
+            self._interpreter = ailia.Net(None, model_path, env_id=env_id, memory_mode=memory_mode)
+            self._input_shapes = [list(self._interpreter.get_input_shape())]
+            self._input_names = [self._interpreter.get_blob_name(0)]
+            self._model = self._interpreter.predict
         
 
         # elif self._runtime in ['tflite_runtime', 'tensorflow']:
@@ -237,10 +245,12 @@ class AbstractModel(ABC):
         *,
         input_datas: List[np.ndarray],
     ) -> List[np.ndarray]:
+        print(input_datas)
         datas = {
             f'{input_name}': input_data \
                 for input_name, input_data in zip(self._input_names, input_datas)
         }
+        print(datas)
         if self._runtime == 'onnx':
             outputs = [
                 output for output in \
@@ -249,7 +259,14 @@ class AbstractModel(ABC):
                         input_feed=datas,
                     )
             ]
+            print(outputs)
             return outputs
+        elif self._runtime == 'ailia':
+            reshaped_array = [input_datas[0].tolist()]
+            outputs = [
+                self._model([input_datas[0]])
+            ]
+
 
     @abstractmethod
     def _preprocess(
@@ -331,7 +348,10 @@ class YOLOX(AbstractModel):
             )
 
         # Inference
-        inferece_image = np.asarray([resized_image], dtype=self._input_dtypes[0])
+        if self._runtime == 'onnx':
+            inferece_image = np.asarray([resized_image], dtype=self._input_dtypes[0])
+        else:
+            inferece_image = resized_image
         outputs = super().__call__(input_datas=[inferece_image])
         boxes = outputs[0]
 
