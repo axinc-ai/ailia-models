@@ -4,6 +4,8 @@ from logging import getLogger
 
 import librosa
 import numpy as np
+import soundfile as sf
+from tqdm import tqdm
 
 import ailia
 
@@ -11,6 +13,7 @@ import ailia
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
+from math_utils import softmax
 
 logger = getLogger(__name__)
 
@@ -84,9 +87,190 @@ def prefix_conditioner(net, cond_dict):
     return conditioning
 
 
+def modify_logit_for_repetition_penalty(
+    logits: np.ndarray,  # shape: (B, C, V)
+    generated_tokens: np.ndarray,  # shape: (B, C, T)
+    repetition_penalty: float,
+    repetition_penalty_window: int,
+):
+    """
+    NumPy version of repetition penalty logic.
+    logits: (batch_size, n_codebooks, vocab_size)
+    generated_tokens: (batch_size, n_codebooks, seq_len)
+    """
+    B, C, V = logits.shape
+    T = generated_tokens.shape[-1]
+
+    tokens = generated_tokens[..., -repetition_penalty_window:]
+    tokens = np.minimum(tokens, V - 1).astype(np.int64)
+
+    factors = np.ones_like(logits)
+    for b in range(B):
+        for c in range(C):
+            for t in range(tokens.shape[2]):
+                idx = tokens[b, c, t]
+                factors[b, c, idx] *= repetition_penalty
+
+    logits = np.where(logits <= 0, logits * factors, logits / factors)
+
+    return logits
+
+
+def sample(
+    logits,
+    temperature=1.0,
+    min_p=0.1,
+    generated_tokens: np.ndarray | None = None,
+    repetition_penalty: float = 3.0,
+    repetition_penalty_window: int = 2,
+):
+    if repetition_penalty != 1.0 and generated_tokens is not None:
+        logits = modify_logit_for_repetition_penalty(
+            logits, generated_tokens, repetition_penalty, repetition_penalty_window
+        )
+
+    probs = softmax(logits / temperature, axis=-1)
+
+    # apply_min_p
+    top_probs = np.max(probs, axis=-1, keepdims=True)
+    tokens_to_remove = probs < (min_p * top_probs)
+    probs = np.where(tokens_to_remove, 0.0, probs)
+    probs = probs / np.sum(probs, axis=-1, keepdims=True)
+
+    # multinomial
+    batch_size, num_heads, vocab_size = probs.shape
+    next_token = np.zeros((batch_size, num_heads, 1), dtype=np.int64)
+    for b in range(batch_size):
+        for h in range(num_heads):
+            next_token[b, h, 0] = np.random.choice(vocab_size, p=probs[b, h])
+
+    return next_token
+
+
 # ======================
 # Main functions
 # ======================
+
+
+def generate(models, prefix_conditioning):
+    eos_token_id = 1024
+    masked_token_id = 1025
+    batch_size = 1
+
+    max_new_tokens = 86 * 30
+    prefix_audio_len = 0
+    audio_seq_len = prefix_audio_len + max_new_tokens
+    unknown_token = -1
+    codes = np.full((batch_size, 9, audio_seq_len), unknown_token)
+
+    # apply_delay_pattern
+    pad_width = ((0, 0), (0, 0), (0, codes.shape[1]))
+    codes_padded = np.pad(
+        codes, pad_width, mode="constant", constant_values=masked_token_id
+    )
+    delayed_codes = np.stack(
+        [
+            np.roll(codes_padded[:, k, :], shift=k + 1, axis=-1)
+            for k in range(codes.shape[1])
+        ],
+        axis=1,
+    )
+    delayed_prefix_audio_codes = delayed_codes[..., : prefix_audio_len + 1]
+
+    net = models["first_net"]
+    if not args.onnx:
+        output = net.run({"conditioning": prefix_conditioning})
+    else:
+        output = net.run(None, {"conditioning": prefix_conditioning})
+    logits, freqs_cis, *kv_cache = output
+
+    next_token = sample(logits)
+
+    offset = delayed_prefix_audio_codes.shape[2]
+    frame = delayed_codes[..., offset : offset + 1]
+    mask = frame == unknown_token
+    frame[mask] = next_token.flatten()[: np.count_nonzero(mask)]
+
+    prefix_length = prefix_conditioning.shape[1] + prefix_audio_len + 1
+    seqlen_offset = np.array(prefix_length)
+
+    logit_bias = np.zeros_like(logits)
+    logit_bias[:, 1:, eos_token_id] = -np.inf  # only allow codebook 0 to predict EOS
+
+    stopping = np.zeros(batch_size, dtype=bool)
+    max_steps = delayed_codes.shape[2] - offset
+    remaining_steps = np.full((batch_size,), max_steps)
+    progress = tqdm(total=max_steps, desc="Generating", disable=False)
+
+    step = 0
+    while np.max(remaining_steps) > 0:
+        offset += 1
+        input_ids = delayed_codes[..., offset - 1 : offset]
+
+        kv_cache = {"kv_cache_%d" % i: kv for i, kv in enumerate(kv_cache)}
+        net = models["second_net"]
+        if not args.onnx:
+            output = net.run(
+                {
+                    "input_ids": input_ids,
+                    "freqs_cis": freqs_cis,
+                    "seqlen_offset": seqlen_offset,
+                    **kv_cache,
+                }
+            )
+        else:
+            output = net.run(
+                None,
+                {
+                    "input_ids": input_ids,
+                    "freqs_cis": freqs_cis,
+                    "seqlen_offset": seqlen_offset,
+                    **kv_cache,
+                },
+            )
+        logits, freqs_cis, *kv_cache = output
+        logits += logit_bias
+
+        next_token = sample(logits, generated_tokens=delayed_codes[..., :offset])
+        eos_in_cb0 = next_token[:, 0] == eos_token_id
+
+        indices = eos_in_cb0[:, 0]
+        remaining_steps[indices] = np.minimum(remaining_steps[indices], 9)
+        stopping |= eos_in_cb0[:, 0]
+
+        eos_codebook_idx = 9 - remaining_steps
+        eos_codebook_idx = np.clip(eos_codebook_idx, None, a_max=9 - 1)
+        for i in range(next_token.shape[0]):
+            if stopping[i]:
+                idx = eos_codebook_idx[i]
+                next_token[i, :idx] = masked_token_id
+                next_token[i, idx] = eos_token_id
+
+        frame = delayed_codes[..., offset : offset + 1]
+        mask = frame == unknown_token
+        frame[mask] = next_token.flatten()[: np.count_nonzero(mask)]
+        seqlen_offset += 1
+
+        remaining_steps -= 1
+        progress.update()
+        step += 1
+
+    # revert_delay_pattern
+    _, n_q, seq_len = delayed_codes.shape
+    codes = np.stack(
+        [delayed_codes[:, k, k + 1 : seq_len - n_q + k + 1] for k in range(n_q)], axis=1
+    )
+    codes[codes >= 1024] = 0
+    codes = codes[..., : offset - 9]
+
+    net = models["decoder"]
+    if not args.onnx:
+        output = net.run({"codes": codes})
+    else:
+        output = net.run(None, {"codes": codes})
+    wavs = output[0]
+
+    return wavs
 
 
 def generate_voice(models):
@@ -101,6 +285,7 @@ def generate_voice(models):
 
     espeak_cond = EspeakPhonemeConditioner().forward((["Hello, world!"], ["en-us"]))
 
+    # prepare_conditioning
     cond_dict = dict(
         espeak=espeak_cond,
         speaker=speaker,
@@ -127,6 +312,11 @@ def generate_voice(models):
     conditioning = np.concatenate(
         [prefix_conditioner(net, cond_dict), prefix_conditioner(net, uncond_dict)]
     )
+    conditioning = conditioning.astype(np.float16)
+
+    wavs = generate(models, conditioning)
+
+    sf.write("sample.wav", wavs[0].T, 44100)
 
     logger.info("Script finished successfully.")
 
