@@ -59,11 +59,6 @@ To use FP16 precision for faster inference:
 $ python3 mobilevlm.py --fp16
 ```
 
-For faster generation , you can enable the key-value cache feature:
-```bash
-$ python3 mobilevlm.py --kvc
-```
-
 note: Only fp16 version is available for the 3B model size.
 
 ### Input Format
