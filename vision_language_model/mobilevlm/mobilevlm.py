@@ -146,22 +146,21 @@ def load_models(env_id=0):
     logger.info("Loading models...")
     models = {}
 
-    # DEBUG
     # Check and download model files
     for component in MODEL_COMPONENTS:
         model_path = MODEL_PATHS[component]
         weight_path = WEIGHT_PATHS[component]
-        #check_and_download_models(weight_path, model_path, REMOTE_PATH)
+        check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
-    ## Model weights
-    #check_and_download_file(
-    #    WEIGHT_PATHS["mobilellama" + ("_kvc" if args.kvc else "")][:-5] + "_weights.pb",
-    #    REMOTE_PATH
-    #)
+    # Model weights
+    check_and_download_file(
+        WEIGHT_PATHS["mobilellama_kvc"][:-5] + "_weights.pb",
+        REMOTE_PATH
+    )
     
     ## Additional files for tokenizer
     tokenizer_path = f"tokenizer"
-    #check_and_download_file(f"{tokenizer_path}.zip", REMOTE_PATH)
+    check_and_download_file(f"{tokenizer_path}.zip", REMOTE_PATH)
     
     memory_mode = ailia.get_memory_mode(
         reduce_constant=True,
@@ -171,11 +170,8 @@ def load_models(env_id=0):
     )
     
     for component in MODEL_COMPONENTS:
-        # DEBUG
-        #model_path = MODEL_PATHS[component]
+        model_path = MODEL_PATHS[component]
         weight_path = WEIGHT_PATHS[component]
-        model_path = None
-        weight_path = '/home/kobakos/ailia/mobilevlm/MobileVLMOrig/onnx_opt/' + weight_path
         logger.info(f"Loading {component}...")
         
         if not args.onnx:
