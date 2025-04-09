@@ -810,6 +810,7 @@ If you would like to try on your computer:
 | [<img src="vision_language_model/florence2/car.jpg" width=128px>](vision_language_model/florence2/) | [florence2](vision_language_model/florence2) | [Hugging Face - microsoft/Florence-2-base](https://huggingface.co/microsoft/Florence-2-base) | Pytorch | 1.2.16 and later | |
 | [<img src="vision_language_model/qwen2_vl/demo.jpeg" width=128px>](vision_language_model/qwen2_vl/) | [qwen2_vl](vision_language_model/qwen2_vl) | [Qwen2-VL](https://github.com/QwenLM/Qwen2-VL) | Pytorch | 1.5.0 and later | |
 | [<img src="vision_language_model/llava-jp/sample.jpg" width=128px>](vision_language_model/llava-jp/) | [llava-jp](vision_language_model/llava-jp) | [LLaVA-JP](https://github.com/tosiyuki/LLaVA-JP/tree/main) | Pytorch | 1.5.0 and later | |
+| [<img src="vision_language_model/mobilevlm/demo.jpg" width=128px>](vision_language_model/mobilevlm/) | [mobilevlm](vision_language_model/mobilevlm) | [MobileVLM](https://github.com/Meituan-AutoML/MobileVLM) | Pytorch | 1.5.0 and later | |
 
 ## Commercial model
 
