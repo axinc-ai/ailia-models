@@ -15,6 +15,8 @@ from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from math_utils import softmax
 
+from conditioning import phonemize, tokenize_phonemes
+
 logger = getLogger(__name__)
 
 
@@ -23,11 +25,13 @@ logger = getLogger(__name__)
 # ======================
 
 WEIGHT_EMB_PATH = "speaker_embedding.onnx"
+WEIGHT_PH_EMB_PATH = "phoneme_embedder.onnx"
 WEIGHT_COND_PATH = "conditioner.onnx"
 WEIGHT_FIRST_PATH = "generator_first.onnx"
 WEIGHT_SECOND_PATH = "generator_second.onnx"
 WEIGHT_DEC_PATH = "autoencoder.onnx"
 MODEL_EMB_PATH = "speaker_embedding.onnx.prototxt"
+MODEL_PH_EMB_PATH = "phoneme_embedder.onnx.prototxt"
 MODEL_COND_PATH = "conditioner.onnx.prototxt"
 MODEL_FIRST_PATH = "generator_first.onnx.prototxt"
 MODEL_SECOND_PATH = "generator_second.onnx.prototxt"
@@ -52,8 +56,30 @@ args = update_parser(parser)
 
 
 class EspeakPhonemeConditioner:
-    def forward(self, x):
-        return x
+    def __init__(self, phoneme_embedder, flg_onnx=False):
+        self.phoneme_embedder = phoneme_embedder
+        self.flg_onnx = flg_onnx
+
+    def forward(self, texts: list[str], languages: list[str]):
+        """
+        Args:
+            texts: list of texts to convert to phonemes
+            languages: ISO 639-1 -or otherwise eSpeak compatible- language code
+        """
+        phonemes = phonemize(texts, languages)
+        phoneme_ids, _ = tokenize_phonemes(phonemes)
+        if not self.flg_onnx:
+            output = self.phoneme_embedder.run(
+                {"input": phoneme_ids},
+            )
+        else:
+            output = self.phoneme_embedder.run(
+                None,
+                {"input": phoneme_ids},
+            )
+        cond = output[0]
+
+        return cond
 
 
 def prefix_conditioner(net, cond_dict):
@@ -283,7 +309,10 @@ def generate_voice(models):
         output = net.run(None, {"wav": wav})
     speaker = output[0]
 
-    espeak_cond = EspeakPhonemeConditioner().forward((["Hello, world!"], ["en-us"]))
+    net = models["phoneme_embedder"]
+    espeak_cond = EspeakPhonemeConditioner(net, args.onnx).forward(
+        ["Hello, world!"], ["en-us"]
+    )
 
     # prepare_conditioning
     cond_dict = dict(
@@ -324,6 +353,7 @@ def generate_voice(models):
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_EMB_PATH, MODEL_EMB_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PH_EMB_PATH, MODEL_PH_EMB_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_COND_PATH, MODEL_COND_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_FIRST_PATH, MODEL_FIRST_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_SECOND_PATH, MODEL_SECOND_PATH, REMOTE_PATH)
@@ -334,6 +364,9 @@ def main():
     # initialize
     if not args.onnx:
         embedding = ailia.Net(MODEL_EMB_PATH, WEIGHT_EMB_PATH, env_id=env_id)
+        phoneme_embedder = ailia.Net(
+            MODEL_PH_EMB_PATH, WEIGHT_PH_EMB_PATH, env_id=env_id
+        )
         conditioner = ailia.Net(MODEL_COND_PATH, WEIGHT_COND_PATH, env_id=env_id)
         first_net = ailia.Net(MODEL_FIRST_PATH, WEIGHT_FIRST_PATH, env_id=env_id)
         second_net = ailia.Net(MODEL_SECOND_PATH, WEIGHT_SECOND_PATH, env_id=env_id)
@@ -343,6 +376,9 @@ def main():
 
         providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
         embedding = onnxruntime.InferenceSession(WEIGHT_EMB_PATH, providers=providers)
+        phoneme_embedder = onnxruntime.InferenceSession(
+            WEIGHT_PH_EMB_PATH, providers=providers
+        )
         conditioner = onnxruntime.InferenceSession(
             WEIGHT_COND_PATH, providers=providers
         )
@@ -354,6 +390,7 @@ def main():
 
     models = {
         "embedding": embedding,
+        "phoneme_embedder": phoneme_embedder,
         "conditioner": conditioner,
         "first_net": first_net,
         "second_net": second_net,
