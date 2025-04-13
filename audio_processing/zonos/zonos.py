@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 from logging import getLogger
@@ -15,7 +16,7 @@ from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from math_utils import softmax
 
-from conditioning import phonemize, tokenize_phonemes
+from conditioning import supported_language_codes, phonemize, tokenize_phonemes
 
 logger = getLogger(__name__)
 
@@ -38,6 +39,7 @@ MODEL_SECOND_PATH = "generator_second.onnx.prototxt"
 MODEL_DEC_PATH = "autoencoder.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/zonos/"
 
+REF_WAV_PATH = "exampleaudio.mp3"
 SAVE_WAV_PATH = "output.wav"
 
 
@@ -46,8 +48,24 @@ SAVE_WAV_PATH = "output.wav"
 # ======================
 
 parser = get_base_parser("Zonos", None, SAVE_WAV_PATH)
+# overwrite
+parser.add_argument(
+    "--input",
+    "-i",
+    metavar="TEXT",
+    default="こんにちは",
+    help="input text",
+)
+parser.add_argument("--text_language", "-tl", default="ja", help="language")
+parser.add_argument(
+    "--ref_audio",
+    "-ra",
+    metavar="TEXT",
+    default=REF_WAV_PATH,
+    help="ref audio",
+)
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
-args = update_parser(parser)
+args = update_parser(parser, check_input_type=False)
 
 
 # ======================
@@ -300,7 +318,25 @@ def generate(models, prefix_conditioning):
 
 
 def generate_voice(models):
-    ref_audio, sr = librosa.load(input_audio, sr=16_000)
+    ref_audio = args.ref_audio
+    text = args.input
+    text_language = args.text_language
+
+    if not os.path.isfile(ref_audio):
+        logger.error("specified input is not file path nor directory path")
+        sys.exit(0)
+
+    language_code_to_id = {lang: i for i, lang in enumerate(supported_language_codes)}
+    if text_language not in language_code_to_id:
+        raise ValueError(
+            f"Language '{text_language}' is not supported. "
+            f"Supported languages are: {supported_language_codes}"
+        )
+
+    wav, _ = librosa.load(ref_audio, sr=16_000)
+    wav = wav[None, ...]
+
+    language_id = language_code_to_id[text_language]
 
     net = models["embedding"]
     if not args.onnx:
@@ -311,7 +347,7 @@ def generate_voice(models):
 
     net = models["phoneme_embedder"]
     espeak_cond = EspeakPhonemeConditioner(net, args.onnx).forward(
-        ["Hello, world!"], ["en-us"]
+        [text], [text_language]
     )
 
     # prepare_conditioning
@@ -325,7 +361,7 @@ def generate_voice(models):
         fmax=np.array([22050], dtype=np.float32).reshape(1, 1, -1),
         pitch_std=np.array([20], dtype=np.float32).reshape(1, 1, -1),
         speaking_rate=np.array([15], dtype=np.float32).reshape(1, 1, -1),
-        language_id=np.array([24], dtype=int).reshape(1, 1, -1),
+        language_id=np.array([language_id], dtype=int).reshape(1, 1, -1),
     )
     uncond_dict = dict(
         espeak=espeak_cond,
@@ -345,7 +381,10 @@ def generate_voice(models):
 
     wavs = generate(models, conditioning)
 
-    sf.write("sample.wav", wavs[0].T, 44100)
+    # save result
+    savepath = get_savepath(args.savepath, ref_audio, ext=".wav")
+    sf.write(savepath, wavs[0].T, 44100)
+    logger.info(f"saved at : {savepath}")
 
     logger.info("Script finished successfully.")
 
