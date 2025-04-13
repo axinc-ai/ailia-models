@@ -29,13 +29,13 @@ WEIGHT_EMB_PATH = "speaker_embedding.onnx"
 WEIGHT_PH_EMB_PATH = "phoneme_embedder.onnx"
 WEIGHT_COND_PATH = "conditioner.onnx"
 WEIGHT_FIRST_PATH = "generator_first.onnx"
-WEIGHT_SECOND_PATH = "generator_second.onnx"
+WEIGHT_STAGE_PATH = "generator_stage.onnx"
 WEIGHT_DEC_PATH = "autoencoder.onnx"
 MODEL_EMB_PATH = "speaker_embedding.onnx.prototxt"
 MODEL_PH_EMB_PATH = "phoneme_embedder.onnx.prototxt"
 MODEL_COND_PATH = "conditioner.onnx.prototxt"
 MODEL_FIRST_PATH = "generator_first.onnx.prototxt"
-MODEL_SECOND_PATH = "generator_second.onnx.prototxt"
+MODEL_STAGE_PATH = "generator_stage.onnx.prototxt"
 MODEL_DEC_PATH = "autoencoder.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/zonos/"
 
@@ -56,7 +56,12 @@ parser.add_argument(
     default="こんにちは",
     help="input text",
 )
-parser.add_argument("--text_language", "-tl", default="ja", help="language")
+parser.add_argument(
+    "--text_language",
+    "-tl",
+    default="ja",
+    help="input text language. example: en-us, ja,...",
+)
 parser.add_argument(
     "--ref_audio",
     "-ra",
@@ -252,7 +257,7 @@ def generate(models, prefix_conditioning):
         input_ids = delayed_codes[..., offset - 1 : offset]
 
         kv_cache = {"kv_cache_%d" % i: kv for i, kv in enumerate(kv_cache)}
-        net = models["second_net"]
+        net = models["stage_net"]
         if not args.onnx:
             output = net.run(
                 {
@@ -333,6 +338,9 @@ def generate_voice(models):
             f"Supported languages are: {supported_language_codes}"
         )
 
+    logger.info("Actual Input Reference wav: %s" % ref_audio)
+    logger.info("Actual Input Target Text: %s (%s)" % (text, text_language))
+
     wav, _ = librosa.load(ref_audio, sr=16_000)
     wav = wav[None, ...]
 
@@ -377,7 +385,6 @@ def generate_voice(models):
     conditioning = np.concatenate(
         [prefix_conditioner(net, cond_dict), prefix_conditioner(net, uncond_dict)]
     )
-    conditioning = conditioning.astype(np.float16)
 
     wavs = generate(models, conditioning)
 
@@ -395,7 +402,7 @@ def main():
     check_and_download_models(WEIGHT_PH_EMB_PATH, MODEL_PH_EMB_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_COND_PATH, MODEL_COND_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_FIRST_PATH, MODEL_FIRST_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_SECOND_PATH, MODEL_SECOND_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_STAGE_PATH, MODEL_STAGE_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_DEC_PATH, MODEL_DEC_PATH, REMOTE_PATH)
 
     env_id = args.env_id
@@ -408,7 +415,7 @@ def main():
         )
         conditioner = ailia.Net(MODEL_COND_PATH, WEIGHT_COND_PATH, env_id=env_id)
         first_net = ailia.Net(MODEL_FIRST_PATH, WEIGHT_FIRST_PATH, env_id=env_id)
-        second_net = ailia.Net(MODEL_SECOND_PATH, WEIGHT_SECOND_PATH, env_id=env_id)
+        stage_net = ailia.Net(MODEL_STAGE_PATH, WEIGHT_STAGE_PATH, env_id=env_id)
         decoder = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=env_id)
     else:
         import onnxruntime
@@ -422,9 +429,7 @@ def main():
             WEIGHT_COND_PATH, providers=providers
         )
         first_net = onnxruntime.InferenceSession(WEIGHT_FIRST_PATH, providers=providers)
-        second_net = onnxruntime.InferenceSession(
-            WEIGHT_SECOND_PATH, providers=providers
-        )
+        stage_net = onnxruntime.InferenceSession(WEIGHT_STAGE_PATH, providers=providers)
         decoder = onnxruntime.InferenceSession(WEIGHT_DEC_PATH, providers=providers)
 
     models = {
@@ -432,7 +437,7 @@ def main():
         "phoneme_embedder": phoneme_embedder,
         "conditioner": conditioner,
         "first_net": first_net,
-        "second_net": second_net,
+        "stage_net": stage_net,
         "decoder": decoder,
     }
 
