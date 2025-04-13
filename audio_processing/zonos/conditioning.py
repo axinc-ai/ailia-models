@@ -1,13 +1,13 @@
 from functools import cache
 import logging
 import re
+import unicodedata
 
 import inflect
 from kanjize import number2kanji
 import numpy as np
 from phonemizer.backend import EspeakBackend
 from sudachipy import Dictionary, SplitMode
-import unicodedata
 
 
 supported_language_codes = [

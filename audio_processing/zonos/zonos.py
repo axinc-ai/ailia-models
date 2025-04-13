@@ -26,13 +26,13 @@ logger = getLogger(__name__)
 # ======================
 
 WEIGHT_EMB_PATH = "speaker_embedding.onnx"
-WEIGHT_PH_EMB_PATH = "phoneme_embedder.onnx"
+WEIGHT_PHONEME_PATH = "phoneme_embedder.onnx"
 WEIGHT_COND_PATH = "conditioner.onnx"
 WEIGHT_FIRST_PATH = "generator_first.onnx"
 WEIGHT_STAGE_PATH = "generator_stage.onnx"
 WEIGHT_DEC_PATH = "autoencoder.onnx"
 MODEL_EMB_PATH = "speaker_embedding.onnx.prototxt"
-MODEL_PH_EMB_PATH = "phoneme_embedder.onnx.prototxt"
+MODEL_PHONEME_PATH = "phoneme_embedder.onnx.prototxt"
 MODEL_COND_PATH = "conditioner.onnx.prototxt"
 MODEL_FIRST_PATH = "generator_first.onnx.prototxt"
 MODEL_STAGE_PATH = "generator_stage.onnx.prototxt"
@@ -399,7 +399,7 @@ def generate_voice(models):
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_EMB_PATH, MODEL_EMB_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_PH_EMB_PATH, MODEL_PH_EMB_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PHONEME_PATH, MODEL_PHONEME_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_COND_PATH, MODEL_COND_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_FIRST_PATH, MODEL_FIRST_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_STAGE_PATH, MODEL_STAGE_PATH, REMOTE_PATH)
@@ -411,7 +411,7 @@ def main():
     if not args.onnx:
         embedding = ailia.Net(MODEL_EMB_PATH, WEIGHT_EMB_PATH, env_id=env_id)
         phoneme_embedder = ailia.Net(
-            MODEL_PH_EMB_PATH, WEIGHT_PH_EMB_PATH, env_id=env_id
+            MODEL_PHONEME_PATH, WEIGHT_PHONEME_PATH, env_id=env_id
         )
         conditioner = ailia.Net(MODEL_COND_PATH, WEIGHT_COND_PATH, env_id=env_id)
         first_net = ailia.Net(MODEL_FIRST_PATH, WEIGHT_FIRST_PATH, env_id=env_id)
@@ -423,7 +423,7 @@ def main():
         providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
         embedding = onnxruntime.InferenceSession(WEIGHT_EMB_PATH, providers=providers)
         phoneme_embedder = onnxruntime.InferenceSession(
-            WEIGHT_PH_EMB_PATH, providers=providers
+            WEIGHT_PHONEME_PATH, providers=providers
         )
         conditioner = onnxruntime.InferenceSession(
             WEIGHT_COND_PATH, providers=providers
