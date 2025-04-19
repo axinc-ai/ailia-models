@@ -803,11 +803,20 @@ def main():
             memory_mode=memory_mode,
             env_id=env_id,
         )
+        vgan = ailia.Net(
+            weight=WEIGHT_PATH_VGAN,
+            stream=MODEL_PATH_VGAN,
+            memory_mode=memory_mode,
+            env_id=env_id,
+        )
         if args.profile:
             ssl.set_profile_mode(True)
             t2s_encoder.set_profile_mode(True)
             t2s_first_decoder.set_profile_mode(True)
             t2s_stage_decoder.set_profile_mode(True)
+            vq.set_profile_mode(True)
+            vq_cfm.set_profile_mode(True)
+            vgan.set_profile_mode(True)
     else:
         import onnxruntime
 
@@ -847,8 +856,12 @@ def main():
         print(t2s_first_decoder.get_summary())
         print("t2s_stage_decoder : ")
         print(t2s_stage_decoder.get_summary())
-        print("vits : ")
-        print(vits.get_summary())
+        print("vq : ")
+        print(vq.get_summary())
+        print("vq_cfm : ")
+        print(vq_cfm.get_summary())
+        print("vgan : ")
+        print(vgan.get_summary())
 
 
 if __name__ == "__main__":
