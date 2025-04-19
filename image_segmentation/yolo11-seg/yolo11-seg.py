@@ -35,7 +35,7 @@ WEIGHT_YOLO11L_PATH = 'yolo11l-seg.onnx'
 MODEL_YOLO11L_PATH = 'yolo11l-seg.onnx.prototxt'
 WEIGHT_YOLO11X_PATH = 'yolo11x-seg.onnx'
 MODEL_YOLO11X_PATH = 'yolo11x-seg.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov11/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov11-seg/'
 
 IMAGE_PATH = 'demo.jpg'
 SAVE_IMAGE_PATH = 'output.png'
