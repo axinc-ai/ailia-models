@@ -137,6 +137,7 @@ If you would like to try on your computer:
 | [Bert-VITS2](/audio_processing/bert-vits2/) | [Bert-VITS2](https://github.com/fishaudio/Bert-VITS2) | Pytorch | 1.2.16 and later | Aug 2023|
 | [gpt-sovits](/audio_processing/gpt-sovits/) | [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) | Pytorch | 1.4.0 and later | Feb 2024 | [JP](https://medium.com/axinc/gpt-sovits-%E3%83%95%E3%82%A1%E3%82%A4%E3%83%B3%E3%83%81%E3%83%A5%E3%83%BC%E3%83%8B%E3%83%B3%E3%82%B0%E3%81%A7%E3%81%8D%E3%82%8B0%E3%82%B7%E3%83%A7%E3%83%83%E3%83%88%E3%81%AE%E9%9F%B3%E5%A3%B0%E5%90%88%E6%88%90%E3%83%A2%E3%83%87%E3%83%AB-2212eeb5ad20) |
 | [gpt-sovits-v2](/audio_processing/gpt-sovits-v2/) | [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) | Pytorch | 1.4.0 and later | Aug 2024 |  |
+| [gpt-sovits-v3](/audio_processing/gpt-sovits-v3/) | [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) | Pytorch | 1.4.0 and later | Feb 2025 |  |
 
 ### Voice activity detection
 
@@ -473,6 +474,8 @@ If you would like to try on your computer:
 | [<img src="image_segmentation/grounded_sam/output.png" width=128px>](image_segmentation/grounded_sam/) | [grounded_sam](/image_segmentation/grounded_sam/) | [Grounded-SAM](https://github.com/IDEA-Research/Grounded-Segment-Anything/tree/main) | Pytorch | 1.2.16 and later |
 | [<img src="image_segmentation/segment-anything-2/output.png" width=128px>](image_segmentation/segment-anything-2/) | [segment-anything-2](/image_segmentation/segment-anything-2/) | [Segment Anything 2](https://github.com/facebookresearch/segment-anything-2) | Pytorch | 1.2.16 and later |
 | [<img src="image_segmentation/fast_sam/output.png" width=128px>](image_segmentation/fast_sam/) | [fast_sam](/image_segmentation/fast_sam/) | [FastSAM](https://github.com/CASIA-IVA-Lab/FastSAM) | Pytorch | 1.2.14 and later |
+| [<img src="image_segmentation/yolov8-seg/output.png" width=128px>](image_segmentation/yolov8-seg/) | [yolov8-seg](/image_segmentation/yolov8-seg/) | [YOLOv8](https://github.com/ultralytics/ultralytics) | Pytorch | 1.2.14.1 and later |  |
+| [<img src="image_segmentation/yolov11-seg/output.png" width=128px>](image_segmentation/yolov11-seg/) | [yolov11-seg](/image_segmentation/yolov11-seg/) | [Ultralytics YOLO11](https://github.com/ultralytics/ultralytics) | Pytorch | 1.2.14.1 and later |  |
 
 ## Landmark classification
 
@@ -617,7 +620,6 @@ If you would like to try on your computer:
 | [<img src="object_detection/yolov6/output.jpg" width=128px>](object_detection/yolov6/) | [yolov6](/object_detection/yolov6/) | [YOLOV6](https://github.com/meituan/YOLOv6) | Pytorch | 1.2.10 and later | |
 | [<img src="object_detection/yolov7/output.jpg" width=128px>](object_detection/yolov7/) | [yolov7](/object_detection/yolov7/) | [YOLOv7](https://github.com/WongKinYiu/yolov7) | Pytorch | 1.2.7 and later | |
 | [<img src="object_detection/yolov8/output.png" width=128px>](object_detection/yolov8/) | [yolov8](/object_detection/yolov8/) | [YOLOv8](https://github.com/ultralytics/ultralytics) | Pytorch | 1.2.14.1 and later | |
-| [<img src="object_detection/yolov8-seg/output.png" width=128px>](object_detection/yolov8-seg/) | [yolov8-seg](/object_detection/yolov8-seg/) | [YOLOv8](https://github.com/ultralytics/ultralytics) | Pytorch | 1.2.14.1 and later |  |
 | [<img src="object_detection/yolov9/output.png" width=128px>](object_detection/yolov9/) | [yolov9](/object_detection/yolov9/) | [YOLOv9](https://github.com/WongKinYiu/yolov9) | Pytorch | 1.2.10 and later |  |
 | [<img src="object_detection/yolov10/output.png" width=128px>](object_detection/yolov10/) | [yolov10](/object_detection/yolov10/) | [YOLOv10](https://github.com/THU-MIG/yolov10) | Pytorch | 1.2.11 and later |  |
 | [<img src="object_detection/yolov11/output.png" width=128px>](object_detection/yolov11/) | [yolov11](/object_detection/yolov11/) | [YOLOv11](https://github.com/ultralytics/ultralytics) | Pytorch | 1.2.14 and later |  |
