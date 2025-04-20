@@ -20,9 +20,10 @@ If you would like to try on your computer:
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-374 models as of January 2, 2025
+375 models as of February 28, 2025
 
 # Latest update
+- 2025.02.28 Add multilingual-minilmv2
 - 2025.01.02 Add qwen_audio, audiosep
 - 2025.01.01 Add RT-DETRv2, gazelle, lama, anything_v3, depth_anything_controlnet, deepfacelive, llava-jp
 - 2024.12.31 Add clip-japanese-base, timesfm
@@ -136,6 +137,7 @@ If you would like to try on your computer:
 | [Bert-VITS2](/audio_processing/bert-vits2/) | [Bert-VITS2](https://github.com/fishaudio/Bert-VITS2) | Pytorch | 1.2.16 and later | Aug 2023|
 | [gpt-sovits](/audio_processing/gpt-sovits/) | [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) | Pytorch | 1.4.0 and later | Feb 2024 | [JP](https://medium.com/axinc/gpt-sovits-%E3%83%95%E3%82%A1%E3%82%A4%E3%83%B3%E3%83%81%E3%83%A5%E3%83%BC%E3%83%8B%E3%83%B3%E3%82%B0%E3%81%A7%E3%81%8D%E3%82%8B0%E3%82%B7%E3%83%A7%E3%83%83%E3%83%88%E3%81%AE%E9%9F%B3%E5%A3%B0%E5%90%88%E6%88%90%E3%83%A2%E3%83%87%E3%83%AB-2212eeb5ad20) |
 | [gpt-sovits-v2](/audio_processing/gpt-sovits-v2/) | [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) | Pytorch | 1.4.0 and later | Aug 2024 |  |
+| [gpt-sovits-v3](/audio_processing/gpt-sovits-v3/) | [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) | Pytorch | 1.4.0 and later | Feb 2025 |  |
 
 ### Voice activity detection
 
@@ -474,6 +476,8 @@ If you would like to try on your computer:
 | [<img src="image_segmentation/grounded_sam/output.png" width=128px>](image_segmentation/grounded_sam/) | [grounded_sam](/image_segmentation/grounded_sam/) | [Grounded-SAM](https://github.com/IDEA-Research/Grounded-Segment-Anything/tree/main) | Pytorch | 1.2.16 and later |
 | [<img src="image_segmentation/segment-anything-2/output.png" width=128px>](image_segmentation/segment-anything-2/) | [segment-anything-2](/image_segmentation/segment-anything-2/) | [Segment Anything 2](https://github.com/facebookresearch/segment-anything-2) | Pytorch | 1.2.16 and later |
 | [<img src="image_segmentation/fast_sam/output.png" width=128px>](image_segmentation/fast_sam/) | [fast_sam](/image_segmentation/fast_sam/) | [FastSAM](https://github.com/CASIA-IVA-Lab/FastSAM) | Pytorch | 1.2.14 and later |
+| [<img src="image_segmentation/yolov8-seg/output.png" width=128px>](image_segmentation/yolov8-seg/) | [yolov8-seg](/image_segmentation/yolov8-seg/) | [YOLOv8](https://github.com/ultralytics/ultralytics) | Pytorch | 1.2.14.1 and later |  |
+| [<img src="image_segmentation/yolov11-seg/output.png" width=128px>](image_segmentation/yolov11-seg/) | [yolov11-seg](/image_segmentation/yolov11-seg/) | [Ultralytics YOLO11](https://github.com/ultralytics/ultralytics) | Pytorch | 1.2.14.1 and later |  |
 
 ## Landmark classification
 
@@ -505,7 +509,6 @@ If you would like to try on your computer:
 |[bert](/natural_language_processing/bert) | [pytorch-pretrained-bert](https://pypi.org/project/pytorch-pretrained-bert/) | Pytorch | 1.2.2 and later | [EN](https://medium.com/axinc-ai/bert-a-machine-learning-model-for-efficient-natural-language-processing-aef3081c24e8) [JP](https://medium.com/axinc/bert-%E8%87%AA%E7%84%B6%E8%A8%80%E8%AA%9E%E5%87%A6%E7%90%86%E3%82%92%E5%8A%B9%E7%8E%87%E7%9A%84%E3%81%AB%E5%AD%A6%E7%BF%92%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-3a9c27d78cf8) |
 |[bert_maskedlm](/natural_language_processing/bert_maskedlm) | [huggingface/transformers](https://github.com/huggingface/transformers) | Pytorch | 1.2.5 and later |
 |[bert_question_answering](/natural_language_processing/bert_question_answering) | [huggingface/transformers](https://github.com/huggingface/transformers) | Pytorch | 1.2.5 and later |
-|[bert_zero_shot_classification](/natural_language_processing/bert_zero_shot_classification) | [huggingface/transformers](https://github.com/huggingface/transformers) | Pytorch | 1.2.5 and later |
 
 ### Embedding
 
@@ -575,6 +578,13 @@ If you would like to try on your computer:
 |[fugumt-en-ja](/natural_language_processing/fugumt-en-ja) | [Fugu-Machine Translator](https://github.com/s-taka/fugumt)   | Pytorch | 1.2.9 and later | [JP](https://medium.com/axinc/fugumt-%E8%8B%B1%E8%AA%9E%E3%81%8B%E3%82%89%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%81%B8%E3%81%AE%E7%BF%BB%E8%A8%B3%E3%82%92%E8%A1%8C%E3%81%86%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-46b839c1b4ae) |
 |[fugumt-ja-en](/natural_language_processing/fugumt-ja-en) | [Fugu-Machine Translator](https://github.com/s-taka/fugumt)   | Pytorch | 1.2.10 abd later |
 
+### Zero shot classification
+
+| Model | Reference | Exported From | Supported Ailia Version | Blog |
+|------------:|:------------:|:------------:|:------------:|:------------:|
+|[bert_zero_shot_classification](/natural_language_processing/bert_zero_shot_classification) | [huggingface/transformers](https://github.com/huggingface/transformers) | Pytorch | 1.2.5 and later |
+|[multilingual-minilmv2](/natural_language_processing/multilingual-minilmv2) | [MoritzLaurer/multilingual-MiniLMv2-L12-mnli-xnli](https://huggingface.co/MoritzLaurer/multilingual-MiniLMv2-L12-mnli-xnli) | Pytorch | 1.2.10 and later |
+
 ## Network intrusion detection
 
 | Model | Reference | Exported From | Supported Ailia Version | Blog |
@@ -612,7 +622,6 @@ If you would like to try on your computer:
 | [<img src="object_detection/yolov6/output.jpg" width=128px>](object_detection/yolov6/) | [yolov6](/object_detection/yolov6/) | [YOLOV6](https://github.com/meituan/YOLOv6) | Pytorch | 1.2.10 and later | |
 | [<img src="object_detection/yolov7/output.jpg" width=128px>](object_detection/yolov7/) | [yolov7](/object_detection/yolov7/) | [YOLOv7](https://github.com/WongKinYiu/yolov7) | Pytorch | 1.2.7 and later | |
 | [<img src="object_detection/yolov8/output.png" width=128px>](object_detection/yolov8/) | [yolov8](/object_detection/yolov8/) | [YOLOv8](https://github.com/ultralytics/ultralytics) | Pytorch | 1.2.14.1 and later | |
-| [<img src="object_detection/yolov8-seg/output.png" width=128px>](object_detection/yolov8-seg/) | [yolov8-seg](/object_detection/yolov8-seg/) | [YOLOv8](https://github.com/ultralytics/ultralytics) | Pytorch | 1.2.14.1 and later |  |
 | [<img src="object_detection/yolov9/output.png" width=128px>](object_detection/yolov9/) | [yolov9](/object_detection/yolov9/) | [YOLOv9](https://github.com/WongKinYiu/yolov9) | Pytorch | 1.2.10 and later |  |
 | [<img src="object_detection/yolov10/output.png" width=128px>](object_detection/yolov10/) | [yolov10](/object_detection/yolov10/) | [YOLOv10](https://github.com/THU-MIG/yolov10) | Pytorch | 1.2.11 and later |  |
 | [<img src="object_detection/yolov11/output.png" width=128px>](object_detection/yolov11/) | [yolov11](/object_detection/yolov11/) | [YOLOv11](https://github.com/ultralytics/ultralytics) | Pytorch | 1.2.14 and later |  |
