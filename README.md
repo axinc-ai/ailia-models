@@ -20,9 +20,10 @@ If you would like to try on your computer:
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-375 models as of February 28, 2025
+377 models as of April 19, 2025
 
 # Latest update
+- 2025.04.19 Add yolov11-seg, gpt-sovits-v3
 - 2025.02.28 Add multilingual-minilmv2
 - 2025.01.02 Add qwen_audio, audiosep
 - 2025.01.01 Add RT-DETRv2, gazelle, lama, anything_v3, depth_anything_controlnet, deepfacelive, llava-jp
