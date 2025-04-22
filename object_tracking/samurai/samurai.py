@@ -33,7 +33,7 @@ REMOTE_PATH = "https://storage.googleapis.com/ailia-models/samurai/"
 REF_WAV_PATH = "demo.mp4"
 SAVE_WAV_PATH = "output.mp4"
 
-IMG_SIZE = 1024
+IMAGE_SIZE = 1024
 
 this_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -76,6 +76,66 @@ class SAM2VideoPredictor:
 
     ### SAM2Base
 
+    def _forward_sam_heads(
+        self,
+        backbone_features,
+        point_inputs,
+        high_res_features,
+        multimask_output,
+    ):
+        # feedforward
+        if not self.flg_onnx:
+            output = self.sam_heads.predict(
+                [
+                    backbone_features,
+                    point_inputs["point_coords"],
+                    point_inputs["point_labels"],
+                    high_res_features[0],
+                    high_res_features[1],
+                    np.array(multimask_output, dtype=np.int64),
+                ]
+            )
+        else:
+            output = self.sam_heads.run(
+                None,
+                {
+                    "backbone_features": backbone_features,
+                    "point_coords": point_inputs["point_coords"],
+                    "point_labels": point_inputs["point_labels"],
+                    "high_res_features_0": high_res_features[0],
+                    "high_res_features_1": high_res_features[1],
+                    "multimask_output": np.array(multimask_output, dtype=np.int64),
+                },
+            )
+        (
+            low_res_multimasks,
+            high_res_multimasks,
+            ious,
+            obj_ptrs,
+            object_score_logits,
+        ) = output
+
+        kf_ious = None
+        if multimask_output:
+            pass
+        else:
+            best_iou_inds = 0
+            low_res_masks, high_res_masks = low_res_multimasks, high_res_multimasks
+
+        obj_ptr = obj_ptrs[:, best_iou_inds]
+
+        return (
+            low_res_multimasks,
+            high_res_multimasks,
+            ious,
+            low_res_masks,
+            high_res_masks,
+            obj_ptr,
+            object_score_logits,
+            ious[0][best_iou_inds],
+            kf_ious[best_iou_inds] if kf_ious is not None else None,
+        )
+
     def _prepare_backbone_features(self, backbone_out):
         """Prepare and flatten visual features."""
         backbone_out = backbone_out.copy()
@@ -96,6 +156,82 @@ class SAM2VideoPredictor:
 
         return backbone_out, vision_feats, vision_pos_embeds, feat_sizes
 
+    def _prepare_memory_conditioned_features(
+        self,
+        frame_idx,
+        is_init_cond_frame,
+        current_vision_feats,
+        current_vision_pos_embeds,
+        feat_sizes,
+        output_dict,
+        num_frames,
+        track_in_reverse=False,  # tracking in reverse time order (for demo usage)
+    ):
+        """Fuse the current frame's visual feature map with previous memory."""
+        B = current_vision_feats[-1].shape[1]  # batch size on this frame
+        C = self.hidden_dim
+        H, W = feat_sizes[-1]  # top-level (lowest-resolution) feature size
+
+        num_obj_ptr_tokens = 0
+        tpos_sign_mul = -1 if track_in_reverse else 1
+        # Step 1: condition the visual features of the current frame on previous memories
+        if not is_init_cond_frame:
+            # Retrieve the memories encoded with the maskmem backbone
+            to_cat_memory, to_cat_memory_pos_embed = [], []
+        else:
+            # directly add no-mem embedding (instead of using the transformer encoder)
+            pix_feat_with_mem = current_vision_feats[-1] + self.no_mem_embed
+            pix_feat_with_mem = pix_feat_with_mem.transpose(1, 2, 0).reshape(B, C, H, W)
+            return pix_feat_with_mem
+
+        # Step 2: Concatenate the memories and forward through the transformer encoder
+        memory = np.concatenate(to_cat_memory, axis=0)
+        memory_pos_embed = np.concatenate(to_cat_memory_pos_embed, axis=0)
+
+        pix_feat_with_mem = self.memory_attention(
+            curr=current_vision_feats,
+            curr_pos=current_vision_pos_embeds,
+            memory=memory,
+            memory_pos=memory_pos_embed,
+            num_obj_ptr_tokens=num_obj_ptr_tokens,
+        )
+        # reshape the output (HW)BC => BCHW
+        pix_feat_with_mem = pix_feat_with_mem.permute(1, 2, 0).view(B, C, H, W)
+        return pix_feat_with_mem
+
+    def _encode_new_memory(
+        self,
+        current_vision_feats,
+        feat_sizes,
+        pred_masks_high_res,
+        object_score_logits,
+        is_mask_from_pts,
+    ):
+        if not self.flg_onnx:
+            output = self.memory_encoder.predict(
+                [
+                    current_vision_feats,
+                    feat_sizes,
+                    pred_masks_high_res,
+                    object_score_logits,
+                    is_mask_from_pts,
+                ]
+            )
+        else:
+            output = self.memory_encoder.run(
+                None,
+                {
+                    "current_vision_feats": current_vision_feats,
+                    "feat_sizes": feat_sizes,
+                    "high_res_masks": pred_masks_high_res,
+                    "object_score_logits": object_score_logits,
+                    "is_mask_from_pts": is_mask_from_pts,
+                },
+            )
+        maskmem_features, maskmem_pos_enc = output
+
+        return maskmem_features, maskmem_pos_enc
+
     def _track_step(
         self,
         frame_idx,
@@ -104,56 +240,66 @@ class SAM2VideoPredictor:
         current_vision_pos_embeds,
         feat_sizes,
         point_inputs,
-        mask_inputs,
         output_dict,
         num_frames,
         track_in_reverse,
         prev_sam_mask_logits,
     ):
-        current_out = {"point_inputs": point_inputs, "mask_inputs": mask_inputs}
+        current_out = {"point_inputs": point_inputs}
         # High-resolution feature maps for the SAM head, reshape (HW)BC => BCHW
         high_res_features = [
             x.transpose(1, 2, 0).reshape(x.shape[1], x.shape[2], *s)
             for x, s in zip(current_vision_feats[:-1], feat_sizes[:-1])
         ]
 
-        if mask_inputs is not None:
-            # When use_mask_input_as_output_without_sam=True, we directly output the mask input
-            # (see it as a GT mask) without using a SAM prompt encoder + mask decoder.
-            pix_feat = current_vision_feats[-1].transpose(1, 2, 0)
-            pix_feat = pix_feat.reshape(-1, self.hidden_dim, *feat_sizes[-1])
-            sam_outputs = self._use_mask_as_output(
-                pix_feat, high_res_features, mask_inputs
-            )
-        else:
-            # fused the visual feature with previous memory features in the memory bank
-            pix_feat = self._prepare_memory_conditioned_features(
-                frame_idx=frame_idx,
-                is_init_cond_frame=is_init_cond_frame,
-                current_vision_feats=current_vision_feats[-1:],
-                current_vision_pos_embeds=current_vision_pos_embeds[-1:],
-                feat_sizes=feat_sizes[-1:],
-                output_dict=output_dict,
-                num_frames=num_frames,
-                track_in_reverse=track_in_reverse,
-            )
-            # apply SAM-style segmentation head
-            # here we might feed previously predicted low-res SAM mask logits into the SAM mask decoder,
-            # e.g. in demo where such logits come from earlier interaction instead of correction sampling
-            # (in this case, any `mask_inputs` shouldn't reach here as they are sent to _use_mask_as_output instead)
-            if prev_sam_mask_logits is not None:
-                mask_inputs = prev_sam_mask_logits
-            multimask_output = self._use_multimask(is_init_cond_frame, point_inputs)
+        # fused the visual feature with previous memory features in the memory bank
+        pix_feat = self._prepare_memory_conditioned_features(
+            frame_idx=frame_idx,
+            is_init_cond_frame=is_init_cond_frame,
+            current_vision_feats=current_vision_feats[-1:],
+            current_vision_pos_embeds=current_vision_pos_embeds[-1:],
+            feat_sizes=feat_sizes[-1:],
+            output_dict=output_dict,
+            num_frames=num_frames,
+            track_in_reverse=track_in_reverse,
+        )
+        multimask_output = self._use_multimask(point_inputs)
 
-            sam_outputs = self._forward_sam_heads(
-                backbone_features=pix_feat,
-                point_inputs=point_inputs,
-                mask_inputs=mask_inputs,
-                high_res_features=high_res_features,
-                multimask_output=multimask_output,
-            )
+        sam_outputs = self._forward_sam_heads(
+            backbone_features=pix_feat,
+            point_inputs=point_inputs,
+            high_res_features=high_res_features,
+            multimask_output=multimask_output,
+        )
 
         return current_out, sam_outputs, high_res_features, pix_feat
+
+    def _encode_memory_in_output(
+        self,
+        current_vision_feats,
+        feat_sizes,
+        point_inputs,
+        run_mem_encoder,
+        high_res_masks,
+        object_score_logits,
+        current_out,
+    ):
+        if run_mem_encoder and self.num_maskmem > 0:
+            high_res_masks_for_mem_enc = high_res_masks
+            maskmem_features, maskmem_pos_enc = self._encode_new_memory(
+                current_vision_feats=current_vision_feats,
+                feat_sizes=feat_sizes,
+                pred_masks_high_res=high_res_masks_for_mem_enc,
+                object_score_logits=object_score_logits,
+                is_mask_from_pts=torch.tensor(point_inputs is not None).long(),
+            )
+            current_out["maskmem_features"] = maskmem_features
+            current_out["maskmem_pos_enc"] = [maskmem_pos_enc]
+        else:
+            current_out["maskmem_features"] = None
+            current_out["maskmem_pos_enc"] = None
+
+        return current_out
 
     def track_step(
         self,
@@ -163,7 +309,6 @@ class SAM2VideoPredictor:
         current_vision_pos_embeds,
         feat_sizes,
         point_inputs,
-        mask_inputs,
         output_dict,
         num_frames,
         track_in_reverse=False,  # tracking in reverse time order (for demo usage)
@@ -177,7 +322,6 @@ class SAM2VideoPredictor:
             current_vision_pos_embeds,
             feat_sizes,
             point_inputs,
-            mask_inputs,
             output_dict,
             num_frames,
             track_in_reverse,
@@ -201,14 +345,11 @@ class SAM2VideoPredictor:
         current_out["obj_ptr"] = obj_ptr
         current_out["best_iou_score"] = best_iou_score
         current_out["kf_ious"] = kf_ious
-        if not self.training:
-            # Only add this in inference (to avoid unused param in activation checkpointing;
-            # it's mainly used in the demo to encode spatial memories w/ consolidated masks)
-            current_out["object_score_logits"] = object_score_logits
+        current_out["object_score_logits"] = object_score_logits
 
         # Finally run the memory encoder on the predicted mask to encode
         # it into a new memory feature (that can be used in future frames)
-        self._encode_memory_in_output(
+        current_out = self._encode_memory_in_output(
             current_vision_feats,
             feat_sizes,
             point_inputs,
@@ -220,9 +361,9 @@ class SAM2VideoPredictor:
 
         return current_out
 
-    def _use_multimask(self, is_init_cond_frame, point_inputs):
+    def _use_multimask(self, point_inputs):
         """Whether to use multimask output in the SAM head."""
-        num_pts = 0 if point_inputs is None else point_inputs["point_labels"].size(1)
+        num_pts = 0 if point_inputs is None else point_inputs["point_labels"].shape[1]
         multimask_output = 0 <= num_pts <= 1
 
         return multimask_output
@@ -338,9 +479,11 @@ class SAM2VideoPredictor:
         points = box_coords
         labels = box_labels
 
-        points = points / np.array([self.video_width, self.video_height])
+        points = points / np.array(
+            [self.video_width, self.video_height], dtype=np.float32
+        )
         # scale the (normalized) coordinates by the model's internal image size
-        points = points * IMG_SIZE
+        points = points * IMAGE_SIZE
 
         if not clear_old_points:
             point_inputs = point_inputs_per_frame.get(frame_idx, None)
@@ -393,7 +536,6 @@ class SAM2VideoPredictor:
             batch_size=1,  # run on the slice of a single object
             is_init_cond_frame=is_init_cond_frame,
             point_inputs=point_inputs,
-            mask_inputs=None,
             reverse=reverse,
             # Skip the memory encoder when adding clicks or mask. We execute the memory encoder
             # at the beginning of `propagate_in_video` (after user finalize their clicks). This
@@ -416,6 +558,7 @@ class SAM2VideoPredictor:
         _, video_res_masks = self._get_orig_video_res_output(
             consolidated_out["pred_masks_video_res"]
         )
+
         return frame_idx, obj_ids, video_res_masks
 
     def add_new_points(self, *args, **kwargs):
@@ -537,7 +680,6 @@ class SAM2VideoPredictor:
         batch_size,
         is_init_cond_frame,
         point_inputs,
-        mask_inputs,
         reverse,
         run_mem_encoder,
         prev_sam_mask_logits=None,
@@ -560,7 +702,6 @@ class SAM2VideoPredictor:
             current_vision_pos_embeds=current_vision_pos_embeds,
             feat_sizes=feat_sizes,
             point_inputs=point_inputs,
-            mask_inputs=mask_inputs,
             output_dict=output_dict,
             num_frames=self.num_frames,
             track_in_reverse=reverse,
@@ -568,20 +709,11 @@ class SAM2VideoPredictor:
             prev_sam_mask_logits=prev_sam_mask_logits,
         )
 
-        # optionally offload the output to CPU memory to save GPU space
         maskmem_features = current_out["maskmem_features"]
-        if maskmem_features is not None:
-            maskmem_features = maskmem_features.to(torch.bfloat16)
-            maskmem_features = maskmem_features.to(storage_device, non_blocking=True)
-        pred_masks_gpu = current_out["pred_masks"]  # (B, 1, H, W)
-        # potentially fill holes in the predicted masks
-        if self.fill_hole_area > 0:
-            pred_masks_gpu = fill_holes_in_mask_scores(
-                pred_masks_gpu, self.fill_hole_area
-            )
-        pred_masks = pred_masks_gpu
+        pred_masks = current_out["pred_masks"]  # (B, 1, H, W)
         # "maskmem_pos_enc" is the same across frames, so we only need to store one copy of it
-        maskmem_pos_enc = self._get_maskmem_pos_enc(inference_state, current_out)
+        maskmem_pos_enc = self.get_maskmem_pos_enc(current_out)
+
         # object pointer is a small tensor, so we always keep it on GPU memory for fast access
         obj_ptr = current_out["obj_ptr"]
         object_score_logits = current_out["object_score_logits"]
@@ -597,7 +729,34 @@ class SAM2VideoPredictor:
             "best_iou_score": best_iou_score,
             "kf_score": best_kf_score,
         }
-        return compact_current_out, pred_masks_gpu
+
+        return compact_current_out, pred_masks
+
+    def get_maskmem_pos_enc(self, current_out):
+        """
+        `maskmem_pos_enc` is the same across frames and objects, so we cache it as
+        a constant in the inference session to reduce session storage size.
+        """
+        model_constants = self.constants
+
+        # "out_maskmem_pos_enc" should be either a list of tensors or None
+        out_maskmem_pos_enc = current_out["maskmem_pos_enc"]
+        if out_maskmem_pos_enc is not None:
+            if "maskmem_pos_enc" not in model_constants:
+                # only take the slice for one object, since it's same across objects
+                maskmem_pos_enc = [x[0:1].clone() for x in out_maskmem_pos_enc]
+                model_constants["maskmem_pos_enc"] = maskmem_pos_enc
+            else:
+                maskmem_pos_enc = model_constants["maskmem_pos_enc"]
+            # expand the cached maskmem_pos_enc to the actual batch size
+            batch_size = out_maskmem_pos_enc[0].shape[0]
+            expanded_maskmem_pos_enc = [
+                np.broadcast_to(x, (batch_size, *x.shape[1:])) for x in maskmem_pos_enc
+            ]
+        else:
+            expanded_maskmem_pos_enc = None
+
+        return expanded_maskmem_pos_enc
 
 
 def recognize_from_video(predictor: SAM2VideoPredictor):
