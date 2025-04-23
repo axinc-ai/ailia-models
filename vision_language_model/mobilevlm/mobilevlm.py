@@ -301,7 +301,8 @@ def initialize_kv_cache(batch_size=1, model_size='1.7B'):
         config['num_heads'],
         0,
         config['head_dim']
-    ), dtype=np.float16 if args.fp16 else np.float32)
+    #), dtype=np.float16 if args.fp16 else np.float32)
+    ), dtype=np.float32)
 
     return kv_cache
 
@@ -322,7 +323,8 @@ def generate_text(models, prompt, images, max_len=256, temperature=0.7, top_p=0.
         models['vision_tower'],
         models['mm_projector'],
         models['token_embedder'],
-        dtype='half' if args.fp16 else 'float',
+        #dtype='half' if args.fp16 else 'float',
+        dtype='float',
         onnx=args.onnx
     )
     
