@@ -3,6 +3,7 @@ import os
 import sys
 from logging import getLogger
 
+import cv2
 import numpy as np
 from tqdm import tqdm
 
@@ -34,6 +35,9 @@ REF_WAV_PATH = "demo.mp4"
 SAVE_WAV_PATH = "output.mp4"
 
 IMAGE_SIZE = 1024
+
+# a large negative value as a placeholder score for missing objects
+NO_OBJ_SCORE = -1024.0
 
 this_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -207,6 +211,10 @@ class SAM2VideoPredictor:
         object_score_logits,
         is_mask_from_pts,
     ):
+        current_vision_feats = current_vision_feats[-1]
+        feat_sizes = np.array(feat_sizes[-1])
+        is_mask_from_pts = np.array(is_mask_from_pts, dtype=np.int64)
+
         if not self.flg_onnx:
             output = self.memory_encoder.predict(
                 [
@@ -549,13 +557,13 @@ class SAM2VideoPredictor:
 
         # Resize the output mask to the original video resolution
         obj_ids = self.obj_ids
-        consolidated_out = self._consolidate_temp_output_across_obj(
+        consolidated_out = self.consolidate_temp_output_across_obj(
             frame_idx,
             is_cond=is_cond,
             run_mem_encoder=False,
             consolidate_at_video_res=True,
         )
-        _, video_res_masks = self._get_orig_video_res_output(
+        _, video_res_masks = self.get_orig_video_res_output(
             consolidated_out["pred_masks_video_res"]
         )
 
@@ -565,13 +573,136 @@ class SAM2VideoPredictor:
         """Deprecated method. Please use `add_new_points_or_box` instead."""
         return self.add_new_points_or_box(*args, **kwargs)
 
+    def get_orig_video_res_output(self, any_res_masks):
+        """
+        Resize the object scores to the original video resolution (video_res_masks)
+        and apply non-overlapping constraints for final output.
+        """
+        video_H = self.video_height
+        video_W = self.video_width
+        if any_res_masks.shape[-2:] == (video_H, video_W):
+            video_res_masks = any_res_masks
+        else:
+            video_res_masks = cv2.resize(
+                any_res_masks.squeeze(0).squeeze(0),
+                dsize=(video_W, video_H),
+                interpolation=cv2.INTER_LINEAR,
+            )
+            video_res_masks = video_res_masks[np.newaxis, np.newaxis, :, :]
+
+        return any_res_masks, video_res_masks
+
+    def consolidate_temp_output_across_obj(
+        self,
+        frame_idx,
+        is_cond,
+        run_mem_encoder,
+        consolidate_at_video_res=False,
+    ):
+        batch_size = self.get_obj_num()
+        storage_key = "cond_frame_outputs" if is_cond else "non_cond_frame_outputs"
+        # Optionally, we allow consolidating the temporary outputs at the original
+        # video resolution (to provide a better editing experience for mask prompts).
+        if consolidate_at_video_res:
+            consolidated_H = self.video_height
+            consolidated_W = self.video_width
+            consolidated_mask_key = "pred_masks_video_res"
+        else:
+            consolidated_H = consolidated_W = IMAGE_SIZE // 4
+            consolidated_mask_key = "pred_masks"
+
+        # Initialize `consolidated_out`. Its "maskmem_features" and "maskmem_pos_enc"
+        # will be added when rerunning the memory encoder after applying non-overlapping
+        # constraints to object scores. Its "pred_masks" are prefilled with a large
+        # negative value (NO_OBJ_SCORE) to represent missing objects.
+        consolidated_out = {
+            "maskmem_features": None,
+            "maskmem_pos_enc": None,
+            consolidated_mask_key: np.full(
+                shape=(batch_size, 1, consolidated_H, consolidated_W),
+                fill_value=NO_OBJ_SCORE,
+                dtype=np.float32,
+            ),
+            "obj_ptr": np.full(
+                shape=(batch_size, self.hidden_dim),
+                fill_value=NO_OBJ_SCORE,
+                dtype=np.float32,
+            ),
+            "object_score_logits": np.full(
+                shape=(batch_size, 1),
+                # default to 10.0 for object_score_logits, i.e. assuming the object is
+                # present as sigmoid(10)=1, same as in `predict_masks` of `MaskDecoder`
+                fill_value=10.0,
+                dtype=np.float32,
+            ),
+        }
+
+        for obj_idx in range(batch_size):
+            obj_temp_output_dict = self.temp_output_dict_per_obj[obj_idx]
+            obj_output_dict = self.output_dict_per_obj[obj_idx]
+            out = obj_temp_output_dict[storage_key].get(frame_idx, None)
+
+            # If the object doesn't appear in "temp_output_dict_per_obj" on this frame,
+            # we fall back and look up its previous output in "output_dict_per_obj".
+            # We look up both "cond_frame_outputs" and "non_cond_frame_outputs" in
+            # "output_dict_per_obj" to find a previous output for this object.
+            if out is None:
+                out = obj_output_dict["cond_frame_outputs"].get(frame_idx, None)
+            if out is None:
+                out = obj_output_dict["non_cond_frame_outputs"].get(frame_idx, None)
+            if out is None:
+                continue
+
+            # Add the temporary object output mask to consolidated output mask
+            obj_mask = out["pred_masks"]
+            consolidated_pred_masks = consolidated_out[consolidated_mask_key]
+            if obj_mask.shape[-2:] == consolidated_pred_masks.shape[-2:]:
+                consolidated_pred_masks[obj_idx : obj_idx + 1] = obj_mask
+            else:
+                target_h, target_w = consolidated_pred_masks.shape[-2:]
+                resized_obj_mask = cv2.resize(
+                    obj_mask.squeeze(0).squeeze(0),
+                    dsize=(target_w, target_h),
+                    interpolation=cv2.INTER_LINEAR,
+                )
+                resized_obj_mask = resized_obj_mask[np.newaxis, np.newaxis, :, :]
+                consolidated_pred_masks[obj_idx : obj_idx + 1] = resized_obj_mask
+
+            consolidated_out["obj_ptr"][obj_idx : obj_idx + 1] = out["obj_ptr"]
+            consolidated_out["object_score_logits"][obj_idx : obj_idx + 1] = out[
+                "object_score_logits"
+            ]
+
+        # Optionally, apply non-overlapping constraints on the consolidated scores
+        # and rerun the memory encoder
+        if run_mem_encoder:
+            high_res_masks = cv2.resize(
+                consolidated_out["pred_masks"].squeeze(0).squeeze(0),
+                dsize=(IMAGE_SIZE, IMAGE_SIZE),
+                interpolation=cv2.INTER_LINEAR,
+            )
+            high_res_masks = high_res_masks[np.newaxis, np.newaxis, :, :]
+
+            maskmem_features, maskmem_pos_enc = self.run_memory_encoder(
+                frame_idx=frame_idx,
+                batch_size=batch_size,
+                high_res_masks=high_res_masks,
+                object_score_logits=consolidated_out["object_score_logits"],
+                is_mask_from_pts=True,  # these frames are what the user interacted with
+            )
+            consolidated_out["maskmem_features"] = maskmem_features
+            consolidated_out["maskmem_pos_enc"] = maskmem_pos_enc
+
+        return consolidated_out
+
     def preflight(self):
         """Prepare inference_state and consolidate temporary outputs before tracking."""
         # Tracking has started and we don't allow adding new objects until session is reset.
         self.tracking_has_started = True
 
-        batch_size = self.get_obj_num()
-
+        temp_output_dict_per_obj = self.temp_output_dict_per_obj
+        output_dict = self.output_dict
+        consolidated_frame_inds = self.consolidated_frame_inds
         for is_cond in [False, True]:
             # Separately consolidate conditioning and non-conditioning temp outputs
             storage_key = "cond_frame_outputs" if is_cond else "non_cond_frame_outputs"
@@ -579,25 +710,75 @@ class SAM2VideoPredictor:
             temp_frame_inds = set()
             for obj_temp_output_dict in self.temp_output_dict_per_obj.values():
                 temp_frame_inds.update(obj_temp_output_dict[storage_key].keys())
+            consolidated_frame_inds[storage_key].update(temp_frame_inds)
+
+            # consolidate the temporary output across all objects on this frame
+            for frame_idx in temp_frame_inds:
+                consolidated_out = self.consolidate_temp_output_across_obj(
+                    frame_idx, is_cond=is_cond, run_mem_encoder=True
+                )
+                # merge them into "output_dict" and also create per-object slices
+                output_dict[storage_key][frame_idx] = consolidated_out
+                self.add_output_per_object(frame_idx, consolidated_out, storage_key)
+
+            # clear temporary outputs in `temp_output_dict_per_obj`
+            for obj_temp_output_dict in temp_output_dict_per_obj.values():
+                obj_temp_output_dict[storage_key].clear()
+
+        # edge case: if an output is added to "cond_frame_outputs", we remove any prior
+        # output on the same frame in "non_cond_frame_outputs"
+        for frame_idx in output_dict["cond_frame_outputs"]:
+            output_dict["non_cond_frame_outputs"].pop(frame_idx, None)
+        for obj_output_dict in self.output_dict_per_obj.values():
+            for frame_idx in obj_output_dict["cond_frame_outputs"]:
+                obj_output_dict["non_cond_frame_outputs"].pop(frame_idx, None)
+        for frame_idx in consolidated_frame_inds["cond_frame_outputs"]:
+            assert frame_idx in output_dict["cond_frame_outputs"]
+            consolidated_frame_inds["non_cond_frame_outputs"].discard(frame_idx)
 
     def propagate_in_video(self):
         self.preflight()
 
+        output_dict = self.output_dict
+        consolidated_frame_inds = self.consolidated_frame_inds
+        obj_ids = self.obj_ids
+        num_frames = self.num_frames
         batch_size = self.get_obj_num()
-        clear_non_cond_mem = False
 
-        consolidated_frame_inds = {
-            "cond_frame_outputs": {0},
-            "non_cond_frame_outputs": {},
-        }
-        obj_ids = [0]
-
-        start_frame_idx = 0
-        end_frame_idx = 23
+        start_frame_idx = min(output_dict["cond_frame_outputs"])
+        max_frame_num_to_track = num_frames
+        end_frame_idx = min(start_frame_idx + max_frame_num_to_track, num_frames - 1)
         processing_order = range(start_frame_idx, end_frame_idx + 1)
 
         for frame_idx in tqdm(processing_order, desc="propagate in video"):
-            _, video_res_masks = self._get_orig_video_res_output(pred_masks)
+            if frame_idx in consolidated_frame_inds["cond_frame_outputs"]:
+                storage_key = "cond_frame_outputs"
+                current_out = output_dict[storage_key][frame_idx]
+                pred_masks = current_out["pred_masks"]
+            elif frame_idx in consolidated_frame_inds["non_cond_frame_outputs"]:
+                storage_key = "non_cond_frame_outputs"
+                current_out = output_dict[storage_key][frame_idx]
+                pred_masks = current_out["pred_masks"]
+            else:
+                storage_key = "non_cond_frame_outputs"
+                current_out, pred_masks = self.single_frame_inference(
+                    output_dict=output_dict,
+                    frame_idx=frame_idx,
+                    batch_size=batch_size,
+                    is_init_cond_frame=False,
+                    point_inputs=None,
+                    mask_inputs=None,
+                    reverse=False,
+                    run_mem_encoder=True,
+                )
+                output_dict[storage_key][frame_idx] = current_out
+
+            # Create slices of per-object outputs for subsequent interaction with each
+            # individual object after tracking.
+            self.add_output_per_object(frame_idx, current_out, storage_key)
+            self.frames_already_tracked[frame_idx] = {"reverse": False}
+
+            _, video_res_masks = self.get_orig_video_res_output(pred_masks)
 
             yield frame_idx, obj_ids, video_res_masks
 
@@ -732,6 +913,33 @@ class SAM2VideoPredictor:
 
         return compact_current_out, pred_masks
 
+    def run_memory_encoder(
+        self,
+        frame_idx,
+        batch_size,
+        high_res_masks,
+        object_score_logits,
+        is_mask_from_pts,
+    ):
+        # Retrieve correct image features
+        _, _, current_vision_feats, _, feat_sizes = self.get_image_feature(
+            frame_idx, batch_size
+        )
+
+        maskmem_features, maskmem_pos_enc = self._encode_new_memory(
+            current_vision_feats=current_vision_feats,
+            feat_sizes=feat_sizes,
+            pred_masks_high_res=high_res_masks,
+            object_score_logits=object_score_logits,
+            is_mask_from_pts=is_mask_from_pts,
+        )
+        maskmem_pos_enc = [maskmem_pos_enc]
+
+        # "maskmem_pos_enc" is the same across frames, so we only need to store one copy of it
+        maskmem_pos_enc = self.get_maskmem_pos_enc({"maskmem_pos_enc": maskmem_pos_enc})
+
+        return maskmem_features, maskmem_pos_enc
+
     def get_maskmem_pos_enc(self, current_out):
         """
         `maskmem_pos_enc` is the same across frames and objects, so we cache it as
@@ -744,7 +952,7 @@ class SAM2VideoPredictor:
         if out_maskmem_pos_enc is not None:
             if "maskmem_pos_enc" not in model_constants:
                 # only take the slice for one object, since it's same across objects
-                maskmem_pos_enc = [x[0:1].clone() for x in out_maskmem_pos_enc]
+                maskmem_pos_enc = [x[0:1].copy() for x in out_maskmem_pos_enc]
                 model_constants["maskmem_pos_enc"] = maskmem_pos_enc
             else:
                 maskmem_pos_enc = model_constants["maskmem_pos_enc"]
@@ -766,6 +974,9 @@ def recognize_from_video(predictor: SAM2VideoPredictor):
         # image_size=self.image_size,
     )
     images = np.load("images.npy")
+    height, width = 1080, 1920
+
+    color = [(255, 0, 0)]
 
     predictor.init_state(images, video_height, video_width)
 
@@ -776,6 +987,34 @@ def recognize_from_video(predictor: SAM2VideoPredictor):
     for frame_idx, object_ids, masks in predictor.propagate_in_video():
         mask_to_vis = {}
         bbox_to_vis = {}
+
+        for obj_id, mask in zip(object_ids, masks):
+            mask = mask[0]
+            mask = mask > 0.0
+            non_zero_indices = np.argwhere(mask)
+            if len(non_zero_indices) == 0:
+                bbox = [0, 0, 0, 0]
+            else:
+                y_min, x_min = non_zero_indices.min(axis=0).tolist()
+                y_max, x_max = non_zero_indices.max(axis=0).tolist()
+                bbox = [x_min, y_min, x_max - x_min, y_max - y_min]
+            bbox_to_vis[obj_id] = bbox
+            mask_to_vis[obj_id] = mask
+
+        img = images[frame_idx]
+        for obj_id, mask in mask_to_vis.items():
+            mask_img = np.zeros((height, width, 3), np.uint8)
+            mask_img[mask] = color[(obj_id + 1) % len(color)]
+            img = cv2.addWeighted(img, 1, mask_img, 0.2, 0)
+
+        for obj_id, bbox in bbox_to_vis.items():
+            cv2.rectangle(
+                img,
+                (bbox[0], bbox[1]),
+                (bbox[0] + bbox[2], bbox[1] + bbox[3]),
+                color[obj_id % len(color)],
+                2,
+            )
 
     logger.info("Script finished successfully.")
 
