@@ -54,9 +54,9 @@ parser.add_argument(
 parser.add_argument(
     "--disable_ailia_tokenizer", action="store_true", help="disable ailia tokenizer."
 )
-parser.add_argument(
-    "--fp16", action="store_true", help="use fp16 model (default : fp32 model)."
-)
+#parser.add_argument(
+#    "--fp16", action="store_true", help="use fp16 model (default : fp32 model)."
+#)
 parser.add_argument(
     "--temperature",
     type=float,
@@ -93,7 +93,6 @@ postfix = {
     '1.7B': '17',
     '3B': '3'
 }
-FP16 = "_fp16" if args.fp16 else ""
 
 # Define model components
 MODEL_COMPONENTS = [
@@ -110,15 +109,20 @@ WEIGHT_PATHS = {}
 for component in MODEL_COMPONENTS:
     # Vision tower are shared between model sizes
     if component in ['vision_tower']:
-        weight_filename = f"{component}{FP16}.onnx"
-        model_filename = f"{component}{FP16}.onnx.prototxt"
+        weight_filename = f"{component}.onnx"
+        model_filename = f"{component}.onnx.prototxt"
     else:
         # Other components are specific to model size
-        weight_filename = f"{component}_{postfix[args.model_size]}{FP16}.onnx"
-        model_filename = f"{component}_{postfix[args.model_size]}{FP16}.onnx.prototxt"
+        weight_filename = f"{component}_{postfix[args.model_size]}.onnx"
+        model_filename = f"{component}_{postfix[args.model_size]}.onnx.prototxt"
     
     WEIGHT_PATHS[component] = weight_filename
     MODEL_PATHS[component] = model_filename
+
+for key, value in MODEL_PATHS.items():
+    MODEL_PATHS[key] = value
+for key, value in WEIGHT_PATHS.items():
+    WEIGHT_PATHS[key] = value
 
 # ======================
 # KV Cache Configuration
@@ -158,7 +162,7 @@ def load_models(env_id=0):
         REMOTE_PATH
     )
     
-    ## Additional files for tokenizer
+    # Additional files for tokenizer
     tokenizer_path = f"tokenizer"
     check_and_download_file(f"{tokenizer_path}.zip", REMOTE_PATH)
     
@@ -386,19 +390,26 @@ def generate_text(models, prompt, images, max_len=256, temperature=0.7, top_p=0.
             top_p=top_p,
             top_k=top_k
         )
-        
+
         # Append token to generated sequence
-        generated_tokens.append(next_token)
-        
-        # Print progress
-        if len(generated_tokens) % 5 == 0:
-            logger.info(f"Generated {len(generated_tokens)} tokens...")
-        
+        generated_tokens.append(next_token)  # <-- FIX: append before decoding
+
+        # Incremental print with space handling
+        if i == 0:
+            chunk = tokenizer.decode([next_token], skip_special_tokens=True)
+            print(chunk, end='', flush=True)
+        else:
+            full_text = tokenizer.decode(generated_tokens, skip_special_tokens=True)
+            prev_text = tokenizer.decode(generated_tokens[:-1], skip_special_tokens=True)
+            new_text = full_text[len(prev_text):]
+            print(new_text, end='', flush=True)
+
         # Check for end of sequence token
         if next_token == EOS_TOKEN_ID:
             break
     
     # Decode generated tokens
+    print('\n')
     output_text = tokenizer.decode(generated_tokens, skip_special_tokens=True)
     return output_text
 
@@ -457,10 +468,6 @@ def main():
             top_p=args.top_p,
             top_k=args.top_k
         )
-        
-        # Print output
-        print("\nGenerated Response:")
-        print(output)
     
     logger.info("Script finished successfully.")
 

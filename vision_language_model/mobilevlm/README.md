@@ -52,14 +52,15 @@ You can select the model size with the `--model_size` option:
 $ python3 mobilevlm.py --model_size 1.7B  # Options: 1.7B, 3B
 ```
 
+<!--->
 Due to computational limitations, 3B model only supports fp16.
 
 To use FP16 precision for faster inference:
 ```bash
 $ python3 mobilevlm.py --fp16
 ```
+<!--->
 
-note: Only fp16 version is available for the 3B model size.
 
 ### Input Format
 
