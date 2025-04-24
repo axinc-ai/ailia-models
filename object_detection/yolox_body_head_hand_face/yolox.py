@@ -44,7 +44,12 @@ CLASS_SCORE_THRETHOLD = 0.35
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = get_base_parser('yolox model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser = get_base_parser('yolox body head hand face model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser.add_argument(
+    '-m', '--model_name',
+    default='yolox_s',
+    help='[yolox_nano, yolox_tiny, yolox_s, yolox_m, yolox_l, yolox_x]'
+)
 parser.add_argument(
     '-w', '--write_prediction',
     nargs='?',
@@ -67,6 +72,8 @@ parser.add_argument(
 )
 args = update_parser(parser)
 
+MODEL_NAME = args.model_name
+WEIGHT_PATH = MODEL_NAME + ".onnx"
 # ======================
 # Main functions
 # ======================
