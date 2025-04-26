@@ -26,9 +26,11 @@ logger = getLogger(__name__)
 WEIGHT_BACKBONE_PATH = "backbone.onnx"
 WEIGHT_SAM_PATH = "sam_heads.onnx"
 WEIGHT_ENC_PATH = "memory_encoder.onnx"
+WEIGHT_ATN_PATH = "memory_attention.onnx"
 MODEL_BACKBONE_PATH = "backbone.onnx.prototxt"
 MODEL_SAM_PATH = "sam_heads.onnx.prototxt"
 MODEL_ENC_PATH = "memory_encoder.onnx.prototxt"
+MODEL_ATN_PATH = "memory_attention.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/samurai/"
 
 REF_WAV_PATH = "demo.mp4"
@@ -40,6 +42,7 @@ IMAGE_SIZE = 1024
 NO_OBJ_SCORE = -1024.0
 
 this_dir = os.path.dirname(os.path.abspath(__file__))
+weight_dir = os.path.join(this_dir, "weights")
 
 
 # ======================
@@ -60,6 +63,55 @@ def load_video_frames(video_path, image_size=None):
     return None, 1080, 1920
 
 
+def select_closest_cond_frames(frame_idx, cond_frame_outputs, max_cond_frame_num):
+    """
+    Select up to `max_cond_frame_num` conditioning frames from `cond_frame_outputs`
+    that are temporally closest to the current frame at `frame_idx`.
+    """
+    if max_cond_frame_num == -1 or len(cond_frame_outputs) <= max_cond_frame_num:
+        selected_outputs = cond_frame_outputs
+        unselected_outputs = {}
+    else:
+        selected_outputs = {}
+
+        # the closest conditioning frame before `frame_idx` (if any)
+        idx_before = max((t for t in cond_frame_outputs if t < frame_idx), default=None)
+        if idx_before is not None:
+            selected_outputs[idx_before] = cond_frame_outputs[idx_before]
+
+        # the closest conditioning frame after `frame_idx` (if any)
+        idx_after = min((t for t in cond_frame_outputs if t >= frame_idx), default=None)
+        if idx_after is not None:
+            selected_outputs[idx_after] = cond_frame_outputs[idx_after]
+
+        # add other temporally closest conditioning frames until reaching a total
+        # of `max_cond_frame_num` conditioning frames.
+        num_remain = max_cond_frame_num - len(selected_outputs)
+        inds_remain = sorted(
+            (t for t in cond_frame_outputs if t not in selected_outputs),
+            key=lambda x: abs(x - frame_idx),
+        )[:num_remain]
+        selected_outputs.update((t, cond_frame_outputs[t]) for t in inds_remain)
+        unselected_outputs = {
+            t: v for t, v in cond_frame_outputs.items() if t not in selected_outputs
+        }
+
+    return selected_outputs, unselected_outputs
+
+
+def get_1d_sine_pe(pos_inds, dim, temperature=10000):
+    """
+    Get 1D sine positional embedding as in the original Transformer paper.
+    """
+    pe_dim = dim // 2
+    dim_t = np.arange(pe_dim, dtype=np.float32)
+    dim_t = temperature ** (2 * (dim_t // 2) / pe_dim)
+
+    pos_embed = np.expand_dims(pos_inds, axis=-1) / dim_t
+    pos_embed = np.concatenate([np.sin(pos_embed), np.cos(pos_embed)], axis=-1)
+    return pos_embed
+
+
 # ======================
 # Main functions
 # ======================
@@ -68,15 +120,28 @@ def load_video_frames(video_path, image_size=None):
 class SAM2VideoPredictor:
     """The predictor class to handle user interactions and manage inference states."""
 
-    def __init__(self, backbone, sam_heads, memory_encoder, flg_onnx=False):
+    def __init__(
+        self, backbone, sam_heads, memory_encoder, memory_attn, flg_onnx=False
+    ):
         self.backbone = backbone
         self.sam_heads = sam_heads
         self.memory_encoder = memory_encoder
+        self.memory_attn = memory_attn
         self.flg_onnx = flg_onnx
 
         self.num_feature_levels = 3
         self.hidden_dim = 256
-        self.no_mem_embed = np.load(os.path.join(this_dir, "no_mem_embed.npy"))
+        self.maskmem_tpos_enc = np.load(
+            os.path.join(weight_dir, "maskmem_tpos_enc.npy")
+        )
+        self.no_mem_embed = np.load(os.path.join(weight_dir, "no_mem_embed.npy"))
+
+        self.obj_ptr_tpos_proj_weight = np.load(
+            os.path.join(weight_dir, "obj_ptr_tpos_proj_weight.npy")
+        )
+        self.obj_ptr_tpos_proj_bias = np.load(
+            os.path.join(weight_dir, "obj_ptr_tpos_proj_bias.npy")
+        )
 
     ### SAM2Base
 
@@ -182,6 +247,109 @@ class SAM2VideoPredictor:
         if not is_init_cond_frame:
             # Retrieve the memories encoded with the maskmem backbone
             to_cat_memory, to_cat_memory_pos_embed = [], []
+            # Select a maximum number of temporally closest cond frames for cross attention
+            cond_outputs = output_dict["cond_frame_outputs"]
+            max_cond_frames_in_attn = -1
+            selected_cond_outputs, unselected_cond_outputs = select_closest_cond_frames(
+                frame_idx, cond_outputs, max_cond_frames_in_attn
+            )
+            t_pos_and_prevs = [(0, out) for out in selected_cond_outputs.values()]
+
+            valid_indices = []
+            if frame_idx > 1:  # Ensure we have previous frames to evaluate
+                1 / 0  # TODO
+            if frame_idx - 1 not in valid_indices:
+                valid_indices.append(frame_idx - 1)
+
+            num_maskmem = 7
+            for t_pos in range(
+                1, num_maskmem
+            ):  # Iterate over the number of mask memories
+                idx = t_pos - num_maskmem  # Calculate the index for valid indices
+                if idx < -len(valid_indices):  # Skip if index is out of bounds
+                    continue
+                out = output_dict["non_cond_frame_outputs"].get(
+                    valid_indices[idx], None
+                )  # Get output for the valid index
+                if out is None:  # If not found, check unselected outputs
+                    out = unselected_cond_outputs.get(valid_indices[idx], None)
+                t_pos_and_prevs.append(
+                    (t_pos, out)
+                )  # Append the temporal position and output to the list
+
+            for t_pos, prev in t_pos_and_prevs:
+                if prev is None:
+                    continue  # skip padding frames
+                feats = prev["maskmem_features"]
+                to_cat_memory.append(
+                    feats.reshape(feats.shape[0], feats.shape[1], -1).transpose(2, 0, 1)
+                )
+                # Spatial positional encoding (it might have been offloaded to CPU in eval)
+                maskmem_enc = prev["maskmem_pos_enc"][-1]
+                maskmem_enc = maskmem_enc.reshape(
+                    feats.shape[0], feats.shape[1], -1
+                ).transpose(2, 0, 1)
+                # Temporal positional encoding
+                maskmem_enc = (
+                    maskmem_enc + self.maskmem_tpos_enc[num_maskmem - t_pos - 1]
+                )
+                to_cat_memory_pos_embed.append(maskmem_enc)
+
+            # Construct the list of past object pointers
+            max_obj_ptrs_in_encoder = min(num_frames, 16)
+            # First add those object pointers from selected conditioning frames
+            ptr_cond_outputs = {
+                t: out
+                for t, out in selected_cond_outputs.items()
+                if (t >= frame_idx if track_in_reverse else t <= frame_idx)
+            }
+            pos_and_ptrs = [
+                # Temporal pos encoding contains how far away each pointer is from current frame
+                ((frame_idx - t) * tpos_sign_mul, out["obj_ptr"])
+                for t, out in ptr_cond_outputs.items()
+            ]
+            # Add up to (max_obj_ptrs_in_encoder - 1) non-conditioning frames before current frame
+            for t_diff in range(1, max_obj_ptrs_in_encoder):
+                t = frame_idx + t_diff if track_in_reverse else frame_idx - t_diff
+                if t < 0 or (num_frames is not None and t >= num_frames):
+                    break
+                out = output_dict["non_cond_frame_outputs"].get(
+                    t, unselected_cond_outputs.get(t, None)
+                )
+                if out is not None:
+                    pos_and_ptrs.append((t_diff, out["obj_ptr"]))
+            # If we have at least one object pointer, add them to the across attention
+            mem_dim = 64
+            if 0 < len(pos_and_ptrs):
+                pos_list, ptrs_list = zip(*pos_and_ptrs)
+                # stack object pointers along dim=0 into [ptr_seq_len, B, C] shape
+                obj_ptrs = np.stack(ptrs_list, axis=0)
+                # a temporal positional embedding based on how far each object pointer is from
+                # the current frame (sine embedding normalized by the max pointer num).
+                t_diff_max = max_obj_ptrs_in_encoder - 1
+                tpos_dim = C
+                obj_pos = np.array(pos_list, dtype=np.float32)
+                obj_pos = get_1d_sine_pe(obj_pos / t_diff_max, dim=tpos_dim)
+                obj_pos = (
+                    obj_pos @ self.obj_ptr_tpos_proj_weight.T
+                    + self.obj_ptr_tpos_proj_bias
+                )
+                obj_pos = np.broadcast_to(
+                    np.expand_dims(obj_pos, axis=1), (1, B, mem_dim)
+                )
+                if mem_dim < C:
+                    # split a pointer into (C // mem_dim) tokens for mem_dim < C
+                    obj_ptrs = obj_ptrs.reshape(-1, B, C // mem_dim, mem_dim)
+                    obj_ptrs = obj_ptrs.transpose(0, 2, 1, 3).reshape(
+                        -1, obj_ptrs.shape[1], obj_ptrs.shape[3]
+                    )
+                    obj_pos = np.repeat(obj_pos, repeats=(C // mem_dim), axis=0)
+
+                to_cat_memory.append(obj_ptrs)
+                to_cat_memory_pos_embed.append(obj_pos)
+                num_obj_ptr_tokens = obj_ptrs.shape[0]
+            else:
+                num_obj_ptr_tokens = 0
         else:
             # directly add no-mem embedding (instead of using the transformer encoder)
             pix_feat_with_mem = current_vision_feats[-1] + self.no_mem_embed
@@ -192,15 +360,16 @@ class SAM2VideoPredictor:
         memory = np.concatenate(to_cat_memory, axis=0)
         memory_pos_embed = np.concatenate(to_cat_memory_pos_embed, axis=0)
 
-        pix_feat_with_mem = self.memory_attention(
+        pix_feat_with_mem = self.run_memory_attention(
             curr=current_vision_feats,
             curr_pos=current_vision_pos_embeds,
             memory=memory,
             memory_pos=memory_pos_embed,
             num_obj_ptr_tokens=num_obj_ptr_tokens,
         )
+
         # reshape the output (HW)BC => BCHW
-        pix_feat_with_mem = pix_feat_with_mem.permute(1, 2, 0).view(B, C, H, W)
+        pix_feat_with_mem = pix_feat_with_mem.transpose(1, 2, 0).reshape(B, C, H, W)
         return pix_feat_with_mem
 
     def _encode_new_memory(
@@ -292,7 +461,7 @@ class SAM2VideoPredictor:
         object_score_logits,
         current_out,
     ):
-        if run_mem_encoder and self.num_maskmem > 0:
+        if run_mem_encoder:
             high_res_masks_for_mem_enc = high_res_masks
             maskmem_features, maskmem_pos_enc = self._encode_new_memory(
                 current_vision_feats=current_vision_feats,
@@ -767,7 +936,6 @@ class SAM2VideoPredictor:
                     batch_size=batch_size,
                     is_init_cond_frame=False,
                     point_inputs=None,
-                    mask_inputs=None,
                     reverse=False,
                     run_mem_encoder=True,
                 )
@@ -940,6 +1108,40 @@ class SAM2VideoPredictor:
 
         return maskmem_features, maskmem_pos_enc
 
+    def run_memory_attention(
+        self,
+        curr,  # self-attention inputs
+        curr_pos,  # pos_enc for self-attention inputs
+        memory,  # cross-attention inputs
+        memory_pos,  # pos_enc for cross-attention inputs
+        num_obj_ptr_tokens,  # number of object pointer *tokens*
+    ):
+        num_obj_ptr_tokens = np.array(num_obj_ptr_tokens, dtype=int)
+        if not self.flg_onnx:
+            output = self.memory_attn.predict(
+                [
+                    curr[0],
+                    memory,
+                    curr_pos[0],
+                    memory_pos,
+                    num_obj_ptr_tokens,
+                ]
+            )
+        else:
+            output = self.memory_attn.run(
+                None,
+                {
+                    "curr": curr[0],
+                    "memory": memory,
+                    "curr_pos": curr_pos[0],
+                    "memory_pos": memory_pos,
+                    "num_obj_ptr_tokens": num_obj_ptr_tokens,
+                },
+            )
+        pix_feat_with_mem = output[0]
+
+        return pix_feat_with_mem
+
     def get_maskmem_pos_enc(self, current_out):
         """
         `maskmem_pos_enc` is the same across frames and objects, so we cache it as
@@ -1024,6 +1226,7 @@ def main():
     check_and_download_models(WEIGHT_BACKBONE_PATH, MODEL_BACKBONE_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_SAM_PATH, MODEL_SAM_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_ENC_PATH, MODEL_ENC_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_ATN_PATH, MODEL_ATN_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
@@ -1032,6 +1235,7 @@ def main():
         backbone = ailia.Net(MODEL_BACKBONE_PATH, WEIGHT_BACKBONE_PATH, env_id=env_id)
         sam_heads = ailia.Net(MODEL_SAM_PATH, WEIGHT_SAM_PATH, env_id=env_id)
         memory_encoder = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=env_id)
+        memory_attn = ailia.Net(MODEL_ATN_PATH, WEIGHT_ATN_PATH, env_id=env_id)
     else:
         import onnxruntime
 
@@ -1044,11 +1248,13 @@ def main():
         memory_encoder = onnxruntime.InferenceSession(
             WEIGHT_ENC_PATH, providers=providers
         )
+        memory_attn = onnxruntime.InferenceSession(WEIGHT_ATN_PATH, providers=providers)
 
     predictor = SAM2VideoPredictor(
         backbone=backbone,
         sam_heads=sam_heads,
         memory_encoder=memory_encoder,
+        memory_attn=memory_attn,
         flg_onnx=args.onnx,
     )
 
