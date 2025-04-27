@@ -15,6 +15,8 @@ from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from math_utils import softmax
 
+from kalman_filter import KalmanFilter
+
 
 logger = getLogger(__name__)
 
@@ -143,6 +145,14 @@ class SAM2VideoPredictor:
             os.path.join(weight_dir, "obj_ptr_tpos_proj_bias.npy")
         )
 
+        # Init Kalman Filter
+        self.kf = KalmanFilter()
+        self.kf_mean = None
+        self.kf_covariance = None
+        self.stable_frames = 0
+
+        self.stable_frames_threshold = 15
+
     ### SAM2Base
 
     def _forward_sam_heads(
@@ -152,13 +162,22 @@ class SAM2VideoPredictor:
         high_res_features,
         multimask_output,
     ):
+        B = backbone_features.shape[0]
+
+        if point_inputs is not None:
+            sam_point_coords = point_inputs["point_coords"]
+            sam_point_labels = point_inputs["point_labels"]
+        else:
+            sam_point_coords = np.zeros((B, 1, 2), dtype=np.float32)
+            sam_point_labels = -np.ones((B, 1), dtype=np.int64)
+
         # feedforward
         if not self.flg_onnx:
             output = self.sam_heads.predict(
                 [
                     backbone_features,
-                    point_inputs["point_coords"],
-                    point_inputs["point_labels"],
+                    sam_point_coords,
+                    sam_point_labels,
                     high_res_features[0],
                     high_res_features[1],
                     np.array(multimask_output, dtype=np.int64),
@@ -169,8 +188,8 @@ class SAM2VideoPredictor:
                 None,
                 {
                     "backbone_features": backbone_features,
-                    "point_coords": point_inputs["point_coords"],
-                    "point_labels": point_inputs["point_labels"],
+                    "point_coords": sam_point_coords,
+                    "point_labels": sam_point_labels,
                     "high_res_features_0": high_res_features[0],
                     "high_res_features_1": high_res_features[1],
                     "multimask_output": np.array(multimask_output, dtype=np.int64),
@@ -186,12 +205,43 @@ class SAM2VideoPredictor:
 
         kf_ious = None
         if multimask_output:
-            pass
+            if (
+                self.kf_mean is None
+                and self.kf_covariance is None
+                or self.stable_frames == 0
+            ):
+                best_iou_inds = np.argmax(ious, axis=-1)
+                batch_inds = np.arange(B)
+                low_res_masks = np.expand_dims(
+                    low_res_multimasks[batch_inds, best_iou_inds], axis=1
+                )
+                high_res_masks = np.expand_dims(
+                    high_res_multimasks[batch_inds, best_iou_inds], axis=1
+                )
+
+                non_zero_indices = np.argwhere(high_res_masks[0, 0] > 0.0)
+                if len(non_zero_indices) == 0:
+                    high_res_bbox = [0, 0, 0, 0]
+                else:
+                    y_min, x_min = non_zero_indices.min(axis=0)
+                    y_max, x_max = non_zero_indices.max(axis=0)
+                    high_res_bbox = [x_min, y_min, x_max, y_max]
+
+                self.kf_mean, self.kf_covariance = self.kf.initiate(
+                    self.kf.xyxy_to_xyah(high_res_bbox)
+                )
+                obj_ptr = obj_ptrs[batch_inds, best_iou_inds]
+                self.stable_frames += 1
+            elif self.stable_frames < self.stable_frames_threshold:
+                # TODO
+                """"""
+            else:
+                # TODO
+                """"""
         else:
             best_iou_inds = 0
             low_res_masks, high_res_masks = low_res_multimasks, high_res_multimasks
-
-        obj_ptr = obj_ptrs[:, best_iou_inds]
+            obj_ptr = obj_ptrs[:, best_iou_inds]
 
         return (
             low_res_multimasks,
@@ -257,7 +307,38 @@ class SAM2VideoPredictor:
 
             valid_indices = []
             if frame_idx > 1:  # Ensure we have previous frames to evaluate
-                1 / 0  # TODO
+                for i in range(
+                    frame_idx - 1, 1, -1
+                ):  # Iterate backwards through previous frames
+                    iou_score = output_dict["non_cond_frame_outputs"][i][
+                        "best_iou_score"
+                    ]  # Get mask affinity score
+                    obj_score = output_dict["non_cond_frame_outputs"][i][
+                        "object_score_logits"
+                    ]  # Get object score
+                    kf_score = (
+                        output_dict["non_cond_frame_outputs"][i]["kf_score"]
+                        if "kf_score" in output_dict["non_cond_frame_outputs"][i]
+                        else None
+                    )  # Get motion score if available
+
+                    # Check if the scores meet the criteria for being a valid index
+                    memory_bank_iou_threshold = 0.5
+                    memory_bank_obj_score_threshold = 0.0
+                    memory_bank_kf_score_threshold = 0.0
+                    if (
+                        iou_score > memory_bank_iou_threshold
+                        and obj_score > memory_bank_obj_score_threshold
+                        and (
+                            kf_score is None
+                            or kf_score > memory_bank_kf_score_threshold
+                        )
+                    ):
+                        valid_indices.insert(0, i)
+                    # Check the number of valid indices
+                    max_obj_ptrs_in_encoder = 16
+                    if len(valid_indices) >= max_obj_ptrs_in_encoder - 1:
+                        break
             if frame_idx - 1 not in valid_indices:
                 valid_indices.append(frame_idx - 1)
 
@@ -335,7 +416,7 @@ class SAM2VideoPredictor:
                     + self.obj_ptr_tpos_proj_bias
                 )
                 obj_pos = np.broadcast_to(
-                    np.expand_dims(obj_pos, axis=1), (1, B, mem_dim)
+                    np.expand_dims(obj_pos, axis=1), (obj_pos.shape[0], B, mem_dim)
                 )
                 if mem_dim < C:
                     # split a pointer into (C // mem_dim) tokens for mem_dim < C
@@ -468,7 +549,7 @@ class SAM2VideoPredictor:
                 feat_sizes=feat_sizes,
                 pred_masks_high_res=high_res_masks_for_mem_enc,
                 object_score_logits=object_score_logits,
-                is_mask_from_pts=torch.tensor(point_inputs is not None).long(),
+                is_mask_from_pts=(point_inputs is not None),
             )
             current_out["maskmem_features"] = maskmem_features
             current_out["maskmem_pos_enc"] = [maskmem_pos_enc]
@@ -639,7 +720,7 @@ class SAM2VideoPredictor:
         else:
             points = np.array(points, dtype=np.float32)
         if labels is None:
-            labels = np.zeros(0, dtype=np.int32)
+            labels = np.zeros(0, dtype=np.int64)
         else:
             labels = np.array(labels, dtype=np.int32)
         if points.ndim == 2:
@@ -651,7 +732,7 @@ class SAM2VideoPredictor:
         # along with the user-provided points (consistent with how SAM 2 is trained).
         box = np.array(box, dtype=np.float32)
         box_coords = box.reshape(1, 2, 2)
-        box_labels = np.array([2, 3], dtype=np.int32)
+        box_labels = np.array([2, 3], dtype=np.int64)
         box_labels = box_labels.reshape(1, 2)
         points = box_coords
         labels = box_labels
