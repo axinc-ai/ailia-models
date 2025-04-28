@@ -19,6 +19,10 @@ If you would like to try on your computer:
 
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
+<a target="_blank" href="https://colab.research.google.com/github/axinc-ai/ailia-models">
+  <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
+</a>
+
 # Supported models
 377 models as of April 19, 2025
 
