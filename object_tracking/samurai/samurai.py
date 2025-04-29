@@ -1,19 +1,21 @@
-from collections import OrderedDict
 import os
+import os.path as osp
 import sys
+from collections import OrderedDict
 from logging import getLogger
 
 import cv2
 import numpy as np
 from tqdm import tqdm
+from PIL import Image
 
 import ailia
 
 # import original modules
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
+from image_utils import normalize_image
 from model_utils import check_and_download_models  # noqa
-from math_utils import softmax
 
 from kalman_filter import KalmanFilter
 
@@ -61,8 +63,46 @@ args = update_parser(parser, check_input_type=False)
 # ======================
 
 
-def load_video_frames(video_path, image_size=None):
-    return None, 1080, 1920
+def load_video_frames(video_path):
+    if osp.isdir(video_path):
+        frames = sorted(
+            [
+                osp.join(video_path, f)
+                for f in os.listdir(video_path)
+                if f.endswith((".png", ".jpg", ".jpeg", ".JPG", ".JPEG"))
+            ]
+        )
+        loaded_frames = [cv2.imread(frame_path) for frame_path in frames]
+        height, width = loaded_frames[0].shape[:2]
+    else:
+        cap = cv2.VideoCapture(video_path)
+        frame_rate = cap.get(cv2.CAP_PROP_FPS)
+        loaded_frames = []
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            loaded_frames.append(frame)
+        cap.release()
+        height, width = loaded_frames[0].shape[:2]
+
+        if len(loaded_frames) == 0:
+            raise ValueError("No frames were loaded from the video.")
+
+    return loaded_frames, height, width
+
+
+def preprocess_image(img):
+    img = img[:, :, ::-1]  # BGR -> RGB
+
+    img = np.array(Image.fromarray(img).resize((IMAGE_SIZE, IMAGE_SIZE)))
+
+    img = normalize_image(img, normalize_type="ImageNet")
+    img = img.transpose(2, 0, 1)  # HWC -> CHW
+    img = np.expand_dims(img, axis=0)
+    img = img.astype(np.float32)
+
+    return img
 
 
 def select_closest_cond_frames(frame_idx, cond_frame_outputs, max_cond_frame_num):
@@ -203,6 +243,7 @@ class SAM2VideoPredictor:
             object_score_logits,
         ) = output
 
+        obj_ptr = obj_ptrs[:, 0]
         kf_ious = None
         if multimask_output:
             if (
@@ -230,18 +271,92 @@ class SAM2VideoPredictor:
                 self.kf_mean, self.kf_covariance = self.kf.initiate(
                     self.kf.xyxy_to_xyah(high_res_bbox)
                 )
-                obj_ptr = obj_ptrs[batch_inds, best_iou_inds]
+                if obj_ptrs.shape[1] > 1:
+                    obj_ptr = obj_ptrs[batch_inds, best_iou_inds]
                 self.stable_frames += 1
             elif self.stable_frames < self.stable_frames_threshold:
-                # TODO
-                """"""
+                self.kf_mean, self.kf_covariance = self.kf.predict(
+                    self.kf_mean, self.kf_covariance
+                )
+                best_iou_inds = np.argmax(ious, axis=-1)
+                batch_inds = np.arange(B)
+                low_res_masks = np.expand_dims(
+                    low_res_multimasks[batch_inds, best_iou_inds], axis=1
+                )
+                high_res_masks = np.expand_dims(
+                    high_res_multimasks[batch_inds, best_iou_inds], axis=1
+                )
+                non_zero_indices = np.argwhere(high_res_masks[0][0] > 0.0)
+
+                if len(non_zero_indices) == 0:
+                    high_res_bbox = [0, 0, 0, 0]
+                else:
+                    y_min, x_min = non_zero_indices.min(axis=0)
+                    y_max, x_max = non_zero_indices.max(axis=0)
+                    high_res_bbox = [x_min, y_min, x_max, y_max]
+
+                stable_ious_threshold = 0.3
+                if ious[0][best_iou_inds] > stable_ious_threshold:
+                    self.kf_mean, self.kf_covariance = self.kf.update(
+                        self.kf_mean,
+                        self.kf_covariance,
+                        self.kf.xyxy_to_xyah(high_res_bbox),
+                    )
+                    self.stable_frames += 1
+                else:
+                    self.stable_frames = 0
+                if obj_ptrs.shape[1] > 1:
+                    obj_ptr = obj_ptrs[batch_inds, best_iou_inds]
             else:
-                # TODO
-                """"""
+                self.kf_mean, self.kf_covariance = self.kf.predict(
+                    self.kf_mean, self.kf_covariance
+                )
+                high_res_multibboxes = []
+                batch_inds = np.arange(B)
+                for i in range(ious.shape[1]):
+                    non_zero_indices = np.argwhere(
+                        np.expand_dims(high_res_multimasks[batch_inds, i], axis=1)[0][0]
+                        > 0.0
+                    )
+                    if len(non_zero_indices) == 0:
+                        high_res_multibboxes.append([0, 0, 0, 0])
+                    else:
+                        y_min, x_min = non_zero_indices.min(axis=0)
+                        y_max, x_max = non_zero_indices.max(axis=0)
+                        high_res_multibboxes.append([x_min, y_min, x_max, y_max])
+
+                # compute the IoU between the predicted bbox and the high_res_multibboxes
+                kf_ious = np.array(
+                    self.kf.compute_iou(self.kf_mean[:4], high_res_multibboxes)
+                )
+                # weighted iou
+                kf_score_weight = 0.25
+                weighted_ious = kf_score_weight * kf_ious + (1 - kf_score_weight) * ious
+                best_iou_inds = np.argmax(weighted_ious, axis=-1)
+                batch_inds = np.arange(B)
+                low_res_masks = np.expand_dims(
+                    low_res_multimasks[batch_inds, best_iou_inds], axis=1
+                )
+                high_res_masks = np.expand_dims(
+                    high_res_multimasks[batch_inds, best_iou_inds], axis=1
+                )
+                if obj_ptrs.shape[1] > 1:
+                    obj_ptr = obj_ptrs[batch_inds, best_iou_inds]
+
+                stable_ious_threshold = 0.3
+                if ious[0][best_iou_inds] < stable_ious_threshold:
+                    self.stable_frames = 0
+                else:
+                    self.kf_mean, self.kf_covariance = self.kf.update(
+                        self.kf_mean,
+                        self.kf_covariance,
+                        self.kf.xyxy_to_xyah(
+                            high_res_multibboxes[best_iou_inds.item()]
+                        ),
+                    )
         else:
             best_iou_inds = 0
             low_res_masks, high_res_masks = low_res_multimasks, high_res_multimasks
-            obj_ptr = obj_ptrs[:, best_iou_inds]
 
         return (
             low_res_multimasks,
@@ -1059,7 +1174,7 @@ class SAM2VideoPredictor:
         # Look up in the cache first
         image, backbone_out = self.cached_features.get(frame_idx, (None, None))
         if backbone_out is None:
-            image = np.expand_dims(self.images[frame_idx].astype(np.float32), axis=0)
+            image = preprocess_image(self.images[frame_idx])
 
             # feedforward
             if not self.flg_onnx:
@@ -1252,12 +1367,7 @@ class SAM2VideoPredictor:
 
 def recognize_from_video(predictor: SAM2VideoPredictor):
     input = args.input
-    images, video_height, video_width = load_video_frames(
-        video_path=input,
-        # image_size=self.image_size,
-    )
-    images = np.load("images.npy")
-    height, width = 1080, 1920
+    images, video_height, video_width = load_video_frames(video_path=input)
 
     color = [(255, 0, 0)]
 
@@ -1267,6 +1377,15 @@ def recognize_from_video(predictor: SAM2VideoPredictor):
 
     _, _, masks = predictor.add_new_points_or_box(box=bbox, frame_idx=0, obj_id=0)
 
+    # saves the result as a video file.
+    video_output_path = get_savepath(args.savepath, None, ext=".mp4")
+    frame_rate = 30
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    video_out = cv2.VideoWriter(
+        video_output_path, fourcc, frame_rate, (video_width, video_height)
+    )
+
+    # loop through the video frames and propagate the masks
     for frame_idx, object_ids, masks in predictor.propagate_in_video():
         mask_to_vis = {}
         bbox_to_vis = {}
@@ -1286,7 +1405,7 @@ def recognize_from_video(predictor: SAM2VideoPredictor):
 
         img = images[frame_idx]
         for obj_id, mask in mask_to_vis.items():
-            mask_img = np.zeros((height, width, 3), np.uint8)
+            mask_img = np.zeros((video_height, video_width, 3), np.uint8)
             mask_img[mask] = color[(obj_id + 1) % len(color)]
             img = cv2.addWeighted(img, 1, mask_img, 0.2, 0)
 
@@ -1298,6 +1417,12 @@ def recognize_from_video(predictor: SAM2VideoPredictor):
                 color[obj_id % len(color)],
                 2,
             )
+
+        video_out.write(img)
+
+    video_out.release()
+
+    logger.info(f"saved at : {video_output_path}")
 
     logger.info("Script finished successfully.")
 
@@ -1321,9 +1446,9 @@ def main():
         import onnxruntime
 
         providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
-        providers_cpu = ["CPUExecutionProvider"]
+        # providers = ["CPUExecutionProvider"]
         backbone = onnxruntime.InferenceSession(
-            WEIGHT_BACKBONE_PATH, providers=providers_cpu
+            WEIGHT_BACKBONE_PATH, providers=providers
         )
         sam_heads = onnxruntime.InferenceSession(WEIGHT_SAM_PATH, providers=providers)
         memory_encoder = onnxruntime.InferenceSession(
