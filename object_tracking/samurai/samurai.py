@@ -1,5 +1,4 @@
 import os
-import os.path as osp
 import sys
 from collections import OrderedDict
 from logging import getLogger
