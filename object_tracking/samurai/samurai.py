@@ -37,8 +37,8 @@ MODEL_ENC_PATH = "memory_encoder.onnx.prototxt"
 MODEL_ATN_PATH = "memory_attention.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/samurai/"
 
-REF_WAV_PATH = "demo.mp4"
-SAVE_WAV_PATH = "output.mp4"
+VIDEO_PATH = "demo.mp4"
+SAVE_VIDEO_PATH = "output.mp4"
 
 IMAGE_SIZE = 1024
 
@@ -53,9 +53,15 @@ weight_dir = os.path.join(this_dir, "weights")
 # Arguemnt Parser Config
 # ======================
 
-parser = get_base_parser("SAMURAI", None, SAVE_WAV_PATH)
+parser = get_base_parser("SAMURAI", VIDEO_PATH, SAVE_VIDEO_PATH)
+parser.add_argument(
+    "--txt_path",
+    type=str,
+    default="bbox.txt",
+    help="the .txt file contains a single line with the bounding box of the first frame in x,y,w,h format",
+)
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
-args = update_parser(parser, check_input_type=False)
+args = update_parser(parser)
 
 
 # ======================
@@ -63,19 +69,23 @@ args = update_parser(parser, check_input_type=False)
 # ======================
 
 
-def load_video_frames(video_path):
-    if osp.isdir(video_path):
-        frames = sorted(
-            [
-                osp.join(video_path, f)
-                for f in os.listdir(video_path)
-                if f.endswith((".png", ".jpg", ".jpeg", ".JPG", ".JPEG"))
-            ]
-        )
-        loaded_frames = [cv2.imread(frame_path) for frame_path in frames]
+def load_txt(gt_path):
+    with open(gt_path, "r") as f:
+        gt = f.readlines()
+    prompts = {}
+    for fid, line in enumerate(gt):
+        x, y, w, h = map(float, line.split(","))
+        x, y, w, h = int(x), int(y), int(w), int(h)
+        prompts[fid] = ((x, y, x + w, y + h), 0)
+    return prompts
+
+
+def load_video_frames(input_path):
+    if isinstance(input_path, list):
+        loaded_frames = [cv2.imread(frame_path) for frame_path in input_path]
         height, width = loaded_frames[0].shape[:2]
     else:
-        cap = cv2.VideoCapture(video_path)
+        cap = cv2.VideoCapture(input_path)
         frame_rate = cap.get(cv2.CAP_PROP_FPS)
         loaded_frames = []
         while True:
@@ -199,6 +209,7 @@ class SAM2VideoPredictor:
         self,
         backbone_features,
         point_inputs,
+        mask_inputs,
         high_res_features,
         multimask_output,
     ):
@@ -211,6 +222,18 @@ class SAM2VideoPredictor:
             sam_point_coords = np.zeros((B, 1, 2), dtype=np.float32)
             sam_point_labels = -np.ones((B, 1), dtype=np.int64)
 
+        if mask_inputs is not None:
+            sam_mask_prompt = np.zeros((B, 1, 256, 256), dtype=np.float32)
+            for i in len(mask_inputs):
+                x = cv2.resize(
+                    mask_inputs[i].squeeze(0),
+                    dsize=(256, 256),
+                    interpolation=cv2.INTER_LINEAR,
+                )
+                sam_mask_prompt[i] = x[np.newaxis, :, :]
+        else:
+            sam_mask_prompt = np.zeros((0, 1, 256, 256), dtype=np.float32)
+
         # feedforward
         if not self.flg_onnx:
             output = self.sam_heads.predict(
@@ -218,6 +241,7 @@ class SAM2VideoPredictor:
                     backbone_features,
                     sam_point_coords,
                     sam_point_labels,
+                    sam_mask_prompt,
                     high_res_features[0],
                     high_res_features[1],
                     np.array(multimask_output, dtype=np.int64),
@@ -230,6 +254,7 @@ class SAM2VideoPredictor:
                     "backbone_features": backbone_features,
                     "point_coords": sam_point_coords,
                     "point_labels": sam_point_labels,
+                    "mask_inputs": sam_mask_prompt,
                     "high_res_features_0": high_res_features[0],
                     "high_res_features_1": high_res_features[1],
                     "multimask_output": np.array(multimask_output, dtype=np.int64),
@@ -636,11 +661,18 @@ class SAM2VideoPredictor:
             num_frames=num_frames,
             track_in_reverse=track_in_reverse,
         )
+
+        # apply SAM-style segmentation head
+        # here we might feed previously predicted low-res SAM mask logits into the SAM mask decoder
+        mask_inputs = None
+        if prev_sam_mask_logits is not None:
+            mask_inputs = prev_sam_mask_logits
         multimask_output = self._use_multimask(point_inputs)
 
         sam_outputs = self._forward_sam_heads(
             backbone_features=pix_feat,
             point_inputs=point_inputs,
+            mask_inputs=mask_inputs,
             high_res_features=high_res_features,
             multimask_output=multimask_output,
         )
@@ -809,7 +841,7 @@ class SAM2VideoPredictor:
         else:
             raise RuntimeError(
                 f"Cannot add new object id {obj_id} after tracking starts. "
-                f"All existing object ids: {inference_state['obj_ids']}. "
+                f"All existing object ids: {self.obj_ids}. "
                 f"Please call 'reset_state' to restart from scratch."
             )
 
@@ -845,12 +877,20 @@ class SAM2VideoPredictor:
 
         # If `box` is provided, we add it as the first two points with labels 2 and 3
         # along with the user-provided points (consistent with how SAM 2 is trained).
-        box = np.array(box, dtype=np.float32)
-        box_coords = box.reshape(1, 2, 2)
-        box_labels = np.array([2, 3], dtype=np.int64)
-        box_labels = box_labels.reshape(1, 2)
-        points = box_coords
-        labels = box_labels
+        if box is not None:
+            if not clear_old_points:
+                raise ValueError(
+                    "cannot add box without clearing old points, since "
+                    "box prompt must be provided before any point prompt "
+                    "(please use clear_old_points=True instead)"
+                )
+            if not isinstance(box, np.ndarray):
+                box = np.array(box, dtype=np.float32)
+            box_coords = box.reshape(1, 2, 2)
+            box_labels = np.array([2, 3], dtype=np.int64)
+            box_labels = box_labels.reshape(1, 2)
+            points = np.concatenate([box_coords, points], axis=1)
+            labels = np.concatenate([box_labels, labels], axis=1)
 
         points = points / np.array(
             [self.video_width, self.video_height], dtype=np.float32
@@ -933,10 +973,6 @@ class SAM2VideoPredictor:
         )
 
         return frame_idx, obj_ids, video_res_masks
-
-    def add_new_points(self, *args, **kwargs):
-        """Deprecated method. Please use `add_new_points_or_box` instead."""
-        return self.add_new_points_or_box(*args, **kwargs)
 
     def get_orig_video_res_output(self, any_res_masks):
         """
@@ -1109,6 +1145,9 @@ class SAM2VideoPredictor:
         obj_ids = self.obj_ids
         num_frames = self.num_frames
         batch_size = self.get_obj_num()
+
+        if len(output_dict["cond_frame_outputs"]) == 0:
+            raise RuntimeError("No points are provided; please add points first")
 
         start_frame_idx = min(output_dict["cond_frame_outputs"])
         max_frame_num_to_track = num_frames
@@ -1366,24 +1405,28 @@ class SAM2VideoPredictor:
 
 
 def recognize_from_video(predictor: SAM2VideoPredictor):
-    input = args.input
-    images, video_height, video_width = load_video_frames(video_path=input)
-
-    color = [(255, 0, 0)]
+    input = (
+        args.video
+        if args.video
+        else args.input[0] if len(args.input) <= 1 else args.input
+    )
+    txt_path = args.txt_path
+    prompts = load_txt(txt_path)
+    images, video_height, video_width = load_video_frames(input)
 
     predictor.init_state(images, video_height, video_width)
 
-    bbox = (702, 227, 1126, 938)
-
+    bbox, track_label = prompts[0]
     _, _, masks = predictor.add_new_points_or_box(box=bbox, frame_idx=0, obj_id=0)
 
     # saves the result as a video file.
-    video_output_path = get_savepath(args.savepath, None, ext=".mp4")
+    video_output_path = get_savepath(args.savepath, SAVE_VIDEO_PATH, ext=".mp4")
     frame_rate = 30
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     video_out = cv2.VideoWriter(
         video_output_path, fourcc, frame_rate, (video_width, video_height)
     )
+    color = [(255, 0, 0)]
 
     # loop through the video frames and propagate the masks
     for frame_idx, object_ids, masks in predictor.propagate_in_video():
