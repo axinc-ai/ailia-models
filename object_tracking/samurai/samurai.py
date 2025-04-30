@@ -909,10 +909,6 @@ class SAM2VideoPredictor:
         point_inputs_per_frame[frame_idx] = point_inputs
         mask_inputs_per_frame.pop(frame_idx, None)
 
-        # If this frame hasn't been tracked before, we treat it as an initial conditioning
-        # frame, meaning that the inputs points are to generate segments on this frame without
-        # using any memory from other frames, like in SAM. Otherwise (if it has been tracked),
-        # the input points will be used to correct the already tracked masks.
         is_init_cond_frame = frame_idx not in self.frames_already_tracked
         # whether to track in reverse time order
         if is_init_cond_frame:
@@ -950,10 +946,7 @@ class SAM2VideoPredictor:
             is_init_cond_frame=is_init_cond_frame,
             point_inputs=point_inputs,
             reverse=reverse,
-            # Skip the memory encoder when adding clicks or mask. We execute the memory encoder
-            # at the beginning of `propagate_in_video` (after user finalize their clicks). This
-            # allows us to enforce non-overlapping constraints on all objects before encoding
-            # them into memory.
+            # Skip the memory encoder when adding clicks or mask.
             run_mem_encoder=False,
             prev_sam_mask_logits=prev_sam_mask_logits,
         )
@@ -1012,10 +1005,7 @@ class SAM2VideoPredictor:
             consolidated_H = consolidated_W = IMAGE_SIZE // 4
             consolidated_mask_key = "pred_masks"
 
-        # Initialize `consolidated_out`. Its "maskmem_features" and "maskmem_pos_enc"
-        # will be added when rerunning the memory encoder after applying non-overlapping
-        # constraints to object scores. Its "pred_masks" are prefilled with a large
-        # negative value (NO_OBJ_SCORE) to represent missing objects.
+        # Initialize `consolidated_out`.
         consolidated_out = {
             "maskmem_features": None,
             "maskmem_pos_enc": None,
@@ -1043,10 +1033,6 @@ class SAM2VideoPredictor:
             obj_output_dict = self.output_dict_per_obj[obj_idx]
             out = obj_temp_output_dict[storage_key].get(frame_idx, None)
 
-            # If the object doesn't appear in "temp_output_dict_per_obj" on this frame,
-            # we fall back and look up its previous output in "output_dict_per_obj".
-            # We look up both "cond_frame_outputs" and "non_cond_frame_outputs" in
-            # "output_dict_per_obj" to find a previous output for this object.
             if out is None:
                 out = obj_output_dict["cond_frame_outputs"].get(frame_idx, None)
             if out is None:
