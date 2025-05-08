@@ -1,9 +1,11 @@
 import sys
 import time
+from logging import getLogger
 
 import numpy as np
 import cv2
 from PIL import Image
+from transformers import AutoTokenizer
 
 import ailia
 
@@ -11,12 +13,8 @@ import ailia
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser
 from model_utils import check_and_download_models
-from image_utils import normalize_image
 from detector_utils import load_image
 from math_utils import softmax
-
-# logger
-from logging import getLogger
 
 
 logger = getLogger(__name__)
@@ -26,14 +24,11 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_PATH = "regnet_y_800mf.onnx"
-MODEL_PATH = "regnet_y_800mf.onnx.prototxt"
+WEIGHT_BASE_P16_224_PATH = "siglip2-base-patch16-224.onnx"
+MODEL_BASE_P16_224_PATH = "siglip2-base-patch16-224.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/siglip/"
 
-IMAGE_PATH = "test.jpg"
-SAVE_IMAGE_PATH = "output.png"
-
-LABELS_FILE_PATH = "imagenet_2012.txt"
+IMAGE_PATH = "demo.jpg"
 
 IMAGE_SIZE = 224
 
@@ -41,7 +36,22 @@ IMAGE_SIZE = 224
 # Arguemnt Parser Config
 # ======================
 
-parser = get_base_parser("SigLIP2", IMAGE_PATH, SAVE_IMAGE_PATH)
+parser = get_base_parser("SigLIP2", IMAGE_PATH, None)
+parser.add_argument(
+    "-t",
+    "--text",
+    dest="text_inputs",
+    type=str,
+    action="append",
+    help="Input text. (can be specified multiple times)",
+)
+parser.add_argument(
+    "-m",
+    "--model_type",
+    default="base-patch16-224",
+    choices=("base-patch16-224", "large-patch16-256"),
+    help="model type",
+)
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
 
@@ -52,60 +62,62 @@ args = update_parser(parser)
 
 
 def preprocess(img):
-    h, w = (IMAGE_SIZE, IMAGE_SIZE)
-    im_h, im_w, _ = img.shape
-
     img = img[:, :, ::-1]  # BGR -> RBG
 
     # resize
-    short, long = (im_w, im_h) if im_w <= im_h else (im_h, im_w)
-    requested_new_short = 232
-    new_short, new_long = requested_new_short, int(requested_new_short * long / short)
-    ow, oh = (new_short, new_long) if im_w <= im_h else (new_long, new_short)
-    if ow != im_w or oh != im_h:
-        img = np.array(Image.fromarray(img).resize((ow, oh), Image.Resampling.BILINEAR))
+    img = np.array(
+        Image.fromarray(img).resize((IMAGE_SIZE, IMAGE_SIZE), Image.Resampling.BILINEAR)
+    )
 
-    # center_crop
-    if ow > w:
-        x = int(round((ow - w) / 2.0))
-        img = img[:, x : x + w, :]
-    if oh > h:
-        y = int(round((oh - h) / 2.0))
-        img = img[y : y + h, :, :]
-
-    img = normalize_image(img, normalize_type="ImageNet")
+    rescale_factor = 0.00392156862745098
+    img = img.astype(np.float32) * rescale_factor
+    img = (img - 0.5) / 0.5
 
     img = img.transpose(2, 0, 1)  # HWC -> CHW
     img = np.expand_dims(img, axis=0)
-    img = img.astype(np.float32)
 
     return img
 
 
-def postprocess_result(output: np.ndarray, top_k: int = 5):
-    softmaxed_scores = softmax(output, -1)[0]
-    topk_labels = np.argsort(softmaxed_scores)[-top_k:][::-1]
-    topk_scores = softmaxed_scores[topk_labels]
+def postprocess_result(logits_per_image, top_k: int = 5):
+    probs = softmax(logits_per_image, axis=1)[0]
 
-    return topk_labels, topk_scores
+    top_labels = np.argsort(-probs)[: min(top_k, probs.shape[0])]
+    top_probs = probs[top_labels]
+
+    return top_labels, top_probs
 
 
-def predict(net, img):
-    img = preprocess(img)
+def predict(net, img, input_ids):
+    pixel_values = preprocess(img)
 
     # feedforward
     if not args.onnx:
-        output = net.predict([img])
+        output = net.predict([input_ids, pixel_values])
     else:
-        output = net.run(None, {"input": img})
-    result = output[0]
+        output = net.run(None, {"input_ids": input_ids, "pixel_values": pixel_values})
+    logits_per_image = output[0]
 
-    return result
+    return logits_per_image
 
 
-def recognize_from_image(net):
-    with open(LABELS_FILE_PATH) as f:
-        imagenet_classes = [x.strip() for x in f.readlines() if x.strip()]
+def recognize_from_image(models):
+    input_labels = args.text_inputs
+    if input_labels is None:
+        input_labels = ["2 cats", "a plane", "a remote", "3 dogs"]
+
+    text_descriptions = [f"This is a photo of a {label}" for label in input_labels]
+
+    tokenizer = models["tokenizer"]
+    encoded = tokenizer(
+        text_descriptions,
+        return_tensors="np",
+        padding=True,
+        truncation=True,
+    )
+    input_ids = encoded["input_ids"]
+
+    net = models["net"]
 
     # input image loop
     for image_path in args.input:
@@ -122,7 +134,7 @@ def recognize_from_image(net):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                result = predict(net, img)
+                logits_per_image = predict(net, img, input_ids)
                 end = int(round(time.time() * 1000))
                 estimation_time = end - start
 
@@ -135,33 +147,42 @@ def recognize_from_image(net):
                 f"\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms"
             )
         else:
-            result = predict(net, img)
+            logits_per_image = predict(net, img, input_ids)
 
-        top_labels, top_scores = postprocess_result(result)
+        top_labels, top_probs = postprocess_result(logits_per_image)
 
         # Show results
-        for idx, (label, score) in enumerate(zip(top_labels, top_scores)):
-            _, predicted_label = imagenet_classes[label].split(" ", 1)
-            print(f"{idx + 1}: {predicted_label} - {score * 100 :.2f}%")
+        a = [(input_labels[x], y) for x, y in zip(top_labels, top_probs)]
+        for idx, (label, score) in enumerate(a):
+            print(f"{idx + 1}: {label} - {score * 100 :.2f}%")
 
     logger.info("Script finished successfully.")
 
 
 def main():
     # model files check and download
-    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    dic_model = {
+        "base-patch16-224": (WEIGHT_BASE_P16_224_PATH, MODEL_BASE_P16_224_PATH),
+    }
+    WEIGTH_PATH, MODEL_PATH = dic_model[args.model_type]
+
+    check_and_download_models(WEIGTH_PATH, MODEL_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
     # initialize
     if not args.onnx:
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        net = ailia.Net(MODEL_PATH, WEIGTH_PATH, env_id=env_id)
     else:
         import onnxruntime
 
-        net = onnxruntime.InferenceSession(WEIGHT_PATH)
+        net = onnxruntime.InferenceSession(WEIGTH_PATH)
 
-    recognize_from_image(net)
+    tokenizer = AutoTokenizer.from_pretrained("tokenizer")
+
+    models = dict(tokenizer=tokenizer, net=net)
+
+    recognize_from_image(models)
 
 
 if __name__ == "__main__":
