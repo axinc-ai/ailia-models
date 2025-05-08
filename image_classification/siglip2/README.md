@@ -1,20 +1,27 @@
-# siglip
+# SigLIP 2
 
 ## Input
 
-![Input](test.jpg)
+![Input](demo.jpg)
 
-(Image from https://farm9.staticflickr.com/8225/8511402100_fea15da1c5_z.jpg)
+(Image from http://images.cocodataset.org/val2017/000000039769.jpg)
 
 ## Output
 
 - Zero-Shot Prediction
 ```bash
-1: tiger cat - 24.91%
-2: tabby, tabby cat - 13.09%
-3: Egyptian cat - 12.17%
-4: computer keyboard, keypad - 6.68%
-5: remote control, remote - 2.12%
+1: 2 cats - 65.41%
+2: 3 dogs - 32.62%
+3: a remote - 1.05%
+4: a plane - 0.92%
+```
+
+## Requirements
+This model requires additional module.
+
+```
+pip3 install transformers
+pip3 install sentencepiece
 ```
 
 ## Usage
@@ -23,16 +30,23 @@ It is necessary to be connected to the Internet while downloading.
 
 For the sample image,
 ```bash
-$ python3 siglip.py
+$ python3 siglip2.py
 ```
 
 If you want to specify the input image, put the image path after the `--input` option.
 ```bash
-$ python3 siglip.py --input IMAGE_PATH
+$ python3 siglip2.py --input IMAGE_PATH
+```
+
+You can use `--text` option  if you want to specify a subset of the texture labels to input into the model.  
+Default labels is "2 cats", "a plane", "a remote" and "3 dogs".
+```bash
+$ python3 siglip2.py --text "2 cats" --text "a plane" --text "a remote" --text "3 dogs"
 ```
 
 ## Reference
 
+- [Hugging Face - SigLIP 2 Base](https://huggingface.co/google/siglip2-base-patch16-224)
 - [Zero-shot Image Classification with SigLIP2](https://github.com/openvinotoolkit/openvino_notebooks/blob/latest/notebooks/siglip-zero-shot-image-classification/siglip-zero-shot-image-classification.ipynb)
 
 ## Framework
@@ -45,4 +59,4 @@ ONNX opset=17
 
 ## Netron
 
-[regnet_y_800mf.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/siglip/regnet_y_800mf.onnx.prototxt)  
+[siglip2-base-patch16-224.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/siglip2/siglip2-base-patch16-224.onnx.prototxt)  
