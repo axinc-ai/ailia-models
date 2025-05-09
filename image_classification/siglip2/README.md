@@ -44,6 +44,11 @@ Default labels is "2 cats", "a plane", "a remote" and "3 dogs".
 $ python3 siglip2.py --text "2 cats" --text "a plane" --text "a remote" --text "3 dogs"
 ```
 
+By adding the `--model_type` option, you can specify model type which is selected from "base-patch16-224", "base-patch16-224", "giant-patch16-256". (default is base-patch16-224)
+```bash
+$ python3 siglip2.py --model_type base-patch16-224
+```
+
 ## Reference
 
 - [Hugging Face - SigLIP 2 Base](https://huggingface.co/google/siglip2-base-patch16-224)

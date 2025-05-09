@@ -12,7 +12,7 @@ import ailia
 # import original modules
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser
-from model_utils import check_and_download_models
+from model_utils import check_and_download_file, check_and_download_models
 from detector_utils import load_image
 from math_utils import softmax
 
@@ -25,12 +25,17 @@ logger = getLogger(__name__)
 # ======================
 
 WEIGHT_BASE_P16_224_PATH = "siglip2-base-patch16-224.onnx"
+WEIGHT_LARGE_P16_256_PATH = "siglip2-large-patch16-256.onnx"
+WEIGHT_GIANT_P16_256_PATH = "siglip2-giant-opt-patch16-256.onnx"
 MODEL_BASE_P16_224_PATH = "siglip2-base-patch16-224.onnx.prototxt"
-REMOTE_PATH = "https://storage.googleapis.com/ailia-models/siglip/"
+MODEL_LARGE_P16_256_PATH = "siglip2-large-patch16-256.onnx.prototxt"
+MODEL_GIANT_P16_256_PATH = "siglip2-giant-opt-patch16-256.onnx.prototxt"
+PB_LARGE_P16_256_PATH = "siglip2-large-patch16-256_weights.pb"
+PB_GIANT_P16_256_PATH = "siglip2-giant-opt-patch16-256_weights.pb"
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/siglip2/"
 
 IMAGE_PATH = "demo.jpg"
 
-IMAGE_SIZE = 224
 
 # ======================
 # Arguemnt Parser Config
@@ -49,7 +54,7 @@ parser.add_argument(
     "-m",
     "--model_type",
     default="base-patch16-224",
-    choices=("base-patch16-224", "large-patch16-256"),
+    choices=("base-patch16-224", "large-patch16-256", "giant-patch16-256"),
     help="model type",
 )
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
@@ -61,12 +66,19 @@ args = update_parser(parser)
 # ======================
 
 
-def preprocess(img):
+def preprocess(img, model_type):
+    dic_size = {
+        "base-patch16-224": 224,
+        "large-patch16-256": 256,
+        "giant-patch16-256": 256,
+    }
+    img_size = dic_size[model_type]
+
     img = img[:, :, ::-1]  # BGR -> RBG
 
     # resize
     img = np.array(
-        Image.fromarray(img).resize((IMAGE_SIZE, IMAGE_SIZE), Image.Resampling.BILINEAR)
+        Image.fromarray(img).resize((img_size, img_size), Image.Resampling.BILINEAR)
     )
 
     rescale_factor = 0.00392156862745098
@@ -88,10 +100,11 @@ def postprocess_result(logits_per_image, top_k: int = 5):
     return top_labels, top_probs
 
 
-def predict(net, img, input_ids):
-    pixel_values = preprocess(img)
+def predict(models, img, input_ids):
+    pixel_values = preprocess(img, models["model_type"])
 
     # feedforward
+    net = models["net"]
     if not args.onnx:
         output = net.predict([input_ids, pixel_values])
     else:
@@ -134,7 +147,7 @@ def recognize_from_image(models):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                logits_per_image = predict(net, img, input_ids)
+                logits_per_image = predict(models, img, input_ids)
                 end = int(round(time.time() * 1000))
                 estimation_time = end - start
 
@@ -147,7 +160,7 @@ def recognize_from_image(models):
                 f"\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms"
             )
         else:
-            logits_per_image = predict(net, img, input_ids)
+            logits_per_image = predict(models, img, input_ids)
 
         top_labels, top_probs = postprocess_result(logits_per_image)
 
@@ -162,11 +175,24 @@ def recognize_from_image(models):
 def main():
     # model files check and download
     dic_model = {
-        "base-patch16-224": (WEIGHT_BASE_P16_224_PATH, MODEL_BASE_P16_224_PATH),
+        "base-patch16-224": (WEIGHT_BASE_P16_224_PATH, MODEL_BASE_P16_224_PATH, None),
+        "large-patch16-256": (
+            WEIGHT_LARGE_P16_256_PATH,
+            MODEL_LARGE_P16_256_PATH,
+            PB_LARGE_P16_256_PATH,
+        ),
+        "giant-patch16-256": (
+            WEIGHT_GIANT_P16_256_PATH,
+            MODEL_GIANT_P16_256_PATH,
+            PB_GIANT_P16_256_PATH,
+        ),
     }
-    WEIGTH_PATH, MODEL_PATH = dic_model[args.model_type]
+    model_type = args.model_type
+    WEIGTH_PATH, MODEL_PATH, PB_PATH = dic_model[model_type]
 
     check_and_download_models(WEIGTH_PATH, MODEL_PATH, REMOTE_PATH)
+    if PB_PATH:
+        check_and_download_file(PB_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
@@ -178,9 +204,11 @@ def main():
 
         net = onnxruntime.InferenceSession(WEIGTH_PATH)
 
-    tokenizer = AutoTokenizer.from_pretrained("tokenizer")
+    tokenizer = AutoTokenizer.from_pretrained(
+        "tokenizer" if model_type == "giant-patch16-256" else "tokenizer-giant"
+    )
 
-    models = dict(tokenizer=tokenizer, net=net)
+    models = dict(model_type=model_type, tokenizer=tokenizer, net=net)
 
     recognize_from_image(models)
 
