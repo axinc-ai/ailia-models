@@ -14,7 +14,7 @@ from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from image_utils import normalize_image  # noqa
 from math_utils import sigmoid
-from detector_utils import load_image, plot_results, hsv_to_rgb  # noqa
+from detector_utils import load_image, plot_results, hsv_to_rgb, write_predictions  # noqa
 
 # logger
 from logging import getLogger  # noqa
@@ -50,7 +50,19 @@ parser.add_argument(
     action='store_true',
     help='disable ailia tokenizer.'
 )
-parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
+parser.add_argument(
+    "--onnx",
+    action="store_true",
+    help="execute onnxruntime version."
+)
+parser.add_argument(
+    '-w', '--write_prediction',
+    nargs='?',
+    const='txt',
+    choices=['txt', 'json'],
+    type=str,
+    help='Output results to txt or json file.'
+)
 args = update_parser(parser)
 
 
@@ -310,6 +322,12 @@ def recognize_from_image(models):
         savepath = get_savepath(args.savepath, image_path, ext=".png")
         logger.info(f"saved at : {savepath}")
         cv2.imwrite(savepath, res_img)
+
+        # write prediction
+        if args.write_prediction is not None:
+            ext = args.write_prediction
+            pred_file = "%s.%s" % (savepath.rsplit('.', 1)[0], ext)
+            write_predictions(pred_file, detect_objects, img, category=None, file_type=ext)
 
     logger.info("Script finished successfully.")
 
