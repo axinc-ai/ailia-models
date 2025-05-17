@@ -67,7 +67,6 @@ parser.add_argument(
     default="./gt_masks",
     help="directory of the ground truth mask files.",
 )
-parser.add_argument("--seed", type=int, default=1024, help="random seed")
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
 
