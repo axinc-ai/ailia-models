@@ -71,13 +71,6 @@ LANDMARK2_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/mediapipe_
 # ======================
 # Utils
 # ======================
-def draw_roi(img, roi):
-    for i in range(roi.shape[0]):
-        (x1, x2, x3, x4), (y1, y2, y3, y4) = roi[i]
-        cv2.line(img, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 0), 2)
-        cv2.line(img, (int(x1), int(y1)), (int(x3), int(y3)), (0, 255, 0), 2)
-        cv2.line(img, (int(x2), int(y2)), (int(x4), int(y4)), (0, 0, 0), 2)
-        cv2.line(img, (int(x3), int(y3)), (int(x4), int(y4)), (0, 0, 0), 2)
 
 
 def draw_landmarks(img, points, color=(0, 0, 255), size=2):
