@@ -40,6 +40,13 @@ logger = getLogger(__name__)
 IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.jpg'
 CLASS_SCORE_THRETHOLD = 0.35
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolox_body_head_hand_face/'
+MODEL_YOLOX_L_NAME = 'yolox_l_body_head_hand_face_0086_0.5143_post_1x3x480x640'
+# WEIGHT_YOLOX_M_PATH = 'yolox_m_body_head_hand_face_0111_0.5016_post_1x3x480x640.onnx'
+# WEIGHT_YOLOX_N_PATH = 'yolox_n_body_head_hand_face_0299_0.3803_post_1x3x480x640.onnx'
+# WEIGHT_YOLOX_S_PATH = 'yolox_s_body_head_hand_face_0299_0.4668_post_1x3x480x640.onnx'
+# WEIGHT_YOLOX_T_PATH = 'yolox_t_body_head_hand_face_0299_0.4265_post_1x3x480x640.onnx'
+# WEIGHT_YOLOX_X_PATH = 'yolox_x_body_head_hand_face_0076_0.5228_post_1x3x480x640.onnx'
 
 # ======================
 # Arguemnt Parser Config
@@ -47,8 +54,8 @@ CLASS_SCORE_THRETHOLD = 0.35
 parser = get_base_parser('yolox body head hand face model', IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
     '-m', '--model_name',
-    default='yolox_s',
-    help='[yolox_nano, yolox_tiny, yolox_s, yolox_m, yolox_l, yolox_x]'
+    default='l',
+    help='[n, t, s, m, l, x]'
 )
 parser.add_argument(
     '-w', '--write_prediction',
@@ -59,11 +66,9 @@ parser.add_argument(
     help='Output results to txt or json file.'
 )
 parser.add_argument(
-    '-m',
-    '--model',
-    type=str,
-    default='yolox_x_body_head_hand_face_0076_0.5228_post_1x3x480x640.onnx',
-    help='ONNX/TFLite file path for YOLOX.',
+    '-m', '--model', default='m',
+    choices=('l', 'm', 'n', 's', 't', 'x'),
+    help='model type'
 )
 parser.add_argument(
     '--onnx',
@@ -71,9 +76,6 @@ parser.add_argument(
     help='execute onnxruntime version.'
 )
 args = update_parser(parser)
-
-MODEL_NAME = args.model_name
-WEIGHT_PATH = MODEL_NAME + ".onnx"
 # ======================
 # Main functions
 # ======================
@@ -154,6 +156,7 @@ class AbstractModel(ABC):
         *,
         runtime: Optional[str] = 'onnx',
         model_path: Optional[str] = '',
+        weight_path: Optional[str] = '',
         class_score_th: Optional[float] = 0.35,
         env_id: Optional[int] = 0
     ):
@@ -166,6 +169,7 @@ class AbstractModel(ABC):
 
         self._runtime = runtime
         self._model_path = model_path
+        self._weight_path = weight_path
         self._class_score_th = class_score_th
         self._providers = providers
         
@@ -176,7 +180,7 @@ class AbstractModel(ABC):
             session_option.log_severity_level = 3
             self._interpreter = \
                 onnxruntime.InferenceSession(
-                    model_path,
+                    weight_path,
                     sess_options=session_option,
                     providers=providers,
                 )
@@ -205,7 +209,7 @@ class AbstractModel(ABC):
                 reduce_constant=True, ignore_input_with_initializer=True,
                 reduce_interstage=False, reuse_interstage=False)
             
-            self._interpreter = ailia.Net(None, model_path, env_id=env_id, memory_mode=memory_mode)
+            self._interpreter = ailia.Net(model_path, weight_path, env_id=env_id, memory_mode=memory_mode)
             self._input_shapes = [list(self._interpreter.get_input_shape())]
             self._input_names = [self._interpreter.get_blob_name(0)]
             self._model = self._interpreter.predict
@@ -289,7 +293,8 @@ class YOLOX(AbstractModel):
         self,
         *,
         runtime: Optional[str] = 'onnx',
-        model_path: Optional[str] = 'yolox_n_body_head_hand_post_0461_0.4428_1x3x256x320_float32.tflite',
+        weight_path: Optional[str] = 'yolox_l_body_head_hand_face_0086_0.5143_post_1x3x480x640.onnx',
+        model_path: Optional[str] = 'yolox_l_body_head_hand_face_0086_0.5143_post_1x3x480x640.onnx.prototxt',
         class_score_th: Optional[float] = 0.35,
         # providers: Optional[List] = None,
         env_id: Optional[int] = 0,
@@ -312,6 +317,7 @@ class YOLOX(AbstractModel):
         """
         super().__init__(
             runtime=runtime,
+            weight_path=weight_path,
             model_path=model_path,
             class_score_th=class_score_th,
             # providers=providers,
@@ -684,21 +690,36 @@ def recognize_from_video(model):
 
 def main():
     logger.info('Checking encode_image model...')
-    # check_and_download_models(WEIGHT_IMAGE_PATH, MODEL_IMAGE_PATH, REMOTE_PATH)
+    dic_model = {
+        'l': (MODEL_YOLOX_L_NAME),
+        # 'm': (WEIGHT_YOLOX_M_PATH),
+        # 'n': (WEIGHT_YOLOX_N_PATH),
+        # 's': (WEIGHT_YOLOX_S_PATH),
+        # 't': (WEIGHT_YOLOX_T_PATH),
+        # 'x': (WEIGHT_YOLOX_X_PATH)
+    }
+    model = dic_model[args.model_name]
+    WEIGHT_PATH = model + ".onnx"
+    MODEL_PATH = model + ".onnx.prototxt"
+    print(WEIGHT_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     env_id = args.env_id
     if not args.onnx:
         # ailia
         model = YOLOX(
             runtime='ailia',
-            model_path=args.model,
+            weight_path=WEIGHT_PATH,
+            model_path=MODEL_PATH
+            ,
             class_score_th=CLASS_SCORE_THRETHOLD,
             env_id=env_id
         )
     else:
         model = YOLOX(
             runtime='onnx',
-            model_path=args.model,
+            weight_path=WEIGHT_PATH,
+            model_path=MODEL_PATH,
             class_score_th=CLASS_SCORE_THRETHOLD,
             env_id=env_id
         )

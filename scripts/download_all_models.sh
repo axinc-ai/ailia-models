@@ -278,6 +278,7 @@ cd ../../object_detection/yolov9; python3 yolov9.py ${OPTION}
 cd ../../object_detection/yolov10; python3 yolov10.py ${OPTION}
 cd ../../object_detection/yolov11; python3 yolov11.py ${OPTION}
 cd ../../object_detection/yolox; python3 yolox.py ${OPTION}
+cd ../../object_detection/yolox_body_head_hand_face; python3 yolox.py ${OPTION}
 cd ../../object_detection/yolox-ti-lite; python3 yolox-ti-lite.py ${OPTION}
 cd ../../object_detection/yolov; python3 yolov.py ${OPTION}
 cd ../../object_detection/pedestrian_detection; python3 pedestrian_detection.py ${OPTION}
