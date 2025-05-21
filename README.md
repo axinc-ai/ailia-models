@@ -19,6 +19,10 @@ If you would like to try on your computer:
 
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
+# Documentation
+
+[ailia-models wiki](https://deepwiki.com/axinc-ai/ailia-models)
+
 # Supported models
 377 models as of April 19, 2025
 
