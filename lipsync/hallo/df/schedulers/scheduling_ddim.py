@@ -89,22 +89,6 @@ class DDIMScheduler(ConfigMixin):
         self.num_inference_steps = None
         self.timesteps = np.arange(0, num_train_timesteps)[::-1].copy().astype(np.int64)
 
-    def scale_model_input(
-        self, sample: np.ndarray, timestep: Optional[int] = None
-    ) -> np.ndarray:
-        """
-        Ensures interchangeability with schedulers that need to scale the denoising model input depending on the
-        current timestep.
-
-        Args:
-            sample (`np.ndarray`): input sample
-            timestep (`int`, optional): current timestep
-
-        Returns:
-            `np.ndarray`: scaled input sample
-        """
-        return sample
-
     def _get_variance(self, timestep, prev_timestep):
         alpha_prod_t = self.alphas_cumprod[timestep]
         alpha_prod_t_prev = (
@@ -142,6 +126,7 @@ class DDIMScheduler(ConfigMixin):
         sample: np.ndarray,
         eta: float = 0.0,
         use_clipped_model_output: bool = False,
+        generator=None,
         variance_noise: Optional[np.ndarray] = None,
     ):
         """
@@ -211,12 +196,10 @@ class DDIMScheduler(ConfigMixin):
 
         if eta > 0:
             if variance_noise is None:
-                variance_noise = np.random.randn(**model_output.shape)
-            variance = (
-                self._get_variance(timestep, prev_timestep) ** (0.5)
-                * eta
-                * variance_noise
-            )
+                variance_noise = generator.normal(
+                    loc=0.0, scale=1.0, size=model_output.shape
+                ).astype(model_output.dtype)
+            variance = std_dev_t * variance_noise
 
             prev_sample = prev_sample + variance
 

@@ -1,16 +1,11 @@
-import os
-import shutil
-import subprocess
 import sys
-import tempfile
 from logging import getLogger
+from typing import Optional
 
 import ailia
-import cv2
-import librosa
 import numpy as np
-import soundfile as sf
 import tqdm
+from moviepy.editor import AudioFileClip, VideoClip
 
 # import original modules
 sys.path.append("../../util")
@@ -27,8 +22,10 @@ logger = getLogger(__name__)
 
 WEIGHT_REF_UNET_PATH = "reference_unet.onnx"
 WEIGHT_DENOISE_PATH = "denoising_unet.onnx"
+WEIGHT_VAE_DEC_PATH = "vae_decoder.onnx"
 MODEL_REF_UNET_PATH = "reference_unet.onnx.prototxt"
 MODEL_DENOISE_PATH = "denoising_unet.onnx.prototxt"
+MODEL_VAE_DEC_PATH = "vae_decoder.onnx.prototxt"
 WEIGHT_DENOISE_PB_PATH = "denoising_unet_weights.pb"
 
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/hallo/"
@@ -69,20 +66,57 @@ args.input = parser.parse_args().input
 class FaceAnimatePipeline:
     def __init__(
         self,
+        vae_decoder,
         reference_unet,
         denoising_unet,
         scheduler,
         use_onnx: bool = False,
     ):
+        self.vae_decoder = vae_decoder
         self.reference_unet = reference_unet
         self.denoising_unet = denoising_unet
         self.scheduler = scheduler
         self.use_onnx = use_onnx
 
+    def decode_latents(self, latents):
+        """
+        Decode the latents to produce a video.
+        """
+        video_length = latents.shape[2]  # f
+        latents = latents / 0.18215
+
+        # b c f h w -> (b f) c h w
+        b, c, f, h, w = latents.shape
+        latents = latents.transpose(0, 2, 1, 3, 4)
+        latents = latents.reshape(b * f, c, h, w)
+
+        video = []
+        for i in tqdm.tqdm(range(latents.shape[0])):
+            z = latents[i : i + 1]
+            if not self.use_onnx:
+                output = self.vae_decoder.predict([z])
+            else:
+                output = self.vae_decoder.run(None, {"z": z})
+            decoded = output[0]
+            video.append(decoded)
+        video = np.concatenate(video, axis=0)
+
+        # (b f) c h w -> b c f h w
+        b = video.shape[0] // video_length
+        f = video_length
+        c, h, w = video.shape[1:]
+        video = video.reshape(b, f, c, h, w)
+        video = video.transpose(0, 2, 1, 3, 4)
+
+        video = np.clip(video / 2 + 0.5, 0, 1)
+        return video
+
     def forward(
         self,
         num_inference_steps,
         guidance_scale,
+        eta: float = 0.0,
+        generator: Optional[np.random.Generator] = None,
     ):
         motion_scale = np.array([1.0, 1.0, 1.0], dtype=np.float32)
 
@@ -132,7 +166,7 @@ class FaceAnimatePipeline:
                 # Forward reference image
                 if i == 0:
                     # feedforward
-                    if not args.onnx:
+                    if not self.use_onnx:
                         output = self.reference_unet.predict(
                             [
                                 np.repeat(
@@ -168,7 +202,7 @@ class FaceAnimatePipeline:
                 )
                 latent_model_input = np.load("latent_model_input.npy")
 
-                if not args.onnx:
+                if not self.use_onnx:
                     output = self.denoising_unet.predict(
                         [
                             latent_model_input,
@@ -210,6 +244,35 @@ class FaceAnimatePipeline:
                     )
                 noise_pred = output[0]
 
+                # perform guidance
+                if do_classifier_free_guidance:
+                    noise_pred_uncond, noise_pred_text = np.split(noise_pred, 2, axis=0)
+                    noise_pred = noise_pred_uncond + guidance_scale * (
+                        noise_pred_text - noise_pred_uncond
+                    )
+
+                # compute the previous noisy sample x_t -> x_t-1
+                latents = self.scheduler.step(
+                    noise_pred,
+                    t,
+                    latents,
+                    eta=eta,
+                    generator=generator,
+                )
+
+                # call the callback, if provided
+                if (
+                    i == len(timesteps) - 1
+                    or (i + 1) > num_warmup_steps
+                    and (i + 1) % self.scheduler.order == 0
+                ):
+                    progress_bar.update()
+
+        # Post-processing
+        images = self.decode_latents(latents)  # (b, c, f, h, w)
+
+        return images
+
     def progress_bar(self, iterable=None, total=None):
         from tqdm.auto import tqdm
 
@@ -222,10 +285,28 @@ class FaceAnimatePipeline:
 def recognize_from_video(pipe: FaceAnimatePipeline):
     logger.info("Start inference...")
 
-    videos = pipe.forward(
-        num_inference_steps=40,
-        guidance_scale=3.5,
-    )
+    # 3.2 prepare audio embeddings
+    audio_emb, audio_length = None, 188
+
+    times = 12
+
+    tensor_result = []
+
+    generator = np.random.default_rng(42)
+
+    for t in range(times):
+        print(f"[{t+1}/{times}]")
+
+        videos = pipe.forward(
+            num_inference_steps=40,
+            guidance_scale=3.5,
+            generator=generator,
+        )
+        tensor_result.append(videos)
+
+    tensor_result = np.concatenate(tensor_result, axis=2)
+    tensor_result = tensor_result.squeeze(0)
+    tensor_result = tensor_result[:, :audio_length]
 
     logger.info("Script finished successfully.")
 
@@ -257,6 +338,12 @@ def main():
             env_id=env_id,
             memory_mode=memory_mode,
         )
+        vae_decoder = ailia.Net(
+            MODEL_VAE_DEC_PATH,
+            WEIGHT_VAE_DEC_PATH,
+            env_id=env_id,
+            memory_mode=memory_mode,
+        )
     else:
         import onnxruntime
 
@@ -275,13 +362,15 @@ def main():
             providers=providers,
             # sess_options=so,
         )
+        vae_decoder = onnxruntime.InferenceSession(
+            WEIGHT_VAE_DEC_PATH, providers=providers
+        )
 
     scheduler = df.schedulers.DDIMScheduler.from_config(
         {
             "beta_start": 0.00085,
             "beta_end": 0.012,
             "beta_schedule": "linear",
-            "clip_sample": False,
             "steps_offset": 1,
             "prediction_type": "v_prediction",
             "rescale_betas_zero_snr": True,
@@ -292,6 +381,7 @@ def main():
     pipe = FaceAnimatePipeline(
         reference_unet=reference_unet,
         denoising_unet=denoising_unet,
+        vae_decoder=vae_decoder,
         scheduler=scheduler,
         use_onnx=args.onnx,
     )
