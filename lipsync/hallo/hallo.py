@@ -1,6 +1,6 @@
 import sys
 from logging import getLogger
-from typing import Optional
+from typing import List, Optional
 
 import ailia
 import numpy as np
@@ -23,9 +23,13 @@ logger = getLogger(__name__)
 WEIGHT_REF_UNET_PATH = "reference_unet.onnx"
 WEIGHT_DENOISE_PATH = "denoising_unet.onnx"
 WEIGHT_VAE_DEC_PATH = "vae_decoder.onnx"
+WEIGHT_AUDIO_PROJ_PATH = "audio_proj.onnx"
+WEIGHT_IMAGE_PROJ_PATH = "image_proj.onnx"
 MODEL_REF_UNET_PATH = "reference_unet.onnx.prototxt"
 MODEL_DENOISE_PATH = "denoising_unet.onnx.prototxt"
 MODEL_VAE_DEC_PATH = "vae_decoder.onnx.prototxt"
+MODEL_AUDIO_PROJ_PATH = "audio_proj.onnx.prototxt"
+MODEL_IMAGE_PROJ_PATH = "image_proj.onnx.prototxt"
 WEIGHT_DENOISE_PB_PATH = "denoising_unet_weights.pb"
 
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/hallo/"
@@ -56,11 +60,50 @@ args.input = parser.parse_args().input
 # ======================
 
 
+def tensor_to_video(tensor, output_video_file, audio_source, fps=25):
+    """
+    Converts a Tensor with shape [c, f, h, w] into a video and adds an audio track from the specified audio file.
+
+    Args:
+        tensor (Tensor): The Tensor to be converted, shaped [c, f, h, w].
+        output_video_file (str): The file path where the output video will be saved.
+        audio_source (str): The path to the audio file (WAV file) that contains the audio track to be added.
+        fps (int): The frame rate of the output video. Default is 25 fps.
+    """
+    tensor = tensor.transpose(1, 2, 3, 0)  # convert to [f, h, w, c]
+    tensor = np.clip(tensor * 255, 0, 255).astype(np.uint8)  # to [0, 255]
+
+    def make_frame(t):
+        # get index
+        frame_index = min(int(t * fps), tensor.shape[0] - 1)
+        return tensor[frame_index]
+
+    new_video_clip = VideoClip(make_frame, duration=tensor.shape[0] / fps)
+    audio_clip = AudioFileClip(audio_source).subclip(0, tensor.shape[0] / fps)
+    new_video_clip = new_video_clip.set_audio(audio_clip)
+    new_video_clip.write_videofile(output_video_file, fps=fps, audio_codec="aac")
 
 
 # ======================
 # Main functions
 # ======================
+
+
+def process_audio_emb(audio_emb):
+    """
+    Process the audio embedding to concatenate with other tensors.
+    """
+    concatenated_tensors = []
+
+    for i in range(audio_emb.shape[0]):
+        vectors_to_concat = [
+            audio_emb[max(min(i + j, audio_emb.shape[0] - 1), 0)] for j in range(-2, 3)
+        ]
+        concatenated_tensors.append(np.stack(vectors_to_concat, axis=0))
+
+    audio_emb = np.stack(concatenated_tensors, axis=0)
+
+    return audio_emb
 
 
 class FaceAnimatePipeline:
@@ -70,12 +113,16 @@ class FaceAnimatePipeline:
         reference_unet,
         denoising_unet,
         scheduler,
+        image_proj,
+        audio_proj,
         use_onnx: bool = False,
     ):
         self.vae_decoder = vae_decoder
         self.reference_unet = reference_unet
         self.denoising_unet = denoising_unet
         self.scheduler = scheduler
+        self.image_proj = image_proj
+        self.audio_proj = audio_proj
         self.use_onnx = use_onnx
 
     def decode_latents(self, latents):
@@ -113,12 +160,28 @@ class FaceAnimatePipeline:
 
     def forward(
         self,
+        ref_image,
+        audio_tensor,
+        face_emb,
+        face_mask,
+        pixel_values_full_mask,
+        pixel_values_face_mask,
+        pixel_values_lip_mask,
+        width,
+        height,
+        video_length,
         num_inference_steps,
         guidance_scale,
+        motion_scale: np.ndarray,
+        num_images_per_prompt=1,
         eta: float = 0.0,
         generator: Optional[np.random.Generator] = None,
     ):
-        motion_scale = np.array([1.0, 1.0, 1.0], dtype=np.float32)
+        if not args.onnx:
+            output = self.audio_proj.predict([audio_tensor])
+        else:
+            output = self.audio_proj.run(None, {"audio_embeds": audio_tensor})
+        audio_tensor = output[0]
 
         # Prepare timesteps
         self.scheduler.set_timesteps(num_inference_steps)
@@ -128,8 +191,23 @@ class FaceAnimatePipeline:
 
         batch_size = 1
 
-        encoder_hidden_states = np.load("encoder_hidden_states.npy")
-        uncond_encoder_hidden_states = np.load("uncond_encoder_hidden_states.npy")
+        # prepare clip image embeddings
+        clip_image_embeds = face_emb
+        clip_image_embeds = clip_image_embeds.astype(np.float16)
+
+        if not args.onnx:
+            output = self.image_proj.predict([clip_image_embeds])
+        else:
+            output = self.image_proj.run(None, {"image_embeds": clip_image_embeds})
+        encoder_hidden_states = output[0]
+
+        if not args.onnx:
+            output = self.image_proj.predict([np.zeros_like(clip_image_embeds)])
+        else:
+            output = self.image_proj.run(
+                None, {"image_embeds": np.zeros_like(clip_image_embeds)}
+            )
+        uncond_encoder_hidden_states = output[0]
 
         if do_classifier_free_guidance:
             encoder_hidden_states = np.concatenate(
@@ -192,7 +270,6 @@ class FaceAnimatePipeline:
                             },
                         )
                     _, *bank = output
-                bank = [np.load("bank_%d.npy" % i) for i in range(16)]
 
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = (
@@ -213,7 +290,7 @@ class FaceAnimatePipeline:
                             *pixel_values_full_mask,
                             *pixel_values_face_mask,
                             *pixel_values_lip_mask,
-                            np.array(motion_scale),
+                            motion_scale,
                             *bank,
                         ]
                     )
@@ -285,22 +362,93 @@ class FaceAnimatePipeline:
 def recognize_from_video(pipe: FaceAnimatePipeline):
     logger.info("Start inference...")
 
+    # 1. config
+    motion_scale = np.array([1.0, 1.0, 1.0], dtype=np.float32)
+
+    # 3. prepare inference data
+    # 3.1 prepare source image, face mask, face embeddings
+    clip_length = 16
+    if 1:
+        (
+            source_image_pixels,
+            source_image_face_region,
+            source_image_face_emb,
+            source_image_full_mask,
+            source_image_face_mask,
+            source_image_lip_mask,
+        ) = (
+            np.load("data/source_image_pixels.npy"),
+            np.load("data/source_image_face_region.npy"),
+            np.load("data/source_image_face_emb.npy"),
+            [np.load("data/source_image_full_mask_%d.npy" % i) for i in range(4)],
+            [np.load("data/source_image_face_mask_%d.npy" % i) for i in range(4)],
+            [np.load("data/source_image_lip_mask_%d.npy" % i) for i in range(4)],
+        )
+
     # 3.2 prepare audio embeddings
-    audio_emb, audio_length = None, 188
+    audio_emb, audio_length = np.load("data/audio_emb.npy"), 188
 
-    times = 12
+    # 5. inference
+    audio_emb = process_audio_emb(audio_emb)
 
-    tensor_result = []
+    source_image_pixels = np.expand_dims(source_image_pixels, axis=0)
+    source_image_face_region = np.expand_dims(source_image_face_region, axis=0)
+    source_image_face_emb = source_image_face_emb.reshape(1, -1)
 
+    source_image_full_mask = [
+        np.tile(mask, (clip_length, 1)) for mask in source_image_full_mask
+    ]
+    source_image_face_mask = [
+        np.tile(mask, (clip_length, 1)) for mask in source_image_face_mask
+    ]
+    source_image_lip_mask = [
+        np.tile(mask, (clip_length, 1)) for mask in source_image_lip_mask
+    ]
+
+    n_motion_frames = 2
     generator = np.random.default_rng(42)
 
+    times = audio_emb.shape[0] // clip_length
+    tensor_result = []
     for t in range(times):
         print(f"[{t+1}/{times}]")
 
+        if len(tensor_result) == 0:
+            # The first iteration
+            motion_zeros = np.tile(source_image_pixels, (n_motion_frames, 1, 1, 1))
+            motion_zeros = motion_zeros.astype(dtype=source_image_pixels.dtype)
+            pixel_values_ref_img = np.concatenate(
+                [source_image_pixels, motion_zeros], axis=0
+            )  # concat the ref image and the first motion frames
+        else:
+            motion_frames = tensor_result[-1][0]
+            motion_frames = motion_frames.transpose(1, 0, 2, 3)
+            motion_frames = motion_frames[0 - n_motion_frames :]
+            motion_frames = motion_frames * 2.0 - 1.0
+            motion_frames = motion_frames.astype(dtype=source_image_pixels.dtype)
+            pixel_values_ref_img = np.concatenate(
+                [source_image_pixels, motion_frames], axis=0
+            )  # concat the ref image and the motion frames
+        pixel_values_ref_img = np.expand_dims(pixel_values_ref_img, axis=0)
+
+        audio_tensor = audio_emb[
+            t * clip_length : min((t + 1) * clip_length, audio_emb.shape[0])
+        ]
+        audio_tensor = np.expand_dims(audio_tensor, axis=0)
+        audio_tensor = audio_tensor.astype(dtype=np.float16)
+
         videos = pipe.forward(
+            ref_image=pixel_values_ref_img,
+            audio_tensor=audio_tensor,
+            face_emb=source_image_face_emb,
+            face_mask=source_image_face_region,
+            pixel_values_full_mask=source_image_full_mask,
+            pixel_values_face_mask=source_image_face_mask,
+            pixel_values_lip_mask=source_image_lip_mask,
             num_inference_steps=40,
             guidance_scale=3.5,
             generator=generator,
+            motion_scale=motion_scale,
         )
         tensor_result.append(videos)
 
@@ -314,6 +462,12 @@ def recognize_from_video(pipe: FaceAnimatePipeline):
 def main():
     check_and_download_models(WEIGHT_REF_UNET_PATH, MODEL_REF_UNET_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_DENOISE_PATH, MODEL_DENOISE_PATH, REMOTE_PATH)
+    check_and_download_models(
+        WEIGHT_AUDIO_PROJ_PATH, MODEL_AUDIO_PROJ_PATH, REMOTE_PATH
+    )
+    check_and_download_models(
+        WEIGHT_IMAGE_PROJ_PATH, MODEL_IMAGE_PROJ_PATH, REMOTE_PATH
+    )
     check_and_download_file(WEIGHT_DENOISE_PB_PATH, REMOTE_PATH)
 
     env_id = args.env_id
@@ -344,6 +498,18 @@ def main():
             env_id=env_id,
             memory_mode=memory_mode,
         )
+        image_proj = ailia.Net(
+            MODEL_IMAGE_PROJ_PATH,
+            WEIGHT_IMAGE_PROJ_PATH,
+            env_id=env_id,
+            memory_mode=memory_mode,
+        )
+        audio_proj = ailia.Net(
+            MODEL_AUDIO_PROJ_PATH,
+            WEIGHT_AUDIO_PROJ_PATH,
+            env_id=env_id,
+            memory_mode=memory_mode,
+        )
     else:
         import onnxruntime
 
@@ -365,6 +531,12 @@ def main():
         vae_decoder = onnxruntime.InferenceSession(
             WEIGHT_VAE_DEC_PATH, providers=providers
         )
+        image_proj = onnxruntime.InferenceSession(
+            WEIGHT_IMAGE_PROJ_PATH, providers=providers
+        )
+        audio_proj = onnxruntime.InferenceSession(
+            WEIGHT_AUDIO_PROJ_PATH, providers=providers
+        )
 
     scheduler = df.schedulers.DDIMScheduler.from_config(
         {
@@ -379,10 +551,12 @@ def main():
     )
 
     pipe = FaceAnimatePipeline(
+        vae_decoder=vae_decoder,
         reference_unet=reference_unet,
         denoising_unet=denoising_unet,
-        vae_decoder=vae_decoder,
         scheduler=scheduler,
+        image_proj=image_proj,
+        audio_proj=audio_proj,
         use_onnx=args.onnx,
     )
 
