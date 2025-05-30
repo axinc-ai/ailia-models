@@ -6,6 +6,7 @@ import ailia
 import numpy as np
 import tqdm
 from moviepy.editor import AudioFileClip, VideoClip
+from PIL import Image
 
 # import original modules
 sys.path.append("../../util")
@@ -20,14 +21,16 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
+WEIGHT_VAE_ENC_PATH = "vae_encoder.onnx"
+WEIGHT_VAE_DEC_PATH = "vae_decoder.onnx"
 WEIGHT_REF_UNET_PATH = "reference_unet.onnx"
 WEIGHT_DENOISE_PATH = "denoising_unet.onnx"
-WEIGHT_VAE_DEC_PATH = "vae_decoder.onnx"
 WEIGHT_AUDIO_PROJ_PATH = "audio_proj.onnx"
 WEIGHT_IMAGE_PROJ_PATH = "image_proj.onnx"
+MODEL_VAE_ENC_PATH = "vae_encoder.onnx.prototxt"
+MODEL_VAE_DEC_PATH = "vae_decoder.onnx.prototxt"
 MODEL_REF_UNET_PATH = "reference_unet.onnx.prototxt"
 MODEL_DENOISE_PATH = "denoising_unet.onnx.prototxt"
-MODEL_VAE_DEC_PATH = "vae_decoder.onnx.prototxt"
 MODEL_AUDIO_PROJ_PATH = "audio_proj.onnx.prototxt"
 MODEL_IMAGE_PROJ_PATH = "image_proj.onnx.prototxt"
 WEIGHT_DENOISE_PB_PATH = "denoising_unet_weights.pb"
@@ -109,21 +112,68 @@ def process_audio_emb(audio_emb):
 class FaceAnimatePipeline:
     def __init__(
         self,
+        vae_encoder,
         vae_decoder,
         reference_unet,
         denoising_unet,
+        face_locator,
         scheduler,
         image_proj,
         audio_proj,
         use_onnx: bool = False,
     ):
+        self.vae_encoder = vae_encoder
         self.vae_decoder = vae_decoder
         self.reference_unet = reference_unet
         self.denoising_unet = denoising_unet
+        self.face_locator = face_locator
         self.scheduler = scheduler
         self.image_proj = image_proj
         self.audio_proj = audio_proj
+
         self.use_onnx = use_onnx
+
+        self.vae_scale_factor = 8  # VAE downscaling factor
+
+    def image_processor(self, image, height, width):
+        width, height = (x - x % self.vae_scale_factor for x in (width, height))
+
+        N, C, *_ = image.shape
+        resized = np.zeros((N, C, height, width), dtype=image.dtype)
+        for n in range(N):
+            for c in range(C):
+                resized[n, c] = np.array(
+                    Image.fromarray(image[n, c]).resize(
+                        (width, height), Image.Resampling.BICUBIC
+                    )
+                )
+
+        return resized
+
+    def prepare_latents(
+        self,
+        batch_size: int,  # Number of videos to generate in parallel
+        num_channels_latents: int,  # Number of channels in the latents
+        width: int,  # Width of the video frame
+        height: int,  # Height of the video frame
+        video_length: int,  # Length of the video in frames
+        generator: np.random.Generator,  # Random number generator for reproducibility
+    ):
+        """
+        Prepares the initial latents for video generation.
+        """
+        shape = (
+            batch_size,
+            num_channels_latents,
+            video_length,
+            height // self.vae_scale_factor,
+            width // self.vae_scale_factor,
+        )
+        latents = generator.normal(loc=0.0, scale=1.0, size=shape).astype(np.float16)
+
+        # scale the initial noise by the standard deviation required by the scheduler
+        latents = latents * self.scheduler.init_noise_sigma
+        return latents
 
     def decode_latents(self, latents):
         """
@@ -213,9 +263,45 @@ class FaceAnimatePipeline:
             encoder_hidden_states = np.concatenate(
                 [uncond_encoder_hidden_states, encoder_hidden_states], axis=0
             )
-        latents = np.load("latents.npy")
 
-        ref_image_latents = np.load("ref_image_latents.npy")
+        num_channels_latents = 4
+        latents = self.prepare_latents(
+            batch_size * num_images_per_prompt,
+            num_channels_latents,
+            width,
+            height,
+            video_length,
+            generator,
+        )
+
+        # Prepare ref image latents
+        ## b f c h w -> (b f) c h w
+        b, f, c, h, w = ref_image.shape
+        ref_image_tensor = ref_image.reshape(b * f, c, h, w)
+        ref_image_tensor = self.image_processor(
+            ref_image_tensor, height=height, width=width
+        )  # (bs, c, width, height)
+        ref_image_tensor = ref_image_tensor.astype(dtype=np.float16)
+
+        if not args.onnx:
+            output = self.vae_encoder.predict([ref_image_tensor])
+        else:
+            output = self.vae_encoder.run(None, {"x": ref_image_tensor})
+        ref_image_latents = output[0]
+
+        ref_image_latents = ref_image_latents * 0.18215  # (b, 4, h, w)
+
+        face_mask = np.expand_dims(face_mask, axis=1).astype(
+            dtype=np.float16
+        )  # (bs, f, c, H, W)
+        face_mask = np.repeat(face_mask, video_length, axis=1)
+        face_mask = face_mask.transpose(0, 2, 1, 3, 4)
+
+        if not args.onnx:
+            output = self.face_locator.predict([face_mask])
+        else:
+            output = self.face_locator.run(None, {"face_mask": face_mask})
+        face_mask = output[0]
 
         face_mask = (
             np.concatenate([np.zeros_like(face_mask), face_mask], axis=0)
@@ -226,16 +312,7 @@ class FaceAnimatePipeline:
         audio_tensor = np.load("audio_tensor.npy")
         uncond_audio_tensor = np.zeros_like(audio_tensor)
         audio_tensor = np.concatenate([uncond_audio_tensor, audio_tensor], axis=0)
-
-        pixel_values_full_mask = [
-            np.load("pixel_values_full_mask_%d.npy" % i) for i in range(4)
-        ]
-        pixel_values_face_mask = [
-            np.load("pixel_values_face_mask_%d.npy" % i) for i in range(4)
-        ]
-        pixel_values_lip_mask = [
-            np.load("pixel_values_lip_mask_%d.npy" % i) for i in range(4)
-        ]
+        audio_tensor = audio_tensor.astype(dtype=np.float16)
 
         # denoising loop
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
@@ -277,7 +354,6 @@ class FaceAnimatePipeline:
                     if do_classifier_free_guidance
                     else latents
                 )
-                latent_model_input = np.load("latent_model_input.npy")
 
                 if not self.use_onnx:
                     output = self.denoising_unet.predict(
@@ -367,6 +443,7 @@ def recognize_from_video(pipe: FaceAnimatePipeline):
 
     # 3. prepare inference data
     # 3.1 prepare source image, face mask, face embeddings
+    img_size = (512, 512)
     clip_length = 16
     if 1:
         (
@@ -445,6 +522,9 @@ def recognize_from_video(pipe: FaceAnimatePipeline):
             pixel_values_full_mask=source_image_full_mask,
             pixel_values_face_mask=source_image_face_mask,
             pixel_values_lip_mask=source_image_lip_mask,
+            width=img_size[0],
+            height=img_size[1],
+            video_length=clip_length,
             num_inference_steps=40,
             guidance_scale=3.5,
             generator=generator,
@@ -460,6 +540,8 @@ def recognize_from_video(pipe: FaceAnimatePipeline):
 
 
 def main():
+    check_and_download_models(WEIGHT_VAE_ENC_PATH, MODEL_VAE_ENC_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_VAE_DEC_PATH, MODEL_VAE_DEC_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_REF_UNET_PATH, MODEL_REF_UNET_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_DENOISE_PATH, MODEL_DENOISE_PATH, REMOTE_PATH)
     check_and_download_models(
@@ -480,6 +562,18 @@ def main():
             reduce_interstage=False,
             reuse_interstage=True,
         )
+        vae_encoder = ailia.Net(
+            MODEL_VAE_ENC_PATH,
+            WEIGHT_VAE_ENC_PATH,
+            env_id=env_id,
+            memory_mode=memory_mode,
+        )
+        vae_decoder = ailia.Net(
+            MODEL_VAE_DEC_PATH,
+            WEIGHT_VAE_DEC_PATH,
+            env_id=env_id,
+            memory_mode=memory_mode,
+        )
         reference_unet = ailia.Net(
             MODEL_REF_UNET_PATH,
             WEIGHT_REF_UNET_PATH,
@@ -492,12 +586,7 @@ def main():
             env_id=env_id,
             memory_mode=memory_mode,
         )
-        vae_decoder = ailia.Net(
-            MODEL_VAE_DEC_PATH,
-            WEIGHT_VAE_DEC_PATH,
-            env_id=env_id,
-            memory_mode=memory_mode,
-        )
+        face_locator = None
         image_proj = ailia.Net(
             MODEL_IMAGE_PROJ_PATH,
             WEIGHT_IMAGE_PROJ_PATH,
@@ -520,6 +609,12 @@ def main():
 
         providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
 
+        vae_encoder = onnxruntime.InferenceSession(
+            WEIGHT_VAE_ENC_PATH, providers=providers
+        )
+        vae_decoder = onnxruntime.InferenceSession(
+            WEIGHT_VAE_DEC_PATH, providers=providers
+        )
         reference_unet = onnxruntime.InferenceSession(
             WEIGHT_REF_UNET_PATH, providers=providers
         )
@@ -528,9 +623,7 @@ def main():
             providers=providers,
             # sess_options=so,
         )
-        vae_decoder = onnxruntime.InferenceSession(
-            WEIGHT_VAE_DEC_PATH, providers=providers
-        )
+        face_locator = None
         image_proj = onnxruntime.InferenceSession(
             WEIGHT_IMAGE_PROJ_PATH, providers=providers
         )
@@ -551,9 +644,11 @@ def main():
     )
 
     pipe = FaceAnimatePipeline(
+        vae_encoder=vae_encoder,
         vae_decoder=vae_decoder,
         reference_unet=reference_unet,
         denoising_unet=denoising_unet,
+        face_locator=face_locator,
         scheduler=scheduler,
         image_proj=image_proj,
         audio_proj=audio_proj,
