@@ -25,12 +25,14 @@ WEIGHT_VAE_ENC_PATH = "vae_encoder.onnx"
 WEIGHT_VAE_DEC_PATH = "vae_decoder.onnx"
 WEIGHT_REF_UNET_PATH = "reference_unet.onnx"
 WEIGHT_DENOISE_PATH = "denoising_unet.onnx"
+WEIGHT_FACE_LOC_PATH = "face_locator.onnx"
 WEIGHT_AUDIO_PROJ_PATH = "audio_proj.onnx"
 WEIGHT_IMAGE_PROJ_PATH = "image_proj.onnx"
 MODEL_VAE_ENC_PATH = "vae_encoder.onnx.prototxt"
 MODEL_VAE_DEC_PATH = "vae_decoder.onnx.prototxt"
 MODEL_REF_UNET_PATH = "reference_unet.onnx.prototxt"
 MODEL_DENOISE_PATH = "denoising_unet.onnx.prototxt"
+MODEL_FACE_LOC_PATH = "face_locator.onnx.prototxt"
 MODEL_AUDIO_PROJ_PATH = "audio_proj.onnx.prototxt"
 MODEL_IMAGE_PROJ_PATH = "image_proj.onnx.prototxt"
 WEIGHT_DENOISE_PB_PATH = "denoising_unet_weights.pb"
@@ -300,7 +302,7 @@ class FaceAnimatePipeline:
         if not args.onnx:
             output = self.face_locator.predict([face_mask])
         else:
-            output = self.face_locator.run(None, {"face_mask": face_mask})
+            output = self.face_locator.run(None, {"conditioning": face_mask})
         face_mask = output[0]
 
         face_mask = (
@@ -308,6 +310,24 @@ class FaceAnimatePipeline:
             if do_classifier_free_guidance
             else face_mask
         )
+        pixel_values_full_mask = (
+            [np.concatenate([mask] * 2) for mask in pixel_values_full_mask]
+            if do_classifier_free_guidance
+            else pixel_values_full_mask
+        )
+        pixel_values_face_mask = (
+            [np.concatenate([mask] * 2) for mask in pixel_values_face_mask]
+            if do_classifier_free_guidance
+            else pixel_values_face_mask
+        )
+        pixel_values_lip_mask = (
+            [np.concatenate([mask] * 2) for mask in pixel_values_lip_mask]
+            if do_classifier_free_guidance
+            else pixel_values_lip_mask
+        )
+        pixel_values_full_mask = [x.astype(np.float16) for x in pixel_values_full_mask]
+        pixel_values_face_mask = [x.astype(np.float16) for x in pixel_values_face_mask]
+        pixel_values_lip_mask = [x.astype(np.float16) for x in pixel_values_lip_mask]
 
         audio_tensor = np.load("audio_tensor.npy")
         uncond_audio_tensor = np.zeros_like(audio_tensor)
@@ -586,7 +606,12 @@ def main():
             env_id=env_id,
             memory_mode=memory_mode,
         )
-        face_locator = None
+        face_locator = ailia.Net(
+            MODEL_FACE_LOC_PATH,
+            WEIGHT_FACE_LOC_PATH,
+            env_id=env_id,
+            memory_mode=memory_mode,
+        )
         image_proj = ailia.Net(
             MODEL_IMAGE_PROJ_PATH,
             WEIGHT_IMAGE_PROJ_PATH,
@@ -623,7 +648,9 @@ def main():
             providers=providers,
             # sess_options=so,
         )
-        face_locator = None
+        face_locator = onnxruntime.InferenceSession(
+            WEIGHT_FACE_LOC_PATH, providers=providers_cpu
+        )
         image_proj = onnxruntime.InferenceSession(
             WEIGHT_IMAGE_PROJ_PATH, providers=providers
         )
