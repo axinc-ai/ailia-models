@@ -1,18 +1,24 @@
 import sys
 from logging import getLogger
-from typing import List, Optional
+from typing import Optional
 
 import ailia
+import cv2
 import numpy as np
 import tqdm
+from insightface.app import FaceAnalysis
 from moviepy.editor import AudioFileClip, VideoClip
 from PIL import Image
 
 # import original modules
 sys.path.append("../../util")
+
 import df
-from arg_utils import get_base_parser, get_savepath, update_parser  # noqa
-from model_utils import check_and_download_file, check_and_download_models  # noqa
+from arg_utils import get_base_parser, get_savepath, update_parser
+from detector_utils import load_image
+from image_utils import normalize_image
+from model_utils import check_and_download_file, check_and_download_models
+from util_hallo import get_mask
 
 logger = getLogger(__name__)
 
@@ -92,6 +98,129 @@ def tensor_to_video(tensor, output_video_file, audio_source, fps=25):
 # ======================
 # Main functions
 # ======================
+
+
+def transform(img, width, height):
+    img = np.array(
+        Image.fromarray(img).resize((width, height), Image.Resampling.BILINEAR)
+    )
+
+    if img.ndim < 3:
+        img = np.expand_dims(img, axis=2)
+
+    img = img / 255
+    img = img.transpose(2, 0, 1)  # HWC -> CHW
+    img = img.astype(np.float32)
+
+    return img
+
+
+def image_processor(img):
+    height = width = IMAGE_SIZE
+    img_rgb = np.ascontiguousarray(img[:, :, ::-1])  # BGR to RGB
+
+    _img = np.array(
+        Image.fromarray(img_rgb).resize((width, height), Image.Resampling.BILINEAR)
+    )
+    _img = normalize_image(_img, normalize_type="127.5")
+    _img = _img.transpose(2, 0, 1)  # HWC -> CHW
+    _img = _img.astype(np.float32)
+    pixel_values_ref_img = _img
+
+    face_analysis_model_path = "./face_analysis/"
+    face_analysis = FaceAnalysis(
+        name="",
+        root=face_analysis_model_path,
+        providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
+    )
+    face_analysis.prepare(ctx_id=0, det_size=(640, 640))
+
+    # 2.1 detect face
+    faces = face_analysis.get(img)
+    if not faces:
+        print(
+            "No faces detected in the image. Using the entire image as the face region."
+        )
+        # Use the entire image as the face region
+        face = {
+            "bbox": [0, 0, img.shape[1], img.shape[0]],
+            "embedding": np.zeros(512),
+        }
+    else:
+        # Sort faces by size and select the largest one
+        faces_sorted = sorted(
+            faces,
+            key=lambda x: (x["bbox"][2] - x["bbox"][0]) * (x["bbox"][3] - x["bbox"][1]),
+            reverse=True,
+        )
+        face = faces_sorted[0]  # Select the largest face
+
+    """
+    Closes the ImageProcessor and releases any resources held by the FaceAnalysis instance.
+    """
+    for _, model in face_analysis.models.items():
+        if hasattr(model, "Dispose"):
+            model.Dispose()
+
+    # 2.2 face embedding
+    face_emb = face["embedding"]
+
+    # 2.3 render face mask
+    face_region_ratio = 1.2
+    (face_mask, sep_lip_mask, sep_background_mask, sep_face_mask) = get_mask(
+        img_rgb, face_region_ratio
+    )
+    face_mask = np.repeat(face_mask[:, :, np.newaxis], 3, axis=2)
+
+    # 2.4 detect and expand lip, face mask
+    face_mask = transform(face_mask, width, height)
+    pixel_values_face_mask = [
+        transform(sep_face_mask, width // 8, height // 8),
+        transform(sep_face_mask, width // 16, height // 16),
+        transform(sep_face_mask, width // 32, height // 32),
+        transform(sep_face_mask, width // 64, height // 64),
+    ]
+    pixel_values_lip_mask = [
+        transform(sep_lip_mask, width // 8, height // 8),
+        transform(sep_lip_mask, width // 16, height // 16),
+        transform(sep_lip_mask, width // 32, height // 32),
+        transform(sep_lip_mask, width // 64, height // 64),
+    ]
+    pixel_values_full_mask = [
+        transform(sep_background_mask, width // 8, height // 8),
+        transform(sep_background_mask, width // 16, height // 16),
+        transform(sep_background_mask, width // 32, height // 32),
+        transform(sep_background_mask, width // 64, height // 64),
+    ]
+
+    pixel_values_full_mask = [mask.reshape(1, -1) for mask in pixel_values_full_mask]
+    pixel_values_face_mask = [mask.reshape(1, -1) for mask in pixel_values_face_mask]
+    pixel_values_lip_mask = [mask.reshape(1, -1) for mask in pixel_values_lip_mask]
+
+    (
+        pixel_values_ref_img,
+        face_mask,
+        face_emb,
+        pixel_values_full_mask,
+        pixel_values_face_mask,
+        pixel_values_lip_mask,
+    ) = (
+        np.load("data/source_image_pixels.npy"),
+        np.load("data/source_image_face_region.npy"),
+        np.load("data/source_image_face_emb.npy"),
+        [np.load("data/source_image_full_mask_%d.npy" % i) for i in range(4)],
+        [np.load("data/source_image_face_mask_%d.npy" % i) for i in range(4)],
+        [np.load("data/source_image_lip_mask_%d.npy" % i) for i in range(4)],
+    )
+
+    return (
+        pixel_values_ref_img,
+        face_mask,
+        face_emb,
+        pixel_values_full_mask,
+        pixel_values_face_mask,
+        pixel_values_lip_mask,
+    )
 
 
 def process_audio_emb(audio_emb):
@@ -197,6 +326,7 @@ class FaceAnimatePipeline:
             else:
                 output = self.vae_decoder.run(None, {"z": z})
             decoded = output[0]
+            del output
             video.append(decoded)
         video = np.concatenate(video, axis=0)
 
@@ -234,6 +364,7 @@ class FaceAnimatePipeline:
         else:
             output = self.audio_proj.run(None, {"audio_embeds": audio_tensor})
         audio_tensor = output[0]
+        del output
 
         # Prepare timesteps
         self.scheduler.set_timesteps(num_inference_steps)
@@ -260,6 +391,7 @@ class FaceAnimatePipeline:
                 None, {"image_embeds": np.zeros_like(clip_image_embeds)}
             )
         uncond_encoder_hidden_states = output[0]
+        del output
 
         if do_classifier_free_guidance:
             encoder_hidden_states = np.concatenate(
@@ -290,6 +422,7 @@ class FaceAnimatePipeline:
         else:
             output = self.vae_encoder.run(None, {"x": ref_image_tensor})
         ref_image_latents = output[0]
+        del output
 
         ref_image_latents = ref_image_latents * 0.18215  # (b, 4, h, w)
 
@@ -304,6 +437,7 @@ class FaceAnimatePipeline:
         else:
             output = self.face_locator.run(None, {"conditioning": face_mask})
         face_mask = output[0]
+        del output
 
         face_mask = (
             np.concatenate([np.zeros_like(face_mask), face_mask], axis=0)
@@ -367,6 +501,7 @@ class FaceAnimatePipeline:
                             },
                         )
                     _, *bank = output
+                    del output
 
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = (
@@ -416,6 +551,7 @@ class FaceAnimatePipeline:
                         },
                     )
                 noise_pred = output[0]
+                del output
 
                 # perform guidance
                 if do_classifier_free_guidance:
@@ -456,6 +592,11 @@ class FaceAnimatePipeline:
 
 
 def recognize_from_video(pipe: FaceAnimatePipeline):
+    image_path = args.input[0]
+    # prepare input data
+    image = load_image(image_path)
+    image = cv2.cvtColor(image, cv2.COLOR_BGRA2BGR)
+
     logger.info("Start inference...")
 
     # 1. config
@@ -465,22 +606,14 @@ def recognize_from_video(pipe: FaceAnimatePipeline):
     # 3.1 prepare source image, face mask, face embeddings
     img_size = (512, 512)
     clip_length = 16
-    if 1:
-        (
-            source_image_pixels,
-            source_image_face_region,
-            source_image_face_emb,
-            source_image_full_mask,
-            source_image_face_mask,
-            source_image_lip_mask,
-        ) = (
-            np.load("data/source_image_pixels.npy"),
-            np.load("data/source_image_face_region.npy"),
-            np.load("data/source_image_face_emb.npy"),
-            [np.load("data/source_image_full_mask_%d.npy" % i) for i in range(4)],
-            [np.load("data/source_image_face_mask_%d.npy" % i) for i in range(4)],
-            [np.load("data/source_image_lip_mask_%d.npy" % i) for i in range(4)],
-        )
+    (
+        source_image_pixels,
+        source_image_face_region,
+        source_image_face_emb,
+        source_image_full_mask,
+        source_image_face_mask,
+        source_image_lip_mask,
+    ) = image_processor(image)
 
     # 3.2 prepare audio embeddings
     audio_emb, audio_length = np.load("data/audio_emb.npy"), 188
