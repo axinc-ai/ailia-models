@@ -1,14 +1,17 @@
+import math
 import sys
 from logging import getLogger
 from typing import Optional
 
 import ailia
 import cv2
+import librosa
 import numpy as np
 import tqdm
 from insightface.app import FaceAnalysis
 from moviepy.editor import AudioFileClip, VideoClip
 from PIL import Image
+from transformers import Wav2Vec2FeatureExtractor
 
 # import original modules
 sys.path.append("../../util")
@@ -29,6 +32,7 @@ logger = getLogger(__name__)
 
 WEIGHT_VAE_ENC_PATH = "vae_encoder.onnx"
 WEIGHT_VAE_DEC_PATH = "vae_decoder.onnx"
+WEIGHT_AUDIO_ENC_PATH = "audio_encoder.onnx"
 WEIGHT_REF_UNET_PATH = "reference_unet.onnx"
 WEIGHT_DENOISE_PATH = "denoising_unet.onnx"
 WEIGHT_FACE_LOC_PATH = "face_locator.onnx"
@@ -36,6 +40,7 @@ WEIGHT_AUDIO_PROJ_PATH = "audio_proj.onnx"
 WEIGHT_IMAGE_PROJ_PATH = "image_proj.onnx"
 MODEL_VAE_ENC_PATH = "vae_encoder.onnx.prototxt"
 MODEL_VAE_DEC_PATH = "vae_decoder.onnx.prototxt"
+MODEL_AUDIO_ENC_PATH = "audio_encoder.onnx.prototxt"
 MODEL_REF_UNET_PATH = "reference_unet.onnx.prototxt"
 MODEL_DENOISE_PATH = "denoising_unet.onnx.prototxt"
 MODEL_FACE_LOC_PATH = "face_locator.onnx.prototxt"
@@ -46,6 +51,7 @@ WEIGHT_DENOISE_PB_PATH = "denoising_unet_weights.pb"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/hallo/"
 
 IMAGE_SIZE = 512
+SAMPLING_RATE = 16000
 IMAGE_PATH = "demo.jpg"
 WAV_PATH = "demo.wav"
 VIDEO_PATH = "demo.wav"
@@ -197,21 +203,6 @@ def image_processor(img):
     pixel_values_face_mask = [mask.reshape(1, -1) for mask in pixel_values_face_mask]
     pixel_values_lip_mask = [mask.reshape(1, -1) for mask in pixel_values_lip_mask]
 
-    (
-        pixel_values_ref_img,
-        face_mask,
-        face_emb,
-        pixel_values_full_mask,
-        pixel_values_face_mask,
-        pixel_values_lip_mask,
-    ) = (
-        np.load("data/source_image_pixels.npy"),
-        np.load("data/source_image_face_region.npy"),
-        np.load("data/source_image_face_emb.npy"),
-        [np.load("data/source_image_full_mask_%d.npy" % i) for i in range(4)],
-        [np.load("data/source_image_face_mask_%d.npy" % i) for i in range(4)],
-        [np.load("data/source_image_lip_mask_%d.npy" % i) for i in range(4)],
-    )
 
     return (
         pixel_values_ref_img,
@@ -221,6 +212,47 @@ def image_processor(img):
         pixel_values_face_mask,
         pixel_values_lip_mask,
     )
+
+
+def audio_processor(audio_encoder, speech_array, clip_length: int = -1, use_onnx=False):
+    wav2vec_model_path = "./wav2vec/wav2vec2-base-960h"
+    wav2vec_feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(
+        wav2vec_model_path, local_files_only=True
+    )
+
+    # extract wav2vec features
+    audio_feature = np.squeeze(
+        wav2vec_feature_extractor(
+            speech_array, sampling_rate=SAMPLING_RATE
+        ).input_values
+    )
+    fps = 25
+    seq_len = math.ceil(len(audio_feature) / SAMPLING_RATE * fps)
+    audio_length = seq_len
+
+    if clip_length > 0 and seq_len % clip_length != 0:
+        pad_len = (clip_length - seq_len % clip_length) % clip_length
+        pad_len *= SAMPLING_RATE // fps
+        audio_feature = np.pad(
+            audio_feature, (0, pad_len), mode="constant", constant_values=0.0
+        )
+        seq_len += clip_length - seq_len % clip_length
+    audio_feature = np.expand_dims(audio_feature, axis=0)
+
+    seq_len = np.array(seq_len, dtype=np.int64)
+    if not use_onnx:
+        output = audio_encoder.predict([audio_feature, seq_len])
+    else:
+        output = audio_encoder.run(
+            None, {"audio_feature": audio_feature, "seq_len": seq_len}
+        )
+    hidden_state = output[0]
+    del output
+
+    audio_emb = hidden_state[1:]
+    audio_emb = audio_emb.transpose(1, 0, 2)  # (b, s, d) -> (s, b, d)
+
+    return audio_emb, audio_length
 
 
 def process_audio_emb(audio_emb):
@@ -245,6 +277,7 @@ class FaceAnimatePipeline:
         self,
         vae_encoder,
         vae_decoder,
+        audio_encoder,
         reference_unet,
         denoising_unet,
         face_locator,
@@ -255,6 +288,7 @@ class FaceAnimatePipeline:
     ):
         self.vae_encoder = vae_encoder
         self.vae_decoder = vae_decoder
+        self.audio_encoder = audio_encoder
         self.reference_unet = reference_unet
         self.denoising_unet = denoising_unet
         self.face_locator = face_locator
@@ -463,7 +497,6 @@ class FaceAnimatePipeline:
         pixel_values_face_mask = [x.astype(np.float16) for x in pixel_values_face_mask]
         pixel_values_lip_mask = [x.astype(np.float16) for x in pixel_values_lip_mask]
 
-        audio_tensor = np.load("audio_tensor.npy")
         uncond_audio_tensor = np.zeros_like(audio_tensor)
         audio_tensor = np.concatenate([uncond_audio_tensor, audio_tensor], axis=0)
         audio_tensor = audio_tensor.astype(dtype=np.float16)
@@ -597,13 +630,14 @@ def recognize_from_video(pipe: FaceAnimatePipeline):
     image = load_image(image_path)
     image = cv2.cvtColor(image, cv2.COLOR_BGRA2BGR)
 
+    speech_array, _ = librosa.load(driving_audio_path, sr=SAMPLING_RATE)
+
     logger.info("Start inference...")
 
-    # 1. config
     motion_scale = np.array([1.0, 1.0, 1.0], dtype=np.float32)
 
-    # 3. prepare inference data
-    # 3.1 prepare source image, face mask, face embeddings
+    # prepare inference data
+    ## prepare source image, face mask, face embeddings
     img_size = (512, 512)
     clip_length = 16
     (
@@ -615,10 +649,13 @@ def recognize_from_video(pipe: FaceAnimatePipeline):
         source_image_lip_mask,
     ) = image_processor(image)
 
-    # 3.2 prepare audio embeddings
-    audio_emb, audio_length = np.load("data/audio_emb.npy"), 188
+    ## prepare audio embeddings
+    audio_emb, audio_length = audio_processor(
+        pipe.audio_encoder, speech_array, clip_length, use_onnx=args.onnx
+    )
+    del pipe.audio_encoder
 
-    # 5. inference
+    # inference
     audio_emb = process_audio_emb(audio_emb)
 
     source_image_pixels = np.expand_dims(source_image_pixels, axis=0)
@@ -695,6 +732,7 @@ def recognize_from_video(pipe: FaceAnimatePipeline):
 def main():
     check_and_download_models(WEIGHT_VAE_ENC_PATH, MODEL_VAE_ENC_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_VAE_DEC_PATH, MODEL_VAE_DEC_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_AUDIO_ENC_PATH, MODEL_AUDIO_ENC_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_REF_UNET_PATH, MODEL_REF_UNET_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_DENOISE_PATH, MODEL_DENOISE_PATH, REMOTE_PATH)
     check_and_download_models(
@@ -724,6 +762,12 @@ def main():
         vae_decoder = ailia.Net(
             MODEL_VAE_DEC_PATH,
             WEIGHT_VAE_DEC_PATH,
+            env_id=env_id,
+            memory_mode=memory_mode,
+        )
+        audio_encoder = ailia.Net(
+            MODEL_AUDIO_ENC_PATH,
+            WEIGHT_AUDIO_ENC_PATH,
             env_id=env_id,
             memory_mode=memory_mode,
         )
@@ -773,6 +817,9 @@ def main():
         vae_decoder = onnxruntime.InferenceSession(
             WEIGHT_VAE_DEC_PATH, providers=providers
         )
+        audio_encoder = onnxruntime.InferenceSession(
+            WEIGHT_AUDIO_ENC_PATH, providers=providers
+        )
         reference_unet = onnxruntime.InferenceSession(
             WEIGHT_REF_UNET_PATH, providers=providers
         )
@@ -806,6 +853,7 @@ def main():
     pipe = FaceAnimatePipeline(
         vae_encoder=vae_encoder,
         vae_decoder=vae_decoder,
+        audio_encoder=audio_encoder,
         reference_unet=reference_unet,
         denoising_unet=denoising_unet,
         face_locator=face_locator,
