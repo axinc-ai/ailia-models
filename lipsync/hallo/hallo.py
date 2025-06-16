@@ -69,7 +69,6 @@ parser = get_base_parser(
 )
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser, check_input_type=False)
-args.input = parser.parse_args().input
 
 
 # ======================
@@ -176,10 +175,10 @@ def image_processor(img):
     (face_mask, sep_lip_mask, sep_background_mask, sep_face_mask) = get_mask(
         img_rgb, face_region_ratio
     )
-    face_mask = np.repeat(face_mask[:, :, np.newaxis], 3, axis=2)
 
     # 2.4 detect and expand lip, face mask
     face_mask = transform(face_mask, width, height)
+    face_mask = np.repeat(face_mask, 3, axis=0)  # GRAY -> RGB
     pixel_values_face_mask = [
         transform(sep_face_mask, width // 8, height // 8),
         transform(sep_face_mask, width // 16, height // 16),
@@ -202,7 +201,6 @@ def image_processor(img):
     pixel_values_full_mask = [mask.reshape(1, -1) for mask in pixel_values_full_mask]
     pixel_values_face_mask = [mask.reshape(1, -1) for mask in pixel_values_face_mask]
     pixel_values_lip_mask = [mask.reshape(1, -1) for mask in pixel_values_lip_mask]
-
 
     return (
         pixel_values_ref_img,
@@ -284,7 +282,7 @@ class FaceAnimatePipeline:
         scheduler,
         image_proj,
         audio_proj,
-        use_onnx: bool = False,
+        flg_onnx: bool = False,
     ):
         self.vae_encoder = vae_encoder
         self.vae_decoder = vae_decoder
@@ -296,7 +294,7 @@ class FaceAnimatePipeline:
         self.image_proj = image_proj
         self.audio_proj = audio_proj
 
-        self.use_onnx = use_onnx
+        self.flg_onnx = flg_onnx
 
         self.vae_scale_factor = 8  # VAE downscaling factor
 
@@ -355,7 +353,7 @@ class FaceAnimatePipeline:
         video = []
         for i in tqdm.tqdm(range(latents.shape[0])):
             z = latents[i : i + 1]
-            if not self.use_onnx:
+            if not self.flg_onnx:
                 output = self.vae_decoder.predict([z])
             else:
                 output = self.vae_decoder.run(None, {"z": z})
@@ -393,7 +391,7 @@ class FaceAnimatePipeline:
         eta: float = 0.0,
         generator: Optional[np.random.Generator] = None,
     ):
-        if not args.onnx:
+        if not self.flg_onnx:
             output = self.audio_proj.predict([audio_tensor])
         else:
             output = self.audio_proj.run(None, {"audio_embeds": audio_tensor})
@@ -409,16 +407,15 @@ class FaceAnimatePipeline:
         batch_size = 1
 
         # prepare clip image embeddings
-        clip_image_embeds = face_emb
-        clip_image_embeds = clip_image_embeds.astype(np.float16)
+        clip_image_embeds = face_emb.astype(np.float16)
 
-        if not args.onnx:
+        if not self.flg_onnx:
             output = self.image_proj.predict([clip_image_embeds])
         else:
             output = self.image_proj.run(None, {"image_embeds": clip_image_embeds})
         encoder_hidden_states = output[0]
 
-        if not args.onnx:
+        if not self.flg_onnx:
             output = self.image_proj.predict([np.zeros_like(clip_image_embeds)])
         else:
             output = self.image_proj.run(
@@ -449,16 +446,16 @@ class FaceAnimatePipeline:
         ref_image_tensor = self.image_processor(
             ref_image_tensor, height=height, width=width
         )  # (bs, c, width, height)
-        ref_image_tensor = ref_image_tensor.astype(dtype=np.float16)
+        ref_image_tensor = ref_image_tensor.astype(dtype=np.float32)
 
-        if not args.onnx:
+        if not self.flg_onnx:
             output = self.vae_encoder.predict([ref_image_tensor])
         else:
             output = self.vae_encoder.run(None, {"x": ref_image_tensor})
         ref_image_latents = output[0]
         del output
-
         ref_image_latents = ref_image_latents * 0.18215  # (b, 4, h, w)
+        ref_image_latents = ref_image_latents.astype(np.float16)
 
         face_mask = np.expand_dims(face_mask, axis=1).astype(
             dtype=np.float16
@@ -466,7 +463,7 @@ class FaceAnimatePipeline:
         face_mask = np.repeat(face_mask, video_length, axis=1)
         face_mask = face_mask.transpose(0, 2, 1, 3, 4)
 
-        if not args.onnx:
+        if not self.flg_onnx:
             output = self.face_locator.predict([face_mask])
         else:
             output = self.face_locator.run(None, {"conditioning": face_mask})
@@ -508,13 +505,12 @@ class FaceAnimatePipeline:
                 # Forward reference image
                 if i == 0:
                     # feedforward
-                    if not self.use_onnx:
+                    if not self.flg_onnx:
                         output = self.reference_unet.predict(
                             [
-                                np.repeat(
+                                np.tile(
                                     ref_image_latents,
-                                    (2 if do_classifier_free_guidance else 1),
-                                    axis=0,
+                                    (2 if do_classifier_free_guidance else 1, 1, 1, 1),
                                 ),
                                 np.zeros_like(t),
                                 encoder_hidden_states,
@@ -524,10 +520,9 @@ class FaceAnimatePipeline:
                         output = self.reference_unet.run(
                             None,
                             {
-                                "sample": np.repeat(
+                                "sample": np.tile(
                                     ref_image_latents,
-                                    (2 if do_classifier_free_guidance else 1),
-                                    axis=0,
+                                    (2 if do_classifier_free_guidance else 1, 1, 1, 1),
                                 ),
                                 "timestep": np.zeros_like(t),
                                 "encoder_hidden_states": encoder_hidden_states,
@@ -543,7 +538,7 @@ class FaceAnimatePipeline:
                     else latents
                 )
 
-                if not self.use_onnx:
+                if not self.flg_onnx:
                     output = self.denoising_unet.predict(
                         [
                             latent_model_input,
@@ -634,12 +629,12 @@ def recognize_from_video(pipe: FaceAnimatePipeline):
 
     logger.info("Start inference...")
 
+    img_size = (512, 512)
+    clip_length = 16
     motion_scale = np.array([1.0, 1.0, 1.0], dtype=np.float32)
 
     # prepare inference data
     ## prepare source image, face mask, face embeddings
-    img_size = (512, 512)
-    clip_length = 16
     (
         source_image_pixels,
         source_image_face_region,
@@ -651,7 +646,7 @@ def recognize_from_video(pipe: FaceAnimatePipeline):
 
     ## prepare audio embeddings
     audio_emb, audio_length = audio_processor(
-        pipe.audio_encoder, speech_array, clip_length, use_onnx=args.onnx
+        pipe.audio_encoder, speech_array, clip_length, flg_onnx=args.onnx
     )
     del pipe.audio_encoder
 
@@ -721,10 +716,17 @@ def recognize_from_video(pipe: FaceAnimatePipeline):
             motion_scale=motion_scale,
         )
         tensor_result.append(videos)
+        del pixel_values_ref_img
+        del audio_tensor
+        del videos
 
     tensor_result = np.concatenate(tensor_result, axis=2)
     tensor_result = tensor_result.squeeze(0)
     tensor_result = tensor_result[:, :audio_length]
+
+    output_file = get_savepath(args.savepath, "", ext=".mp4")
+    logger.info(f"saved at : {output_file}")
+    tensor_to_video(tensor_result, output_file, driving_audio_path)
 
     logger.info("Script finished successfully.")
 
@@ -804,13 +806,7 @@ def main():
     else:
         import onnxruntime
 
-        so = onnxruntime.SessionOptions()
-        so.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
-        so.add_session_config_entry("session.use_env_allocators", "1")
-        so.intra_op_num_threads = 1
-
         providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
-
         vae_encoder = onnxruntime.InferenceSession(
             WEIGHT_VAE_ENC_PATH, providers=providers
         )
@@ -824,12 +820,10 @@ def main():
             WEIGHT_REF_UNET_PATH, providers=providers
         )
         denoising_unet = onnxruntime.InferenceSession(
-            WEIGHT_DENOISE_PATH,
-            providers=providers,
-            # sess_options=so,
+            WEIGHT_DENOISE_PATH, providers=providers
         )
         face_locator = onnxruntime.InferenceSession(
-            WEIGHT_FACE_LOC_PATH, providers=providers_cpu
+            WEIGHT_FACE_LOC_PATH, providers=providers
         )
         image_proj = onnxruntime.InferenceSession(
             WEIGHT_IMAGE_PROJ_PATH, providers=providers
@@ -860,7 +854,7 @@ def main():
         scheduler=scheduler,
         image_proj=image_proj,
         audio_proj=audio_proj,
-        use_onnx=args.onnx,
+        flg_onnx=args.onnx,
     )
 
     # generate
