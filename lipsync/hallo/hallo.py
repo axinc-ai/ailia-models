@@ -76,6 +76,44 @@ parser.add_argument("--onnx", action="store_true", help="execute onnxruntime ver
 args = update_parser(parser, check_input_type=False)
 
 
+HALLO_DIR = "/workspaces/ooe_work/hallo"
+sys.path.insert(0, HALLO_DIR)
+import os
+
+import torch
+from diffusers import AutoencoderKL, DDIMScheduler
+from diffusers.image_processor import VaeImageProcessor
+from diffusers.models import activations
+from einops import rearrange, repeat
+from hallo.models.audio_proj import AudioProjModel
+from hallo.models.face_locator import FaceLocator
+from hallo.models.image_proj import ImageProjModel
+from hallo.models.mutual_self_attention import ReferenceAttentionControl
+from hallo.models.unet_2d_condition import UNet2DConditionModel
+from hallo.models.unet_3d import UNet3DConditionModel
+from omegaconf import OmegaConf
+from torch import nn
+
+activations.flg = True
+
+
+class Net(nn.Module):
+    def __init__(
+        self,
+        reference_unet: UNet2DConditionModel,
+        denoising_unet: UNet3DConditionModel,
+        face_locator: FaceLocator,
+        imageproj,
+        audioproj,
+    ):
+        super().__init__()
+        self.reference_unet = reference_unet
+        self.denoising_unet = denoising_unet
+        self.face_locator = face_locator
+        self.imageproj = imageproj
+        self.audioproj = audioproj
+
+
 # ======================
 # Secondary Functions
 # ======================
@@ -539,6 +577,27 @@ class FaceAnimatePipeline:
         audio_tensor = np.concatenate([uncond_audio_tensor, audio_tensor], axis=0)
         audio_tensor = audio_tensor.astype(dtype=np.float16)
 
+        # Test
+        device = torch.device("cuda")
+        reference_control_reader = ReferenceAttentionControl(
+            self.denoising_unet,
+            do_classifier_free_guidance=do_classifier_free_guidance,
+            mode="read",
+            batch_size=batch_size,
+            fusion_blocks="full",
+        )
+        face_mask = torch.from_numpy(face_mask).to(device=device)
+        pixel_values_full_mask = [
+            torch.from_numpy(x).to(device=device) for x in pixel_values_full_mask
+        ]
+        pixel_values_face_mask = [
+            torch.from_numpy(x).to(device=device) for x in pixel_values_face_mask
+        ]
+        pixel_values_lip_mask = [
+            torch.from_numpy(x).to(device=device) for x in pixel_values_lip_mask
+        ]
+        audio_tensor = torch.from_numpy(audio_tensor).to(device=device)
+
         # denoising loop
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
         with self.progress_bar(total=num_inference_steps) as progress_bar:
@@ -572,6 +631,23 @@ class FaceAnimatePipeline:
                     _, *bank = output
                     del output
 
+                    from hallo.models.mutual_self_attention import (
+                        TemporalBasicTransformerBlock,
+                        torch_dfs,
+                    )
+
+                    reader_attn_modules = [
+                        module
+                        for module in torch_dfs(self.denoising_unet)
+                        if isinstance(module, TemporalBasicTransformerBlock)
+                    ]
+                    reader_attn_modules = sorted(
+                        reader_attn_modules,
+                        key=lambda x: -x.norm1.normalized_shape[0],
+                    )
+                    for r, v in zip(reader_attn_modules, bank):
+                        r.bank = [torch.from_numpy(v).to(device)]
+
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = (
                     np.concatenate([latents] * 2)
@@ -579,48 +655,67 @@ class FaceAnimatePipeline:
                     else latents
                 )
 
-                if not self.flg_onnx:
-                    output = self.denoising_unet.predict(
-                        [
-                            latent_model_input,
-                            np.array(t),
-                            encoder_hidden_states,
-                            audio_tensor,
-                            face_mask,
-                            *pixel_values_full_mask,
-                            *pixel_values_face_mask,
-                            *pixel_values_lip_mask,
-                            motion_scale,
-                            *bank,
-                        ]
-                    )
-                else:
-                    output = self.denoising_unet.run(
-                        None,
-                        {
-                            "sample": latent_model_input,
-                            "timestep": np.array(t),
-                            "encoder_hidden_states": encoder_hidden_states,
-                            "audio_embedding": audio_tensor,
-                            "mask_cond_fea": face_mask,
-                            **{
-                                "full_mask_%d" % i: x
-                                for i, x in enumerate(pixel_values_full_mask)
-                            },
-                            **{
-                                "face_mask_%d" % i: x
-                                for i, x in enumerate(pixel_values_face_mask)
-                            },
-                            **{
-                                "lip_mask_%d" % i: x
-                                for i, x in enumerate(pixel_values_lip_mask)
-                            },
-                            "motion_scale": motion_scale,
-                            **{"bank_%d" % i: x for i, x in enumerate(bank)},
-                        },
-                    )
-                noise_pred = output[0]
-                del output
+                # Test
+                latent_model_input = torch.from_numpy(latent_model_input).to(
+                    device=device
+                )
+                noise_pred = self.denoising_unet(
+                    latent_model_input,
+                    t,
+                    encoder_hidden_states=torch.from_numpy(encoder_hidden_states).to(
+                        device=device
+                    ),
+                    mask_cond_fea=face_mask,
+                    full_mask=pixel_values_full_mask,
+                    face_mask=pixel_values_face_mask,
+                    lip_mask=pixel_values_lip_mask,
+                    audio_embedding=audio_tensor,
+                    motion_scale=motion_scale,
+                    return_dict=False,
+                )[0]
+                noise_pred = noise_pred.cpu().numpy()
+                # if not self.flg_onnx:
+                #     output = self.denoising_unet.predict(
+                #         [
+                #             latent_model_input,
+                #             np.array(t),
+                #             encoder_hidden_states,
+                #             audio_tensor,
+                #             face_mask,
+                #             *pixel_values_full_mask,
+                #             *pixel_values_face_mask,
+                #             *pixel_values_lip_mask,
+                #             motion_scale,
+                #             *bank,
+                #         ]
+                #     )
+                # else:
+                #     output = self.denoising_unet.run(
+                #         None,
+                #         {
+                #             "sample": latent_model_input,
+                #             "timestep": np.array(t),
+                #             "encoder_hidden_states": encoder_hidden_states,
+                #             "audio_embedding": audio_tensor,
+                #             "mask_cond_fea": face_mask,
+                #             **{
+                #                 "full_mask_%d" % i: x
+                #                 for i, x in enumerate(pixel_values_full_mask)
+                #             },
+                #             **{
+                #                 "face_mask_%d" % i: x
+                #                 for i, x in enumerate(pixel_values_face_mask)
+                #             },
+                #             **{
+                #                 "lip_mask_%d" % i: x
+                #                 for i, x in enumerate(pixel_values_lip_mask)
+                #             },
+                #             "motion_scale": motion_scale,
+                #             **{"bank_%d" % i: x for i, x in enumerate(bank)},
+                #         },
+                #     )
+                # noise_pred = output[0]
+                # del output
 
                 # perform guidance
                 if do_classifier_free_guidance:
@@ -768,6 +863,92 @@ def main():
 
     env_id = args.env_id
 
+    # 4. build modules
+    config = OmegaConf.load(
+        os.path.join(
+            HALLO_DIR, os.path.join(HALLO_DIR, "configs/inference/default.yaml")
+        )
+    )
+    config = OmegaConf.merge(
+        config,
+        {
+            "config": os.path.join(HALLO_DIR, "configs/inference/default.yaml"),
+            "source_image": os.path.join(HALLO_DIR, "examples/reference_images/1.jpg"),
+            "driving_audio": os.path.join(HALLO_DIR, "examples/driving_audios/1.wav"),
+            "output": os.path.join(HALLO_DIR, ".cache/output.mp4"),
+        },
+    )
+    weight_dtype = torch.float16
+    device = torch.device("cuda")
+    vae = AutoencoderKL.from_pretrained(
+        os.path.join(HALLO_DIR, "./pretrained_models/sd-vae-ft-mse")
+    )
+    reference_unet = UNet2DConditionModel.from_pretrained(
+        os.path.join(HALLO_DIR, "./pretrained_models/stable-diffusion-v1-5"),
+        subfolder="unet",
+    )
+    denoising_unet = UNet3DConditionModel.from_pretrained_2d(
+        os.path.join(HALLO_DIR, "./pretrained_models/stable-diffusion-v1-5"),
+        os.path.join(HALLO_DIR, "./pretrained_models/motion_module/mm_sd_v15_v2.ckpt"),
+        subfolder="unet",
+        unet_additional_kwargs=OmegaConf.to_container(config.unet_additional_kwargs),
+        use_landmark=False,
+    )
+    face_locator = FaceLocator(conditioning_embedding_channels=320)
+    image_proj = ImageProjModel(
+        cross_attention_dim=denoising_unet.config.cross_attention_dim,
+        clip_embeddings_dim=512,
+        clip_extra_context_tokens=4,
+    )
+
+    audio_proj = AudioProjModel(
+        seq_len=5,
+        blocks=12,  # use 12 layers' hidden states of wav2vec
+        channels=768,  # audio embedding channel
+        intermediate_dim=512,
+        output_dim=768,
+        context_tokens=32,
+    ).to(device=device, dtype=weight_dtype)
+    audio_ckpt_dir = config.audio_ckpt_dir
+
+    # Freeze
+    vae.requires_grad_(False)
+    image_proj.requires_grad_(False)
+    reference_unet.requires_grad_(False)
+    denoising_unet.requires_grad_(False)
+    face_locator.requires_grad_(False)
+    audio_proj.requires_grad_(False)
+    reference_unet.enable_gradient_checkpointing()
+    denoising_unet.enable_gradient_checkpointing()
+
+    net = Net(
+        reference_unet,
+        denoising_unet,
+        face_locator,
+        image_proj,
+        audio_proj,
+    )
+
+    net.load_state_dict(
+        torch.load(
+            os.path.join(HALLO_DIR, audio_ckpt_dir, "net.pth"),
+            map_location="cpu",
+        ),
+    )
+    reference_unet.to(device=device, dtype=torch.float16)
+    denoising_unet.to(device=device, dtype=torch.float16)
+    vae.to(device=device, dtype=torch.float16)
+    face_locator.to(device=device, dtype=torch.float16)
+    image_proj.to(device=device, dtype=torch.float16)
+    audio_proj.to(device=device, dtype=torch.float16)
+
+    del reference_unet
+    # del denoising_unet
+    del face_locator
+    del image_proj
+    del audio_proj
+    torch.cuda.empty_cache()
+
     # initialize
     if not args.onnx:
         memory_mode = ailia.get_memory_mode(
@@ -840,9 +1021,9 @@ def main():
         reference_unet = onnxruntime.InferenceSession(
             WEIGHT_REF_UNET_PATH, providers=providers
         )
-        denoising_unet = onnxruntime.InferenceSession(
-            WEIGHT_DENOISE_PATH, providers=providers
-        )
+        # denoising_unet = onnxruntime.InferenceSession(
+        #     WEIGHT_DENOISE_PATH, providers=providers_cpu
+        # )
         face_locator = onnxruntime.InferenceSession(
             WEIGHT_FACE_LOC_PATH, providers=providers
         )
