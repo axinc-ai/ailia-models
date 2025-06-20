@@ -76,6 +76,21 @@ args = update_parser(parser, check_input_type=False)
 # ======================
 
 
+def transform(img, width, height):
+    img = np.array(
+        Image.fromarray(img).resize((width, height), Image.Resampling.BILINEAR)
+    )
+
+    if img.ndim < 3:
+        img = np.expand_dims(img, axis=2)
+
+    img = img / 255
+    img = img.transpose(2, 0, 1)  # HWC -> CHW
+    img = img.astype(np.float32)
+
+    return img
+
+
 def tensor_to_video(tensor, output_video_file, audio_source, fps=25):
     """
     Converts a Tensor with shape [c, f, h, w] into a video and adds an audio track from the specified audio file.
@@ -103,171 +118,6 @@ def tensor_to_video(tensor, output_video_file, audio_source, fps=25):
 # ======================
 # Main functions
 # ======================
-
-
-def transform(img, width, height):
-    img = np.array(
-        Image.fromarray(img).resize((width, height), Image.Resampling.BILINEAR)
-    )
-
-    if img.ndim < 3:
-        img = np.expand_dims(img, axis=2)
-
-    img = img / 255
-    img = img.transpose(2, 0, 1)  # HWC -> CHW
-    img = img.astype(np.float32)
-
-    return img
-
-
-def image_processor(img):
-    height = width = IMAGE_SIZE
-    img_rgb = np.ascontiguousarray(img[:, :, ::-1])  # BGR to RGB
-
-    _img = np.array(
-        Image.fromarray(img_rgb).resize((width, height), Image.Resampling.BILINEAR)
-    )
-    _img = normalize_image(_img, normalize_type="127.5")
-    _img = _img.transpose(2, 0, 1)  # HWC -> CHW
-    _img = _img.astype(np.float32)
-    pixel_values_ref_img = _img
-
-    face_analysis_model_path = "./face_analysis/"
-    face_analysis = FaceAnalysis(
-        name="",
-        root=face_analysis_model_path,
-        providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
-    )
-    face_analysis.prepare(ctx_id=0, det_size=(640, 640))
-
-    # 2.1 detect face
-    faces = face_analysis.get(img)
-    if not faces:
-        print(
-            "No faces detected in the image. Using the entire image as the face region."
-        )
-        # Use the entire image as the face region
-        face = {
-            "bbox": [0, 0, img.shape[1], img.shape[0]],
-            "embedding": np.zeros(512),
-        }
-    else:
-        # Sort faces by size and select the largest one
-        faces_sorted = sorted(
-            faces,
-            key=lambda x: (x["bbox"][2] - x["bbox"][0]) * (x["bbox"][3] - x["bbox"][1]),
-            reverse=True,
-        )
-        face = faces_sorted[0]  # Select the largest face
-
-    """
-    Closes the ImageProcessor and releases any resources held by the FaceAnalysis instance.
-    """
-    for _, model in face_analysis.models.items():
-        if hasattr(model, "Dispose"):
-            model.Dispose()
-
-    # 2.2 face embedding
-    face_emb = face["embedding"]
-
-    # 2.3 render face mask
-    face_region_ratio = 1.2
-    (face_mask, sep_lip_mask, sep_background_mask, sep_face_mask) = get_mask(
-        img_rgb, face_region_ratio
-    )
-
-    # 2.4 detect and expand lip, face mask
-    face_mask = transform(face_mask, width, height)
-    face_mask = np.repeat(face_mask, 3, axis=0)  # GRAY -> RGB
-    pixel_values_face_mask = [
-        transform(sep_face_mask, width // 8, height // 8),
-        transform(sep_face_mask, width // 16, height // 16),
-        transform(sep_face_mask, width // 32, height // 32),
-        transform(sep_face_mask, width // 64, height // 64),
-    ]
-    pixel_values_lip_mask = [
-        transform(sep_lip_mask, width // 8, height // 8),
-        transform(sep_lip_mask, width // 16, height // 16),
-        transform(sep_lip_mask, width // 32, height // 32),
-        transform(sep_lip_mask, width // 64, height // 64),
-    ]
-    pixel_values_full_mask = [
-        transform(sep_background_mask, width // 8, height // 8),
-        transform(sep_background_mask, width // 16, height // 16),
-        transform(sep_background_mask, width // 32, height // 32),
-        transform(sep_background_mask, width // 64, height // 64),
-    ]
-
-    pixel_values_full_mask = [mask.reshape(1, -1) for mask in pixel_values_full_mask]
-    pixel_values_face_mask = [mask.reshape(1, -1) for mask in pixel_values_face_mask]
-    pixel_values_lip_mask = [mask.reshape(1, -1) for mask in pixel_values_lip_mask]
-
-    return (
-        pixel_values_ref_img,
-        face_mask,
-        face_emb,
-        pixel_values_full_mask,
-        pixel_values_face_mask,
-        pixel_values_lip_mask,
-    )
-
-
-def audio_processor(audio_encoder, speech_array, clip_length: int = -1, use_onnx=False):
-    wav2vec_model_path = "./wav2vec/wav2vec2-base-960h"
-    wav2vec_feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(
-        wav2vec_model_path, local_files_only=True
-    )
-
-    # extract wav2vec features
-    audio_feature = np.squeeze(
-        wav2vec_feature_extractor(
-            speech_array, sampling_rate=SAMPLING_RATE
-        ).input_values
-    )
-    fps = 25
-    seq_len = math.ceil(len(audio_feature) / SAMPLING_RATE * fps)
-    audio_length = seq_len
-
-    if clip_length > 0 and seq_len % clip_length != 0:
-        pad_len = (clip_length - seq_len % clip_length) % clip_length
-        pad_len *= SAMPLING_RATE // fps
-        audio_feature = np.pad(
-            audio_feature, (0, pad_len), mode="constant", constant_values=0.0
-        )
-        seq_len += clip_length - seq_len % clip_length
-    audio_feature = np.expand_dims(audio_feature, axis=0)
-
-    seq_len = np.array(seq_len, dtype=np.int64)
-    if not use_onnx:
-        output = audio_encoder.predict([audio_feature, seq_len])
-    else:
-        output = audio_encoder.run(
-            None, {"audio_feature": audio_feature, "seq_len": seq_len}
-        )
-    hidden_state = output[0]
-    del output
-
-    audio_emb = hidden_state[1:]
-    audio_emb = audio_emb.transpose(1, 0, 2)  # (b, s, d) -> (s, b, d)
-
-    return audio_emb, audio_length
-
-
-def process_audio_emb(audio_emb):
-    """
-    Process the audio embedding to concatenate with other tensors.
-    """
-    concatenated_tensors = []
-
-    for i in range(audio_emb.shape[0]):
-        vectors_to_concat = [
-            audio_emb[max(min(i + j, audio_emb.shape[0] - 1), 0)] for j in range(-2, 3)
-        ]
-        concatenated_tensors.append(np.stack(vectors_to_concat, axis=0))
-
-    audio_emb = np.stack(concatenated_tensors, axis=0)
-
-    return audio_emb
 
 
 class FaceAnimatePipeline:
@@ -298,7 +148,142 @@ class FaceAnimatePipeline:
 
         self.vae_scale_factor = 8  # VAE downscaling factor
 
-    def image_processor(self, image, height, width):
+    def image_processor(self, img):
+        height = width = IMAGE_SIZE
+        img_rgb = np.ascontiguousarray(img[:, :, ::-1])  # BGR to RGB
+
+        _img = np.array(
+            Image.fromarray(img_rgb).resize((width, height), Image.Resampling.BILINEAR)
+        )
+        _img = normalize_image(_img, normalize_type="127.5")
+        _img = _img.transpose(2, 0, 1)  # HWC -> CHW
+        _img = _img.astype(np.float32)
+        pixel_values_ref_img = _img
+
+        face_analysis_model_path = "./face_analysis/"
+        face_analysis = FaceAnalysis(
+            name="",
+            root=face_analysis_model_path,
+            providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
+        )
+        face_analysis.prepare(ctx_id=0, det_size=(640, 640))
+
+        # 2.1 detect face
+        faces = face_analysis.get(img)
+        if not faces:
+            print(
+                "No faces detected in the image. Using the entire image as the face region."
+            )
+            # Use the entire image as the face region
+            face = {
+                "bbox": [0, 0, img.shape[1], img.shape[0]],
+                "embedding": np.zeros(512),
+            }
+        else:
+            # Sort faces by size and select the largest one
+            faces_sorted = sorted(
+                faces,
+                key=lambda x: (x["bbox"][2] - x["bbox"][0])
+                * (x["bbox"][3] - x["bbox"][1]),
+                reverse=True,
+            )
+            face = faces_sorted[0]  # Select the largest face
+
+        """
+        Closes the ImageProcessor and releases any resources held by the FaceAnalysis instance.
+        """
+        for _, model in face_analysis.models.items():
+            if hasattr(model, "Dispose"):
+                model.Dispose()
+
+        # 2.2 face embedding
+        face_emb = face["embedding"]
+
+        # 2.3 render face mask
+        face_region_ratio = 1.2
+        (face_mask, sep_lip_mask, sep_background_mask, sep_face_mask) = get_mask(
+            img_rgb, face_region_ratio
+        )
+
+        # 2.4 detect and expand lip, face mask
+        face_mask = transform(face_mask, width, height)
+        face_mask = np.repeat(face_mask, 3, axis=0)  # GRAY -> RGB
+        pixel_values_face_mask = [
+            transform(sep_face_mask, width // 8, height // 8),
+            transform(sep_face_mask, width // 16, height // 16),
+            transform(sep_face_mask, width // 32, height // 32),
+            transform(sep_face_mask, width // 64, height // 64),
+        ]
+        pixel_values_lip_mask = [
+            transform(sep_lip_mask, width // 8, height // 8),
+            transform(sep_lip_mask, width // 16, height // 16),
+            transform(sep_lip_mask, width // 32, height // 32),
+            transform(sep_lip_mask, width // 64, height // 64),
+        ]
+        pixel_values_full_mask = [
+            transform(sep_background_mask, width // 8, height // 8),
+            transform(sep_background_mask, width // 16, height // 16),
+            transform(sep_background_mask, width // 32, height // 32),
+            transform(sep_background_mask, width // 64, height // 64),
+        ]
+
+        pixel_values_full_mask = [
+            mask.reshape(1, -1) for mask in pixel_values_full_mask
+        ]
+        pixel_values_face_mask = [
+            mask.reshape(1, -1) for mask in pixel_values_face_mask
+        ]
+        pixel_values_lip_mask = [mask.reshape(1, -1) for mask in pixel_values_lip_mask]
+
+        return (
+            pixel_values_ref_img,
+            face_mask,
+            face_emb,
+            pixel_values_full_mask,
+            pixel_values_face_mask,
+            pixel_values_lip_mask,
+        )
+
+    def audio_processor(self, speech_array, clip_length: int = -1):
+        wav2vec_model_path = "./wav2vec/wav2vec2-base-960h"
+        wav2vec_feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(
+            wav2vec_model_path, local_files_only=True
+        )
+
+        # extract wav2vec features
+        audio_feature = np.squeeze(
+            wav2vec_feature_extractor(
+                speech_array, sampling_rate=SAMPLING_RATE
+            ).input_values
+        )
+        fps = 25
+        seq_len = math.ceil(len(audio_feature) / SAMPLING_RATE * fps)
+        audio_length = seq_len
+
+        if clip_length > 0 and seq_len % clip_length != 0:
+            pad_len = (clip_length - seq_len % clip_length) % clip_length
+            pad_len *= SAMPLING_RATE // fps
+            audio_feature = np.pad(
+                audio_feature, (0, pad_len), mode="constant", constant_values=0.0
+            )
+            seq_len += clip_length - seq_len % clip_length
+        audio_feature = np.expand_dims(audio_feature, axis=0)
+
+        seq_len = np.array(seq_len, dtype=np.int64)
+        if not self.flg_onnx:
+            output = self.audio_encoder.predict([audio_feature, seq_len])
+        else:
+            output = self.audio_encoder.run(
+                None, {"audio_feature": audio_feature, "seq_len": seq_len}
+            )
+        hidden_state = output[0]
+
+        audio_emb = hidden_state[1:]
+        audio_emb = audio_emb.transpose(1, 0, 2)  # (b, s, d) -> (s, b, d)
+
+        return audio_emb, audio_length
+
+    def vae_image_processor(self, image, height, width):
         width, height = (x - x % self.vae_scale_factor for x in (width, height))
 
         N, C, *_ = image.shape
@@ -372,6 +357,75 @@ class FaceAnimatePipeline:
         video = np.clip(video / 2 + 0.5, 0, 1)
         return video
 
+    def preprocess(self, image, speech_array, clip_length=16):
+        # prepare inference data
+        ## prepare source image, face mask, face embeddings
+        (
+            source_image_pixels,
+            face_mask,
+            face_emb,
+            source_image_full_mask,
+            source_image_face_mask,
+            source_image_lip_mask,
+        ) = self.image_processor(image)
+
+        ## prepare audio embeddings
+        audio_emb, audio_length = self.audio_processor(speech_array, clip_length)
+        audio_emb = self.process_audio_emb(audio_emb)
+
+        source_image_pixels = np.expand_dims(source_image_pixels, axis=0)
+        face_mask = np.expand_dims(face_mask, axis=0)
+        face_emb = face_emb.reshape(1, -1)
+        source_image_full_mask = [
+            np.tile(mask, (clip_length, 1)) for mask in source_image_full_mask
+        ]
+        source_image_face_mask = [
+            np.tile(mask, (clip_length, 1)) for mask in source_image_face_mask
+        ]
+        source_image_lip_mask = [
+            np.tile(mask, (clip_length, 1)) for mask in source_image_lip_mask
+        ]
+
+        face_mask = np.expand_dims(face_mask, axis=1).astype(
+            dtype=np.float16
+        )  # (bs, f, c, H, W)
+        face_mask = np.repeat(face_mask, clip_length, axis=1)
+        face_mask = face_mask.transpose(0, 2, 1, 3, 4)
+
+        if not self.flg_onnx:
+            output = self.face_locator.predict([face_mask])
+        else:
+            output = self.face_locator.run(None, {"conditioning": face_mask})
+        face_mask = output[0]
+
+        return (
+            audio_emb,
+            audio_length,
+            source_image_pixels,
+            face_mask,
+            face_emb,
+            source_image_full_mask,
+            source_image_face_mask,
+            source_image_lip_mask,
+        )
+
+    def process_audio_emb(self, audio_emb):
+        """
+        Process the audio embedding to concatenate with other tensors.
+        """
+        concatenated_tensors = []
+
+        for i in range(audio_emb.shape[0]):
+            vectors_to_concat = [
+                audio_emb[max(min(i + j, audio_emb.shape[0] - 1), 0)]
+                for j in range(-2, 3)
+            ]
+            concatenated_tensors.append(np.stack(vectors_to_concat, axis=0))
+
+        audio_emb = np.stack(concatenated_tensors, axis=0)
+
+        return audio_emb
+
     def forward(
         self,
         ref_image,
@@ -396,19 +450,16 @@ class FaceAnimatePipeline:
         else:
             output = self.audio_proj.run(None, {"audio_embeds": audio_tensor})
         audio_tensor = output[0]
-        del output
 
         # Prepare timesteps
         self.scheduler.set_timesteps(num_inference_steps)
         timesteps = self.scheduler.timesteps
 
-        do_classifier_free_guidance = guidance_scale > 1.0
-
         batch_size = 1
+        do_classifier_free_guidance = guidance_scale > 1.0
 
         # prepare clip image embeddings
         clip_image_embeds = face_emb.astype(np.float16)
-
         if not self.flg_onnx:
             output = self.image_proj.predict([clip_image_embeds])
         else:
@@ -422,7 +473,6 @@ class FaceAnimatePipeline:
                 None, {"image_embeds": np.zeros_like(clip_image_embeds)}
             )
         uncond_encoder_hidden_states = output[0]
-        del output
 
         if do_classifier_free_guidance:
             encoder_hidden_states = np.concatenate(
@@ -443,7 +493,7 @@ class FaceAnimatePipeline:
         ## b f c h w -> (b f) c h w
         b, f, c, h, w = ref_image.shape
         ref_image_tensor = ref_image.reshape(b * f, c, h, w)
-        ref_image_tensor = self.image_processor(
+        ref_image_tensor = self.vae_image_processor(
             ref_image_tensor, height=height, width=width
         )  # (bs, c, width, height)
         ref_image_tensor = ref_image_tensor.astype(dtype=np.float32)
@@ -453,22 +503,8 @@ class FaceAnimatePipeline:
         else:
             output = self.vae_encoder.run(None, {"x": ref_image_tensor})
         ref_image_latents = output[0]
-        del output
         ref_image_latents = ref_image_latents * 0.18215  # (b, 4, h, w)
         ref_image_latents = ref_image_latents.astype(np.float16)
-
-        face_mask = np.expand_dims(face_mask, axis=1).astype(
-            dtype=np.float16
-        )  # (bs, f, c, H, W)
-        face_mask = np.repeat(face_mask, video_length, axis=1)
-        face_mask = face_mask.transpose(0, 2, 1, 3, 4)
-
-        if not self.flg_onnx:
-            output = self.face_locator.predict([face_mask])
-        else:
-            output = self.face_locator.run(None, {"conditioning": face_mask})
-        face_mask = output[0]
-        del output
 
         face_mask = (
             np.concatenate([np.zeros_like(face_mask), face_mask], axis=0)
@@ -633,39 +669,16 @@ def recognize_from_video(pipe: FaceAnimatePipeline):
     clip_length = 16
     motion_scale = np.array([1.0, 1.0, 1.0], dtype=np.float32)
 
-    # prepare inference data
-    ## prepare source image, face mask, face embeddings
     (
+        audio_emb,
+        audio_length,
         source_image_pixels,
-        source_image_face_region,
-        source_image_face_emb,
+        face_mask,
+        face_emb,
         source_image_full_mask,
         source_image_face_mask,
         source_image_lip_mask,
-    ) = image_processor(image)
-
-    ## prepare audio embeddings
-    audio_emb, audio_length = audio_processor(
-        pipe.audio_encoder, speech_array, clip_length, flg_onnx=args.onnx
-    )
-    del pipe.audio_encoder
-
-    # inference
-    audio_emb = process_audio_emb(audio_emb)
-
-    source_image_pixels = np.expand_dims(source_image_pixels, axis=0)
-    source_image_face_region = np.expand_dims(source_image_face_region, axis=0)
-    source_image_face_emb = source_image_face_emb.reshape(1, -1)
-
-    source_image_full_mask = [
-        np.tile(mask, (clip_length, 1)) for mask in source_image_full_mask
-    ]
-    source_image_face_mask = [
-        np.tile(mask, (clip_length, 1)) for mask in source_image_face_mask
-    ]
-    source_image_lip_mask = [
-        np.tile(mask, (clip_length, 1)) for mask in source_image_lip_mask
-    ]
+    ) = pipe.preprocess(image, speech_array, clip_length=clip_length)
 
     n_motion_frames = 2
     generator = np.random.default_rng(42)
@@ -702,8 +715,8 @@ def recognize_from_video(pipe: FaceAnimatePipeline):
         videos = pipe.forward(
             ref_image=pixel_values_ref_img,
             audio_tensor=audio_tensor,
-            face_emb=source_image_face_emb,
-            face_mask=source_image_face_region,
+            face_emb=face_emb,
+            face_mask=face_mask,
             pixel_values_full_mask=source_image_full_mask,
             pixel_values_face_mask=source_image_face_mask,
             pixel_values_lip_mask=source_image_lip_mask,
