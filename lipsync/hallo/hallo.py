@@ -48,13 +48,16 @@ MODEL_AUDIO_PROJ_PATH = "audio_proj.onnx.prototxt"
 MODEL_IMAGE_PROJ_PATH = "image_proj.onnx.prototxt"
 WEIGHT_DENOISE_PB_PATH = "denoising_unet_weights.pb"
 
+WEIGHT_FACE_ANALYSIS_DET_PATH = "./face_analysis/models/scrfd_10g_bnkps.onnx"
+WEIGHT_FACE_ANALYSIS_REG_PATH = "./face_analysis/models/glintr100.onnx"
+WEIGHT_WAV2VEC_PATH = "./wav2vec/wav2vec2-base-960h/model.safetensors"
+
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/hallo/"
 
 IMAGE_SIZE = 512
 SAMPLING_RATE = 16000
 IMAGE_PATH = "demo.jpg"
 WAV_PATH = "demo.wav"
-VIDEO_PATH = "demo.wav"
 SAVE_VIDEO_PATH = "output.mp4"
 
 # ======================
@@ -65,8 +68,8 @@ parser = get_base_parser(
     "Hallo: Hierarchical Audio-Driven Visual Synthesis for Portrait Image Animation",
     IMAGE_PATH,
     SAVE_VIDEO_PATH,
-    input_ftype="audio",
 )
+parser.add_argument("--driving_audio", default=WAV_PATH, help="Input audio")
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser, check_input_type=False)
 
@@ -657,6 +660,7 @@ class FaceAnimatePipeline:
 
 def recognize_from_video(pipe: FaceAnimatePipeline):
     image_path = args.input[0]
+    driving_audio_path = args.driving_audio
     # prepare input data
     image = load_image(image_path)
     image = cv2.cvtColor(image, cv2.COLOR_BGRA2BGR)
@@ -757,6 +761,12 @@ def main():
         WEIGHT_IMAGE_PROJ_PATH, MODEL_IMAGE_PROJ_PATH, REMOTE_PATH
     )
     check_and_download_file(WEIGHT_DENOISE_PB_PATH, REMOTE_PATH)
+
+    # for insightface
+    check_and_download_file(WEIGHT_FACE_ANALYSIS_DET_PATH, REMOTE_PATH)
+    check_and_download_file(WEIGHT_FACE_ANALYSIS_REG_PATH, REMOTE_PATH)
+    # wav2vec
+    check_and_download_file(WEIGHT_WAV2VEC_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
