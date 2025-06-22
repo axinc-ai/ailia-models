@@ -70,6 +70,7 @@ parser = get_base_parser(
     SAVE_VIDEO_PATH,
 )
 parser.add_argument("--driving_audio", default=WAV_PATH, help="Input audio")
+parser.add_argument("--seed", type=int, default=42, help="Random seed.")
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser, check_input_type=False)
 
@@ -628,13 +629,7 @@ class FaceAnimatePipeline:
                     )
 
                 # compute the previous noisy sample x_t -> x_t-1
-                latents = self.scheduler.step(
-                    noise_pred,
-                    t,
-                    latents,
-                    eta=eta,
-                    generator=generator,
-                )
+                latents = self.scheduler.step(noise_pred, t, latents, eta=eta)
 
                 # call the callback, if provided
                 if (
@@ -661,6 +656,8 @@ class FaceAnimatePipeline:
 def recognize_from_video(pipe: FaceAnimatePipeline):
     image_path = args.input[0]
     driving_audio_path = args.driving_audio
+    seed = args.seed
+
     # prepare input data
     image = load_image(image_path)
     image = cv2.cvtColor(image, cv2.COLOR_BGRA2BGR)
@@ -685,7 +682,7 @@ def recognize_from_video(pipe: FaceAnimatePipeline):
     ) = pipe.preprocess(image, speech_array, clip_length=clip_length)
 
     n_motion_frames = 2
-    generator = np.random.default_rng(42)
+    generator = np.random.default_rng(seed)
 
     times = audio_emb.shape[0] // clip_length
     tensor_result = []

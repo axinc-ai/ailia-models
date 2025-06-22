@@ -126,7 +126,6 @@ class DDIMScheduler(ConfigMixin):
         sample: np.ndarray,
         eta: float = 0.0,
         use_clipped_model_output: bool = False,
-        generator=None,
         variance_noise: Optional[np.ndarray] = None,
     ):
         """
@@ -195,12 +194,7 @@ class DDIMScheduler(ConfigMixin):
         )
 
         if eta > 0:
-            if variance_noise is None:
-                variance_noise = generator.normal(
-                    loc=0.0, scale=1.0, size=model_output.shape
-                ).astype(model_output.dtype)
             variance = std_dev_t * variance_noise
-
             prev_sample = prev_sample + variance
 
         return prev_sample
