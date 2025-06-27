@@ -42,7 +42,7 @@ TARGET_LENGTH = 1024
 # Arguemnt Parser Config
 # ======================
 
-parser = get_base_parser("Edge SAM", IMAGE_PATH, SAVE_IMAGE_PATH)
+parser = get_base_parser("Edge SAM", IMAGE_PATH, SAVE_IMAGE_PATH, fp16_support = False)
 parser.add_argument(
     "-p",
     "--pos",

@@ -221,6 +221,7 @@ cd ../../image_segmentation/segment-anything-2; python3 segment-anything-2.py ${
 cd ../../image_segmentation/fast_sam; python3 fast_sam.py ${OPTION}
 cd ../../image_segmentation/yolov8-seg; python3 yolov8-seg.py ${OPTION}
 cd ../../image_segmentation/yolov11-seg; python3 yolov11-seg.py ${OPTION}
+cd ../../image_segmentation/edge_sam; python3 edge_sam.py ${OPTION}
 cd ../../landmark_classification/landmarks_classifier_asia; python3 landmarks_classifier_asia.py ${OPTION}
 cd ../../landmark_classification/places365; python3 places365.py ${OPTION}
 cd ../../line_segment_detection/mlsd; python3 mlsd.py ${OPTION}

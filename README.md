@@ -481,6 +481,7 @@ If you would like to try on your computer:
 | [<img src="image_segmentation/fast_sam/output.png" width=128px>](image_segmentation/fast_sam/) | [fast_sam](/image_segmentation/fast_sam/) | [FastSAM](https://github.com/CASIA-IVA-Lab/FastSAM) | Pytorch | 1.2.14 and later |
 | [<img src="image_segmentation/yolov8-seg/output.png" width=128px>](image_segmentation/yolov8-seg/) | [yolov8-seg](/image_segmentation/yolov8-seg/) | [YOLOv8](https://github.com/ultralytics/ultralytics) | Pytorch | 1.2.14.1 and later |  |
 | [<img src="image_segmentation/yolov11-seg/output.png" width=128px>](image_segmentation/yolov11-seg/) | [yolov11-seg](/image_segmentation/yolov11-seg/) | [Ultralytics YOLO11](https://github.com/ultralytics/ultralytics) | Pytorch | 1.2.14.1 and later |  |
+| [<img src="image_segmentation/edge_sam/output.png" width=128px>](image_segmentation/edge_sam/) | [edge_sam](/image_segmentation/edge_sam/) | [EdgeSAM](https://github.com/chongzhou96/EdgeSAM) | Pytorch | 1.2.10 and later |
 
 ## Landmark classification
 
