@@ -14,8 +14,12 @@ Input shape : (n, 3, 224, 224)
 
 Left to right: input, ground truth, predicted mask, segmentation result
 
-![Output](output.png)
+<img src=https://github.com/user-attachments/assets/faec20a2-2702-4747-b7da-2b191c38bf92 height="256">
+<img src=https://github.com/user-attachments/assets/f8f7b3a0-d0ad-46fa-9d6e-9d84de0a3fd0 height="256">
+<img src=https://github.com/user-attachments/assets/f7b7dfa3-d11a-4368-9084-e5bc7e463ee3 height="256">
+<img src=https://github.com/user-attachments/assets/78c7df66-692b-4ef0-b5ee-ec0ac11e0b2a height="256">
 
+<br/>
 <br/>
 
 ## Usage

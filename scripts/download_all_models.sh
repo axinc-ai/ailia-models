@@ -39,6 +39,7 @@ cd ../../audio_processing/reazon_speech/; python3 reazon_speech.py ${OPTION}
 cd ../../audio_processing/reazon_speech2/; python3 reazon_speech2.py ${OPTION}
 cd ../../audio_processing/gpt-sovits/; python3 gpt-sovits.py ${OPTION}
 cd ../../audio_processing/gpt-sovits-v2/; python3 gpt-sovits-v2.py ${OPTION}
+cd ../../audio_processing/gpt-sovits-v3/; python3 gpt-sovits-v3.py ${OPTION}
 cd ../../audio_processing/bert-vits2/; python3 bert-vits2.py ${OPTION}
 cd ../../audio_processing/dtln/; python3 dtln.py ${OPTION}
 cd ../../audio_processing/pytorch_wavenet/; python3 pytorch_wavenet.py ${OPTION}
@@ -218,6 +219,8 @@ cd ../../image_segmentation/pytorch-fcn; python3 pytorch-fcn.py ${OPTION}
 cd ../../image_segmentation/grounded_sam; python3 grounded_sam.py ${OPTION}
 cd ../../image_segmentation/segment-anything-2; python3 segment-anything-2.py ${OPTION}
 cd ../../image_segmentation/fast_sam; python3 fast_sam.py ${OPTION}
+cd ../../image_segmentation/yolov8-seg; python3 yolov8-seg.py ${OPTION}
+cd ../../image_segmentation/yolov11-seg; python3 yolov11-seg.py ${OPTION}
 cd ../../landmark_classification/landmarks_classifier_asia; python3 landmarks_classifier_asia.py ${OPTION}
 cd ../../landmark_classification/places365; python3 places365.py ${OPTION}
 cd ../../line_segment_detection/mlsd; python3 mlsd.py ${OPTION}
@@ -251,6 +254,7 @@ cd ../../natural_language_processing/g2p_en; python3 g2p_en.py ${OPTION}
 cd ../../natural_language_processing/t5_base_japanese_ner; pyhton3 t5_base_japanese_ner.py ${OPTION}
 cd ../../natural_language_processing/japanese-reranker-cross-encoder; python3 japanese-reranker-cross-encoder.py ${OPTION}
 cd ../../natural_language_processing/bert_ner_japanese; python3 bert_ner_japanese.py ${OPTION}
+cd ../../natural_language_processing/multilingual-minilmv2; python3 multilingual-minilmv2.py ${OPTION}
 cd ../../network_intrusion_detection/bert-network-packet-flow-header-payload; python3 bert-network-packet-flow-header-payload.py ${OPTION}
 cd ../../network_intrusion_detection/falcon-adapter-network-packet; python3 falcon-adapter-network-packet.py ${OPTION}
 cd ../../neural_rendering/nerf; python3 nerf.py ${OPTION}
@@ -270,7 +274,6 @@ cd ../../object_detection/yolov5; python3 yolov5.py ${OPTION}
 cd ../../object_detection/yolov6; python3 yolov6.py ${OPTION}
 cd ../../object_detection/yolov7; python3 yolov7.py ${OPTION}
 cd ../../object_detection/yolov8; python3 yolov8.py ${OPTION}
-cd ../../object_detection/yolov8-seg; python3 yolov8-seg.py ${OPTION}
 cd ../../object_detection/yolov9; python3 yolov9.py ${OPTION}
 cd ../../object_detection/yolov10; python3 yolov10.py ${OPTION}
 cd ../../object_detection/yolov11; python3 yolov11.py ${OPTION}
