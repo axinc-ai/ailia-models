@@ -63,7 +63,7 @@ def postprocess(x):
 
 
 def recognize_from_image(net):
-    mask_paths = glob.glob('masks/*.jpg')
+    mask_paths = sorted(glob.glob('masks/*.jpg'))
     N_mask = len(mask_paths)
 
     # input image loop
