@@ -115,6 +115,7 @@ cd ../../face_recognition/ferplus; python3 ferplus.py ${OPTION}
 cd ../../face_recognition/face-anti-spoofing; python3 face-anti-spoofing.py ${OPTION}
 cd ../../face_recognition/ax_facial_features; python3 ax_facial_features.py ${OPTION}
 cd ../../face_recognition/6d_repnet; python3 6d_repnet.py ${OPTION}
+cd ../../face_recognition/6d_repnet_360; python3 6d_repnet_360.py ${OPTION}
 cd ../../face_recognition/hsemotion; python3 hsemotion.py ${OPTION}
 cd ../../face_recognition/facemesh_v2; python3 facemesh_v2.py ${OPTION}
 cd ../../face_recognition/3ddfa; python3 3ddfa$.py ${OPTION}
