@@ -408,6 +408,7 @@ If you would like to try on your computer:
 | [<img src="image_classification/japanese-clip/dog.jpeg" width=128px>](image_classification/japanese-clip/) | [japanese-clip](/image_classification/japanese-clip/)|[Japanese-CLIP](https://github.com/rinnakk/japanese-clip) | Pytorch | 1.2.15 and later | |
 | [<img src="image_classification/japanese-stable-clip-vit-l-16/dog.jpeg" width=128px>](image_classification/japanese-stable-clip-vit-l-16/) | [japanese-stable-clip-vit-l-16](/image_classification/japanese-stable-clip-vit-l-16/) | [japanese-stable-clip-vit-l-16](https://huggingface.co/stabilityai/japanese-stable-clip-vit-l-16/) | Pytorch | 1.2.11 and later | |
 | [<img src="image_classification/clip-japanese-base/demo.jpeg" width=128px>](image_classification/clip-japanse-base/) | [clip-japanese-base](/image_classification/clip-japanese-base/)|[line-corporation/clip-japanese-base](https://huggingface.co/line-corporation/clip-japanese-base) | Pytorch | 1.2.16 and later | |
+| [<img src="image_classification/siglip2/demo.jpg" width=128px>](image_classification/siglip2/) | [siglip2](/image_classification/siglip2/)|[Multilingual Vision-Language Encoders with Improved Semantic Understanding, Localization, and Dense Features](https://huggingface.co/google/siglip2-base-patch16-224) | Pytorch | 1.2.16 and later | |
 
 ### Specific task
 
