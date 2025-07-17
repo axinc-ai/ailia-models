@@ -24,9 +24,11 @@ If you would like to try on your computer:
 [ailia-models wiki](https://deepwiki.com/axinc-ai/ailia-models)
 
 # Supported models
-377 models as of April 19, 2025
+380 models as of July 17, 2025
 
 # Latest update
+- 2025.07.17 Add 6d_repnet_360, siglip2
+- 2025.06.27 Add edge_sam
 - 2025.04.19 Add yolov11-seg, gpt-sovits-v3
 - 2025.02.28 Add multilingual-minilmv2
 - 2025.01.02 Add qwen_audio, audiosep
