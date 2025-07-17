@@ -50,7 +50,7 @@ ONNX opset = 11
 
 ## Netron
 
-[6DRepNet360.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/6d_repnet_360/6DRepNet360.opt.onnx.prototxt)
+[6DRepNet360.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/6d_repnet_360/6DRepNet360.onnx.prototxt)
 
 [RetinaFace.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/6d_repnet/RetinaFace.opt.onnx.prototxt)
 
