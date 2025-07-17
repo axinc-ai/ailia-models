@@ -32,8 +32,8 @@ REMOTE_PATH_6DRepNet360 = 'https://storage.googleapis.com/ailia-models/6d_repnet
 WEIGHT_PATH_FACE = "RetinaFace.opt.onnx"
 MODEL_PATH_FACE = "RetinaFace.opt.onnx.prototxt"
 
-WEIGHT_PATH_6DRepNet360 = "6DRepNet360.opt.onnx"
-MODEL_PATH_6DRepNet360 = "6DRepNet360.opt.onnx.prototxt"
+WEIGHT_PATH_6DRepNet360 = "6DRepNet360.onnx"
+MODEL_PATH_6DRepNet360 = "6DRepNet360.onnx.prototxt"
 
 IMAGE_PATH = 'input.png'
 SAVE_IMAGE_PATH = 'output.png'
