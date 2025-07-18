@@ -52,6 +52,35 @@ parser.add_argument(
 )
 args = update_parser(parser)
 
+def resize_and_pad_with_aspect_ratio(raw_img, target_width=640, target_height=480, padding_color=(0, 0, 0)):
+    # 元の画像の幅と高さ
+    original_height, original_width = raw_img.shape[:2]
+
+    # 幅と高さの比率を計算
+    width_ratio = target_width / original_width
+    height_ratio = target_height / original_height
+
+    # 小さい方の比率を使ってリサイズを行う
+    if width_ratio < height_ratio:
+        new_width = target_width
+        new_height = int(original_height * width_ratio)
+    else:
+        new_width = int(original_width * height_ratio)
+        new_height = target_height
+
+    # 新しいサイズにリサイズ
+    resized_img = cv2.resize(raw_img, (new_width, new_height))
+    
+    # パディングするための新しい画像を作成
+    padded_img = np.full((target_height, target_width, 3), padding_color, dtype=np.uint8)
+    
+    # パディングされた画像の中央にリサイズされた画像を配置
+    x_offset = (target_width - new_width) // 2
+    y_offset = (target_height - new_height) // 2
+    padded_img[y_offset:y_offset+new_height, x_offset:x_offset+new_width] = resized_img
+
+    return padded_img
+
 def recognize_from_image():
     env_id = args.env_id
     net = ailia.Net(MODEL_PATH_6DRepNet360, WEIGHT_PATH_6DRepNet360, env_id=env_id)
@@ -62,7 +91,7 @@ def recognize_from_image():
         logger.debug(f'input image: {image_path}')
         results = []
         raw_img = cv2.imread(image_path)
-        resize_img = cv2.resize(raw_img, dsize=(640, 480))
+        resize_img = resize_and_pad_with_aspect_ratio(raw_img)
         resize_img = np.array(resize_img)
         logger.debug(f'input image shape: {resize_img.shape}')
 
@@ -132,8 +161,8 @@ def recognize_from_video():
         logger.warning(
             'currently, video results cannot be output correctly...'
         )
-        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        f_h = 480
+        f_w = 640
         save_h, save_w = f_h, f_w
         writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
     else:
@@ -147,7 +176,7 @@ def recognize_from_video():
         if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
-        frame = cv2.resize(frame, dsize=(640, 480))
+        frame = resize_and_pad_with_aspect_ratio(frame)
         faces = detector(frame)
         for box, landmarks, score in faces:
             if score < .95:
