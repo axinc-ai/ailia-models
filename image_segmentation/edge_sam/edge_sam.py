@@ -13,6 +13,7 @@ import ailia
 
 # import original modules
 sys.path.append("../../util")
+import webcamera_utils  # noqa: E402
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import urlretrieve, progress_print, check_and_download_models  # noqa
 from image_utils import normalize_image  # noqa
@@ -25,10 +26,12 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_ENC_PATH = "edge_sam_3x_encoder.onnx"
-WEIGHT_DEC_PATH = "edge_sam_3x_decoder.onnx"
-MODEL_ENC_PATH = "edge_sam_3x_encoder.onnx.prototxt"
-MODEL_DEC_PATH = "edge_sam_3x_decoder.onnx.prototxt"
+#WEIGHT_ENC_PATH = "edge_sam_3x_encoder.onnx"
+#WEIGHT_DEC_PATH = "edge_sam_3x_decoder.onnx"
+WEIGHT_ENC_PATH = "trained_model_005_encoder.k.onnx"
+WEIGHT_DEC_PATH = "trained_model_005_decoder.k.onnx"
+MODEL_ENC_PATH = None#"edge_sam_3x_encoder.onnx.prototxt"
+MODEL_DEC_PATH = None#"edge_sam_3x_decoder.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/edge_sam/"
 
 IMAGE_PATH = "truck.jpg"
@@ -241,6 +244,9 @@ def predict(models, img, point_coords, point_labels, num_multimask_outputs=1):
         output = encoder.run(None, {"image": img})
     features = output[0]
 
+    point_coords = [[0, 0], [1024, 1024]]
+    point_labels = [2, 3]
+
     point_coords = np.array(point_coords, dtype=np.float32)[None]
     point_labels = np.array(point_labels, dtype=np.float32)[None]
     point_coords = apply_coords(point_coords, im_h, im_w)
@@ -365,6 +371,77 @@ def recognize_from_image(models):
         logger.info(f"saved at : {savepath}")
 
 
+def recognize_from_video(models):
+    capture = webcamera_utils.get_capture(args.video)
+
+    pos_points = args.pos
+    neg_points = args.neg
+    box = args.box
+    num_multimask_outputs = args.num_multimask_outputs
+
+    if pos_points is None:
+        if neg_points is None and box is None:
+            pos_points = [POINT]
+        else:
+            pos_points = []
+    if neg_points is None:
+        neg_points = []
+    if box is not None:
+        box = np.array(box).reshape(2, 2)
+
+    lf = "\n"
+    logger.info(f"Positive coordinate: {pos_points}")
+    logger.info(f"Negative coordinate: {neg_points}")
+    logger.info(f"Box coordinate: {lf if box is not None else ''}{box}")
+
+    coord_list = []
+    label_list = []
+    if box is not None:
+        coord_list.append(box)
+        label_list.append(np.array([2, 3]))
+    if pos_points:
+        coord_list.append(np.array(pos_points))
+        label_list.append(np.ones(len(pos_points)))
+    if neg_points:
+        coord_list.append(np.array(neg_points))
+        label_list.append(np.zeros(len(neg_points)))
+
+    coord_list = np.concatenate(coord_list, axis=0)
+    label_list = np.concatenate(label_list, axis=0)
+
+    frame_shown = False
+    while(True):
+        ret, frame = capture.read()
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+            break
+
+        img = frame
+
+        output = predict(models, img, coord_list, label_list, num_multimask_outputs)
+
+        masks, scores = output
+
+        mask = np.expand_dims(masks[scores.argmax()], axis=0)
+        res_img = show_mask(mask, img)
+
+        sel = label_list < 2
+        coord_list = coord_list[sel]
+        label_list = label_list[sel]
+        if 0 < len(label_list):
+            res_img = show_points(coord_list, label_list, res_img)
+        if box is not None:
+            res_img = show_box(box, res_img)
+
+        # plot result
+        cv2.imshow('frame', res_img)
+        frame_shown = True
+
+    capture.release()
+    cv2.destroyAllWindows()
+    logger.info('Script finished successfully.')
+
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_ENC_PATH, MODEL_ENC_PATH, REMOTE_PATH)
@@ -388,10 +465,13 @@ def main():
         decoder=decoder,
     )
 
-    if not args.gui:
-        recognize_from_image(models)
+    if args.video is not None:
+        recognize_from_video(models)
     else:
-        show_gui(models, args.input[0])
+        if not args.gui:
+            recognize_from_image(models)
+        else:
+            show_gui(models, args.input[0])
 
 
 if __name__ == "__main__":
