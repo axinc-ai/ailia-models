@@ -28,8 +28,8 @@ logger = getLogger(__name__)
 
 #WEIGHT_ENC_PATH = "edge_sam_3x_encoder.onnx"
 #WEIGHT_DEC_PATH = "edge_sam_3x_decoder.onnx"
-WEIGHT_ENC_PATH = "trained_model_005_encoder.k.onnx"
-WEIGHT_DEC_PATH = "trained_model_005_decoder.k.onnx"
+WEIGHT_ENC_PATH = "trained_model_005_encoder.onnx"
+WEIGHT_DEC_PATH = "trained_model_005_decoder.onnx"
 MODEL_ENC_PATH = None#"edge_sam_3x_encoder.onnx.prototxt"
 MODEL_DEC_PATH = None#"edge_sam_3x_decoder.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/edge_sam/"
@@ -244,7 +244,7 @@ def predict(models, img, point_coords, point_labels, num_multimask_outputs=1):
         output = encoder.run(None, {"image": img})
     features = output[0]
 
-    point_coords = [[0, 0], [1024, 1024]]
+    point_coords = [[0, 0], [im_w, im_h]]
     point_labels = [2, 3]
 
     point_coords = np.array(point_coords, dtype=np.float32)[None]
@@ -353,6 +353,8 @@ def recognize_from_image(models):
             output = predict(models, img, coord_list, label_list, num_multimask_outputs)
 
         masks, scores = output
+
+        print(scores)
 
         mask = np.expand_dims(masks[scores.argmax()], axis=0)
         res_img = show_mask(mask, img)
