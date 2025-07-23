@@ -360,10 +360,10 @@ def recognize_from_image(models):
         sel = label_list < 2
         coord_list = coord_list[sel]
         label_list = label_list[sel]
-        if 0 < len(label_list):
-            res_img = show_points(coord_list, label_list, res_img)
-        if box is not None:
-            res_img = show_box(box, res_img)
+        #if 0 < len(label_list):
+        #    res_img = show_points(coord_list, label_list, res_img)
+        #if box is not None:
+        #    res_img = show_box(box, res_img)
 
         # plot result
         savepath = get_savepath(args.savepath, image_path, ext=".png")
@@ -429,10 +429,10 @@ def recognize_from_video(models):
         sel = label_list < 2
         coord_list = coord_list[sel]
         label_list = label_list[sel]
-        if 0 < len(label_list):
-            res_img = show_points(coord_list, label_list, res_img)
-        if box is not None:
-            res_img = show_box(box, res_img)
+        #if 0 < len(label_list):
+        #    res_img = show_points(coord_list, label_list, res_img)
+        #if box is not None:
+        #    res_img = show_box(box, res_img)
 
         # plot result
         cv2.imshow('frame', res_img)
