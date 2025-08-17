@@ -28,8 +28,14 @@ logger = getLogger(__name__)
 
 #WEIGHT_ENC_PATH = "edge_sam_3x_encoder.onnx"
 #WEIGHT_DEC_PATH = "edge_sam_3x_decoder.onnx"
-WEIGHT_ENC_PATH = "trained_model_005_encoder.onnx"
-WEIGHT_DEC_PATH = "trained_model_005_decoder.onnx"
+#WEIGHT_ENC_PATH = "trained_model_005_encoder.onnx"
+#WEIGHT_DEC_PATH = "trained_model_005_decoder.onnx"
+#WEIGHT_ENC_PATH = "trained_model_007_encoder.onnx"
+#WEIGHT_DEC_PATH = "trained_model_007_decoder.onnx"
+#WEIGHT_ENC_PATH = "trained_model_v11_encoder.onnx"
+#WEIGHT_DEC_PATH = "trained_model_v11_decoder.onnx"
+WEIGHT_ENC_PATH = "trained_model_v11_encoder_512.onnx"
+WEIGHT_DEC_PATH = "trained_model_v11_decoder_512.onnx"
 MODEL_ENC_PATH = None#"edge_sam_3x_encoder.onnx.prototxt"
 MODEL_DEC_PATH = None#"edge_sam_3x_decoder.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/edge_sam/"
@@ -97,7 +103,7 @@ def apply_coords(coords, h, w):
 
 
 def show_mask(mask, img):
-    color = np.array([255, 144, 30], dtype=np.uint8)
+    color = np.array([0, 0, 255], dtype=np.uint8)
     color = color.reshape(1, 1, -1)
 
     h, w = mask.shape[-2:]
@@ -411,6 +417,14 @@ def recognize_from_video(models):
     coord_list = np.concatenate(coord_list, axis=0)
     label_list = np.concatenate(label_list, axis=0)
 
+    if args.savepath != SAVE_IMAGE_PATH:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        save_h, save_w = f_h, f_w
+        writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
+    else:
+        writer = None
+
     frame_shown = False
     while(True):
         ret, frame = capture.read()
@@ -440,8 +454,14 @@ def recognize_from_video(models):
         cv2.imshow('frame', res_img)
         frame_shown = True
 
+        # save results
+        if writer is not None:
+            writer.write(res_img)
+
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     logger.info('Script finished successfully.')
 
 def main():
