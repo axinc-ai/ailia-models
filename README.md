@@ -19,10 +19,16 @@ If you would like to try on your computer:
 
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
+# Documentation
+
+[ailia-models wiki](https://deepwiki.com/axinc-ai/ailia-models)
+
 # Supported models
-377 models as of April 19, 2025
+380 models as of July 17, 2025
 
 # Latest update
+- 2025.07.17 Add 6d_repnet_360, siglip2
+- 2025.06.27 Add edge_sam
 - 2025.04.19 Add yolov11-seg, gpt-sovits-v3
 - 2025.02.28 Add multilingual-minilmv2
 - 2025.01.02 Add qwen_audio, audiosep
@@ -288,6 +294,7 @@ If you would like to try on your computer:
 | [<img src="face_recognition/hopenet/output.png" width=128px>](face_recognition/hopenet/) | [hopenet](/face_recognition/hopenet/) | [deep-head-pose](https://github.com/natanielruiz/deep-head-pose) | Pytorch | 1.2.2 and later | [EN](https://medium.com/axinc-ai/hope-net-a-machine-learning-model-for-estimating-face-orientation-83d5af26a513) [JP](https://medium.com/axinc/hope-net-%E9%A1%94%E3%81%AE%E5%90%91%E3%81%8D%E3%82%92%E6%8E%A8%E5%AE%9A%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-6db21979f935) |
 | [<img src="face_recognition/6d_repnet/output.png" width=128px>](face_recognition/6d_repnet/) | [6d_repnet](/face_recognition/6d_repnet/) | [6D Rotation Representation for Unconstrained Head Pose Estimation (Pytorch)](https://github.com/thohemp/6DRepNet) | Pytorch | 1.2.6 and later |
 | [<img src="face_recognition/l2cs_net/output.png" width=128px>](face_recognition/l2cs_net/) | [L2CS_Net](/face_recognition/l2cs_net/) | [L2CS_Net](https://github.com/Ahmednull/L2CS-Net) | Pytorch | 1.2.9 and later | |
+| [<img src="face_recognition/6d_repnet_360/output.png" width=128px>](face_recognition/6d_repnet_360/) | [6d_repnet_360](/face_recognition/6d_repnet_360/) | [Toward Robust and Unconstrained Full Range of Rotation Head Pose Estimation](https://github.com/thohemp/6DRepNet360) | Pytorch | 1.2.9 and later |
 
 ### Keypoint detection
 
@@ -403,6 +410,7 @@ If you would like to try on your computer:
 | [<img src="image_classification/japanese-clip/dog.jpeg" width=128px>](image_classification/japanese-clip/) | [japanese-clip](/image_classification/japanese-clip/)|[Japanese-CLIP](https://github.com/rinnakk/japanese-clip) | Pytorch | 1.2.15 and later | |
 | [<img src="image_classification/japanese-stable-clip-vit-l-16/dog.jpeg" width=128px>](image_classification/japanese-stable-clip-vit-l-16/) | [japanese-stable-clip-vit-l-16](/image_classification/japanese-stable-clip-vit-l-16/) | [japanese-stable-clip-vit-l-16](https://huggingface.co/stabilityai/japanese-stable-clip-vit-l-16/) | Pytorch | 1.2.11 and later | |
 | [<img src="image_classification/clip-japanese-base/demo.jpeg" width=128px>](image_classification/clip-japanse-base/) | [clip-japanese-base](/image_classification/clip-japanese-base/)|[line-corporation/clip-japanese-base](https://huggingface.co/line-corporation/clip-japanese-base) | Pytorch | 1.2.16 and later | |
+| [<img src="image_classification/siglip2/demo.jpg" width=128px>](image_classification/siglip2/) | [siglip2](/image_classification/siglip2/)|[Multilingual Vision-Language Encoders with Improved Semantic Understanding, Localization, and Dense Features](https://huggingface.co/google/siglip2-base-patch16-224) | Pytorch | 1.2.16 and later | |
 
 ### Specific task
 
@@ -477,6 +485,7 @@ If you would like to try on your computer:
 | [<img src="image_segmentation/fast_sam/output.png" width=128px>](image_segmentation/fast_sam/) | [fast_sam](/image_segmentation/fast_sam/) | [FastSAM](https://github.com/CASIA-IVA-Lab/FastSAM) | Pytorch | 1.2.14 and later |
 | [<img src="image_segmentation/yolov8-seg/output.png" width=128px>](image_segmentation/yolov8-seg/) | [yolov8-seg](/image_segmentation/yolov8-seg/) | [YOLOv8](https://github.com/ultralytics/ultralytics) | Pytorch | 1.2.14.1 and later |  |
 | [<img src="image_segmentation/yolov11-seg/output.png" width=128px>](image_segmentation/yolov11-seg/) | [yolov11-seg](/image_segmentation/yolov11-seg/) | [Ultralytics YOLO11](https://github.com/ultralytics/ultralytics) | Pytorch | 1.2.14.1 and later |  |
+| [<img src="image_segmentation/edge_sam/output.png" width=128px>](image_segmentation/edge_sam/) | [edge_sam](/image_segmentation/edge_sam/) | [EdgeSAM](https://github.com/chongzhou96/EdgeSAM) | Pytorch | 1.2.10 and later |
 
 ## Landmark classification
 

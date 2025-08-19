@@ -115,6 +115,7 @@ cd ../../face_recognition/ferplus; python3 ferplus.py ${OPTION}
 cd ../../face_recognition/face-anti-spoofing; python3 face-anti-spoofing.py ${OPTION}
 cd ../../face_recognition/ax_facial_features; python3 ax_facial_features.py ${OPTION}
 cd ../../face_recognition/6d_repnet; python3 6d_repnet.py ${OPTION}
+cd ../../face_recognition/6d_repnet_360; python3 6d_repnet_360.py ${OPTION}
 cd ../../face_recognition/hsemotion; python3 hsemotion.py ${OPTION}
 cd ../../face_recognition/facemesh_v2; python3 facemesh_v2.py ${OPTION}
 cd ../../face_recognition/3ddfa; python3 3ddfa$.py ${OPTION}
@@ -174,6 +175,7 @@ cd ../../image_classification/swin-transformer; python3 swin_transformer.py ${OP
 cd ../../image_classification/mobileone; python3 mobileone.py ${OPTION}
 cd ../../image_classification/imagenet21k; python3 imagenet21k.py ${OPTION}
 cd ../../image_classification/volo; python3 volo.py ${OPTION}
+cd ../../image_classification/siglip2; python3 siglip2.py ${OPTION}
 cd ../../image_inpainting/3d-photo-inpainting; python3 3d-photo-inpainting.py ${OPTION}
 cd ../../image_inpainting/inpainting_gmcnn; python3 inpainting_gmcnn.py ${OPTION}
 cd ../../image_inpainting/pytorch-inpainting-with-partial-conv; python3 pytorch-inpainting-with-partial-conv.py ${OPTION}
@@ -221,6 +223,7 @@ cd ../../image_segmentation/segment-anything-2; python3 segment-anything-2.py ${
 cd ../../image_segmentation/fast_sam; python3 fast_sam.py ${OPTION}
 cd ../../image_segmentation/yolov8-seg; python3 yolov8-seg.py ${OPTION}
 cd ../../image_segmentation/yolov11-seg; python3 yolov11-seg.py ${OPTION}
+cd ../../image_segmentation/edge_sam; python3 edge_sam.py ${OPTION}
 cd ../../landmark_classification/landmarks_classifier_asia; python3 landmarks_classifier_asia.py ${OPTION}
 cd ../../landmark_classification/places365; python3 places365.py ${OPTION}
 cd ../../line_segment_detection/mlsd; python3 mlsd.py ${OPTION}
