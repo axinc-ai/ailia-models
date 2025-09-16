@@ -1346,7 +1346,7 @@ def main():
             weight_path_det = WEIGHT_PATH_DET_PPOCRV5_MBL
         else:
             weight_path_det = WEIGHT_PATH_DET_PPOCRV5_SVR
-        det_algorithm = 'DB++'
+        det_algorithm = 'DB'
     else:
         det_info = {
             'db_res18': (WEIGHT_PATH_DET_CHN, 'DB'),
