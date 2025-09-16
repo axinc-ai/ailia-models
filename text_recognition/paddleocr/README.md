@@ -45,20 +45,15 @@ $ python3 paddleocr.py -v VIDEO_PATH -s SAVE_VIDEO_PATH
 
 <br/>
 
-By adding the `--language` option, you can choose the language.
+By adding the `--version` option, you can choose model version (v1 or v3).
 ```bash
-$ python3 paddleocr.py --lanuage LANGUAGE
-$ python3 paddleocr.py -l LANGUAGE
-(ex) $ python3 paddleocr.py --lanuage japanese
+$ python3 paddleocr.py --version VERSION
+(ex) $ python3 paddleocr.py --version v3
 ```
 
 The prepared language specifications are as follows.
-  - japanese, jpn, jp (default)
-  - english, eng, en
-  - chinese, chi, ch
-  - german, ger, ge
-  - french, fre, fr
-  - korean, kor, ko
+  - v3 (default)
+  - v1
 
 <br/>
 
@@ -75,6 +70,23 @@ The prepared language specifications are as follows.
 
 <br/>
 
+By adding the `--language` option, you can choose the language. This option is only valid if the version is v1.
+```bash
+$ python3 paddleocr.py --lanuage LANGUAGE
+$ python3 paddleocr.py -l LANGUAGE
+(ex) $ python3 paddleocr.py --lanuage japanese
+```
+
+The prepared language specifications are as follows.
+  - japanese, jpn, jp (default)
+  - english, eng, en
+  - chinese, chi, ch
+  - german, ger, ge
+  - french, fre, fr
+  - korean, kor, ko
+
+<br/>
+
 By adding the `--det_limit_type` and `--det_limit_side_len` option, You can limit the size of the input image for text detection.
 `--det_limit_type` is max or min and `--det_limit_side_len` is a positive integer, generally set to a multiple of 32, such as 960.
 The default setting of the parameters is `--det_limit_type`='max', `--det_limit_side_len`=1920. Indicates that the longest side of the network input image cannot exceed 1920, If this value is exceeded, the image will be resized with the same width ratio to ensure that the longest side is det_limit_side_len.
@@ -85,9 +97,6 @@ $ python3 paddleocr.py  --det_limit_type DET_LIMIT_TYPE --det_limit_side_len DET
 (ex) $ python3 paddleocr.py -lt max -ll 1920
 (ex) $ python3 paddleocr.py  --det_limit_type min --det_limit_side_len 960
 ```
-The prepared language specifications are as follows.
-  - mobile (default)
-  - server (only Japanese and Chinese have server size models)
 
 <br/>
 

@@ -35,7 +35,7 @@ warnings.simplefilter("ignore", DeprecationWarning)
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/paddle_ocr/'
 
 # ======================
-# V1 Models
+# PaddleOCR V1 Models
 # ======================
 
 WEIGHT_PATH_DET_CHN = 'chi_eng_num_sym_server_det_org.onnx'
@@ -74,17 +74,17 @@ SAVE_IMAGE_OR_VIDEO_PATH = 'output.png'
 REOPEN_REQUIRE_IF_SHAPE_CHANED = True # Require for ailia SDK <= 1.2.16
 
 # ======================
-# V5 Models
+# PaddleOCR V3 Models
 # ======================
 
-WEIGHT_PATH_DET_V5_MBL = 'PP-OCRv5_mobile_det_infer.onnx'
-WEIGHT_PATH_DET_V5_SVR = 'PP-OCRv5_server_det_infer.onnx'
+WEIGHT_PATH_DET_PPOCRV5_MBL = 'PP-OCRv5_mobile_det_infer.onnx'
+WEIGHT_PATH_DET_PPOCRV5_SVR = 'PP-OCRv5_server_det_infer.onnx'
 
-WEIGHT_PATH_REC_V5_MBL = 'PP-OCRv5_mobile_rec_infer.onnx'
-DICT_PATH_REC_V5_MBL = './dict/PP-OCRv5_rec.txt'
+WEIGHT_PATH_REC_PPOCRV5_MBL = 'PP-OCRv5_mobile_rec_infer.onnx'
+DICT_PATH_REC_PPOCRV5_MBL = './dict/PP-OCRv5_rec.txt'
 
-WEIGHT_PATH_REC_V5_SVR = 'PP-OCRv5_server_rec_infer.onnx'
-DICT_PATH_REC_V5_SVR = './dict/PP-OCRv5_rec.txt'
+WEIGHT_PATH_REC_PPOCRV5_SVR = 'PP-OCRv5_server_rec_infer.onnx'
+DICT_PATH_REC_PPOCRV5_SVR = './dict/PP-OCRv5_rec.txt'
 
 # ======================
 # Arguemnt Parser Config
@@ -127,8 +127,8 @@ parser.add_argument(
     help='det model type'
 )
 parser.add_argument(
-    '-v', '--version', default='v5', choices=('v1', 'v5'),
-    help='det model type'
+    '-v', '--version', default='v3', choices=('v1', 'v3'),
+    help='paddle ocr model version'
 )
 parser.add_argument(
     '-w', '--write_results',
@@ -161,7 +161,7 @@ def get_default_config():
     # params for text recognizer
     dc['rec_algorithm'] = 'CRNN'
     dc['rec_model_path'] = WEIGHT_PATH_REC_JPN_SVR
-    if args.version == "v5":
+    if args.version == "v3":
         dc['rec_image_shape'] = '3, 48, 320'
     else:
         dc['rec_image_shape'] = '3, 32, 320'
@@ -1341,11 +1341,11 @@ def main():
     config['det_limit_side_len'] = args.det_limit_side_len
     config['det_limit_type'] = args.det_limit_type
 
-    if args.version == "v5":
+    if args.version == "v3":
         if args.case == 'mobile':
-            weight_path_det = WEIGHT_PATH_DET_V5_MBL
+            weight_path_det = WEIGHT_PATH_DET_PPOCRV5_MBL
         else:
-            weight_path_det = WEIGHT_PATH_DET_V5_SVR
+            weight_path_det = WEIGHT_PATH_DET_PPOCRV5_SVR
         det_algorithm = 'DB++'
     else:
         det_info = {
@@ -1359,13 +1359,13 @@ def main():
     weight_path_rec = dict_path_rec = None
 
     lang_tmp = args.language.lower()
-    if args.version == "v5":
+    if args.version == "v3":
         if args.case == 'mobile':
-            weight_path_rec = WEIGHT_PATH_REC_V5_MBL
-            dict_path_rec = DICT_PATH_REC_V5_MBL
+            weight_path_rec = WEIGHT_PATH_REC_PPOCRV5_MBL
+            dict_path_rec = DICT_PATH_REC_PPOCRV5_MBL
         elif args.case == 'server':
-            weight_path_rec = WEIGHT_PATH_REC_V5_SVR
-            dict_path_rec = DICT_PATH_REC_V5_SVR
+            weight_path_rec = WEIGHT_PATH_REC_PPOCRV5_SVR
+            dict_path_rec = DICT_PATH_REC_PPOCRV5_SVR
     elif lang_tmp in ('japanese', 'jpn', 'jp'):
         if args.case == 'mobile':
             weight_path_rec = WEIGHT_PATH_REC_JPN_MBL
