@@ -34,6 +34,10 @@ warnings.simplefilter("ignore", DeprecationWarning)
 # ======================
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/paddle_ocr/'
 
+# ======================
+# V1 Models
+# ======================
+
 WEIGHT_PATH_DET_CHN = 'chi_eng_num_sym_server_det_org.onnx'
 WEIGHT_PATH_DET_R50_ICDAR15 = 'det_r50_db++_icdar15_infer.onnx'
 WEIGHT_PATH_DET_R50_TDTR = 'det_r50_db++_td_tr_infer.onnx'
@@ -68,6 +72,19 @@ IMAGE_OR_VIDEO_PATH = 'input.jpg'
 SAVE_IMAGE_OR_VIDEO_PATH = 'output.png'
 
 REOPEN_REQUIRE_IF_SHAPE_CHANED = True # Require for ailia SDK <= 1.2.16
+
+# ======================
+# V5 Models
+# ======================
+
+WEIGHT_PATH_DET_V5_MBL = 'PP-OCRv5_mobile_det_infer.onnx'
+WEIGHT_PATH_DET_V5_SVR = 'PP-OCRv5_server_det_infer.onnx'
+
+WEIGHT_PATH_REC_V5_MBL = 'PP-OCRv5_mobile_rec_infer.onnx'
+DICT_PATH_REC_V5_MBL = './dict/PP-OCRv5_rec.txt'
+
+WEIGHT_PATH_REC_V5_SVR = 'PP-OCRv5_server_rec_infer.onnx'
+DICT_PATH_REC_V5_SVR = './dict/PP-OCRv5_rec.txt'
 
 # ======================
 # Arguemnt Parser Config
@@ -110,6 +127,10 @@ parser.add_argument(
     help='det model type'
 )
 parser.add_argument(
+    '-v', '--version', default='v5', choices=('v1', 'v5'),
+    help='det model type'
+)
+parser.add_argument(
     '-w', '--write_results',
     action='store_true',
     help='Flag to output results to file.'
@@ -140,7 +161,10 @@ def get_default_config():
     # params for text recognizer
     dc['rec_algorithm'] = 'CRNN'
     dc['rec_model_path'] = WEIGHT_PATH_REC_JPN_SVR
-    dc['rec_image_shape'] = '3, 32, 320'
+    if args.version == "v5":
+        dc['rec_image_shape'] = '3, 48, 320'
+    else:
+        dc['rec_image_shape'] = '3, 32, 320'
     dc['rec_char_type'] = 'ch'
     dc['rec_batch_num'] = 6
     dc['max_text_length'] = 25
@@ -1317,17 +1341,32 @@ def main():
     config['det_limit_side_len'] = args.det_limit_side_len
     config['det_limit_type'] = args.det_limit_type
 
-    det_info = {
-        'db_res18': (WEIGHT_PATH_DET_CHN, 'DB'),
-        'r50_icdar15': (WEIGHT_PATH_DET_R50_ICDAR15, 'DB++'),
-        'r50_trtd': (WEIGHT_PATH_DET_R50_TDTR, 'DB++'),
-    }
-    weight_path_det, det_algorithm = det_info[det_model]
+    if args.version == "v5":
+        if args.case == 'mobile':
+            weight_path_det = WEIGHT_PATH_DET_V5_MBL
+        else:
+            weight_path_det = WEIGHT_PATH_DET_V5_SVR
+        det_algorithm = 'DB++'
+    else:
+        det_info = {
+            'db_res18': (WEIGHT_PATH_DET_CHN, 'DB'),
+            'r50_icdar15': (WEIGHT_PATH_DET_R50_ICDAR15, 'DB++'),
+            'r50_trtd': (WEIGHT_PATH_DET_R50_TDTR, 'DB++'),
+        }
+        weight_path_det, det_algorithm = det_info[det_model]
+
     weight_path_cls = WEIGHT_PATH_CLS_CHN
     weight_path_rec = dict_path_rec = None
 
     lang_tmp = args.language.lower()
-    if lang_tmp in ('japanese', 'jpn', 'jp'):
+    if args.version == "v5":
+        if args.case == 'mobile':
+            weight_path_rec = WEIGHT_PATH_REC_V5_MBL
+            dict_path_rec = DICT_PATH_REC_V5_MBL
+        elif args.case == 'server':
+            weight_path_rec = WEIGHT_PATH_REC_V5_SVR
+            dict_path_rec = DICT_PATH_REC_V5_SVR
+    elif lang_tmp in ('japanese', 'jpn', 'jp'):
         if args.case == 'mobile':
             weight_path_rec = WEIGHT_PATH_REC_JPN_MBL
             dict_path_rec = DICT_PATH_REC_JPN_MBL
