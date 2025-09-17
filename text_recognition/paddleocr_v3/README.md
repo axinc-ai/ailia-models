@@ -117,8 +117,7 @@ ONNX opset = 10
 
 ## Netron
 
-[PP-OCRv5_mobile_det_infer.onnx.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/paddle_ocr/PP-OCRv5_mobile_det_infer.onnx.onnx.prototxt)
-[PP-OCRv5_mobile_rec_infer.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/paddle_ocr/PP-OCRv5_mobile_rec_infer.onnx.prototxt)
-
-[PP-OCRv5_server_det_infer.onnx.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/paddle_ocr/PP-OCRv5_server_det_infer.onnx.onnx.prototxt)
-[PP-OCRv5_server_rec_infer.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/paddle_ocr/PP-OCRv5_server_rec_infer.onnx.prototxt)
+- [PP-OCRv5_mobile_det_infer.onnx.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/paddle_ocr_v3/PP-OCRv5_mobile_det_infer.onnx.prototxt)
+- [PP-OCRv5_mobile_rec_infer.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/paddle_ocr_v3/PP-OCRv5_mobile_rec_infer.onnx.prototxt)
+- [PP-OCRv5_server_det_infer.onnx.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/paddle_ocr_v3/PP-OCRv5_server_det_infer.onnx.prototxt)
+- [PP-OCRv5_server_rec_infer.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/paddle_ocr_v3/PP-OCRv5_server_rec_infer.onnx.prototxt)
