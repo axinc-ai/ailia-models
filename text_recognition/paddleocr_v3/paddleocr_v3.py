@@ -60,6 +60,7 @@ parser = get_base_parser(
     'PP-OCRv5: A Practical Ultra Lightweight OCR System',
     IMAGE_OR_VIDEO_PATH,
     SAVE_IMAGE_OR_VIDEO_PATH,
+    fp16_support = False, # FP16 only support for mobile model
 )
 parser.add_argument(
     '-c', '--case', default='server', choices=('mobile', 'server'),
