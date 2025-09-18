@@ -155,8 +155,8 @@ def get_default_config():
 
     # DB params
     dc['det_db_thresh'] = 0.3
-    dc['det_db_box_thresh'] = 0.5
-    dc['det_db_unclip_ratio'] = 1.6
+    dc['det_db_box_thresh'] = 0.6 if args.version == "v3" else 0.5
+    dc['det_db_unclip_ratio'] = 1.5 if args.version == "v3" else 1.6
 
     # params for text recognizer
     dc['rec_algorithm'] = 'CRNN'
@@ -181,11 +181,11 @@ def get_default_config():
         dc['vis_font_path'] = '/usr/share/fonts/opentype/ipaexfont-gothic/ipaexg.ttf'
     dc['drop_score'] = 0.5  # this is threshold of rec
     dc['rec_bbox_padding'] = 0.1
-    dc['limited_max_width'] = 1280
-    dc['limited_min_width'] = 16
+    dc['limited_max_width'] = 3200 if args.version == "v3" else 1280
+    dc['limited_min_width'] = 320 if args.version == "v3" else 16
 
     # params for text classifier
-    dc['use_angle_cls'] = True
+    dc['use_angle_cls'] = args.version != "v3"
     dc['cls_model_path'] = WEIGHT_PATH_CLS_CHN
     dc['cls_image_shape'] = '3, 48, 192'
     dc['label_list'] = ['0', '180']
@@ -465,7 +465,11 @@ class DBPostProcess(object):
             if self.box_thresh > score:
                 continue
 
-            box = self.unclip(points).reshape(-1, 1, 2)
+            if args.version == "v3":
+                box = self.unclip_v3(points, self.unclip_ratio)
+            else:
+                box = self.unclip(points)
+            box = box.reshape(-1, 1, 2)
             box, sside = self.get_mini_boxes(box)
             if sside < self.min_size + 2:
                 continue
@@ -586,6 +590,71 @@ class DBPostProcess(object):
         box[:, 1] = box[:, 1] - ymin
         cv2.fillPoly(mask, box.reshape(1, -1, 2).astype(np.int32), 1)
         return cv2.mean(bitmap[ymin:ymax + 1, xmin:xmax + 1], mask)[0]
+
+    def unclip_v3(self, box, unclip_ratio):
+        poly_area = cv2.contourArea(box)
+        poly_length = cv2.arcLength(box, True)
+        delta = poly_area * unclip_ratio / poly_length
+
+        tolerance = 1.0e-20
+        if (abs(delta) < tolerance):
+            return box
+
+        normals = []
+        for i in range(len(box)):
+            pt1 = box[i]
+            pt2 = box[(i + 1) % len(box)]
+            if pt2[0] == pt1[0] and pt2[1] == pt1[1]:
+                normals.append([0, 0])
+                continue
+            dx = pt2[0] - pt1[0]
+            dy = pt2[1] - pt1[1]
+            f = 1.0 / math.hypot(dx, dy)
+            dx = dx * f
+            dy = dy * f
+            normals.append([dy, -dx])
+
+        arc_tolerance = 0.25
+
+        y = max(abs(delta) * arc_tolerance, arc_tolerance)
+        steps = min(math.pi / math.acos(1 - y / abs(delta)), abs(delta) * math.pi)
+        sin = math.sin(2.0 * math.pi / steps)
+        cos = math.cos(2.0 * math.pi / steps)
+        steps_per_rad = steps / (2.0 * math.pi)
+        if delta < 0.0:
+            sin = -sin
+
+        dest_poly = []
+        k = len(box) - 1
+        for j in range(len(box)):
+            sina = normals[k][0] * normals[j][1] - normals[j][0] * normals[k][1]
+            if abs(sina * delta) < 1.0:
+                cosa = normals[k][0] * normals[j][0] + normals[j][1] * normals[k][1]
+                if cosa > 0.0:
+                    dest_poly.append(int(round(box[j][0] + normals[k][0] * delta)))
+                    dest_poly.append(int(round(box[j][1] + normals[k][1] * delta)))
+                    continue
+            sina = min(max(sina, -1.0), 1.0)
+            if sina * delta < 0.0:
+                dest_poly.append(int(round(box[j][0] + normals[k][0] * delta)))
+                dest_poly.append(int(round(box[j][1] + normals[k][1] * delta)))
+                dest_poly.append(int(box[j][0]))
+                dest_poly.append(int(box[j][1]))
+                dest_poly.append(int(round(box[j][0] + normals[j][0] * delta)))
+                dest_poly.append(int(round(box[j][1] + normals[j][1] * delta)))
+            else:
+                a = math.atan2(sina, normals[k][0] * normals[j][0] + normals[k][1] * normals[j][1])
+                x = normals[k][0]
+                y = normals[k][1]
+                for i in range(max(int(round(steps_per_rad * abs(a))), 1)):
+                    dest_poly.append(int(round(box[j][0] + x * delta)))
+                    dest_poly.append(int(round(box[j][1] + y * delta)))
+                    x, y = (x * cos - sin * y, x * sin + y * cos)
+                dest_poly.append(int(round(box[j][0] + normals[j][0] * delta)))
+                dest_poly.append(int(round(box[j][1] + normals[j][1] * delta)))
+            k = j
+
+        return np.array(dest_poly).reshape(-1, 2)
 
     def __call__(self, outs_dict, shape_list):
         pred = outs_dict['maps']
@@ -780,7 +849,7 @@ class TextDetector(object):
             "box_thresh": config['det_db_box_thresh'],
             "max_candidates": 1000,
             "unclip_ratio": config['det_db_unclip_ratio'],
-            "use_dilation": True
+            "use_dilation": args.version != "v3"
         }
         if self.det_algorithm == "DB++":
             pre_process_list[1] = {
@@ -987,7 +1056,9 @@ class TextRecognizer(object):
     def resize_norm_img(self, img, max_wh_ratio):
         imgC, imgH, imgW = self.rec_image_shape
         assert imgC == img.shape[2]
-        if self.character_type == "ch":
+        if args.version == "v3":
+            imgW = int(imgW * max_wh_ratio)
+        elif self.character_type == "ch":
             imgW = int((32 * max_wh_ratio))
         imgW = max(min(imgW, self.limited_max_width), self.limited_min_width)
         h, w = img.shape[:2]
@@ -1083,9 +1154,14 @@ class TextSystem(object):
             max(
                 np.linalg.norm(points[0] - points[3]),
                 np.linalg.norm(points[1] - points[2])))
-        pts_std = np.float32([[0, 0], [img_crop_width, 0],
-                              [img_crop_width, img_crop_height],
-                              [0, img_crop_height]])
+        if args.version == "v3":
+            pts_std = np.float32([[0, 0], [img_crop_width - 1, 0],
+                                  [img_crop_width - 1, img_crop_height - 1],
+                                  [0, img_crop_height - 1]])
+        else:
+            pts_std = np.float32([[0, 0], [img_crop_width, 0],
+                                  [img_crop_width, img_crop_height],
+                                  [0, img_crop_height]])
         M = cv2.getPerspectiveTransform(points, pts_std)
         dst_img = cv2.warpPerspective(
             img,
@@ -1108,7 +1184,7 @@ class TextSystem(object):
 
         dt_boxes = sorted_boxes(dt_boxes)
 
-        if (len(dt_boxes) > 0):
+        if args.version != "v3" and (len(dt_boxes) > 0):
             ratio_padding = self.cfg['rec_bbox_padding']
             dt_boxes = np.array(dt_boxes)
             height_vec = dt_boxes[:, 2, :] - dt_boxes[:, 1, :]
@@ -1142,7 +1218,7 @@ class TextSystem(object):
         filter_boxes, filter_rec_res = [], []
         for box, rec_reuslt in zip(dt_boxes, rec_res):
             text, score = rec_reuslt
-            if score >= self.drop_score:
+            if score.size > 0 and score >= self.drop_score:
                 filter_boxes.append(box)
                 filter_rec_res.append(rec_reuslt)
 
