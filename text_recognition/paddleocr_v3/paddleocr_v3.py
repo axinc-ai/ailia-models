@@ -103,8 +103,8 @@ def get_default_config():
 
     # DB params
     dc['det_db_thresh'] = 0.3
-    dc['det_db_box_thresh'] = 0.5
-    dc['det_db_unclip_ratio'] = 1.6
+    dc['det_db_box_thresh'] = 0.6
+    dc['det_db_unclip_ratio'] = 1.5
 
     # params for text recognizer
     dc['rec_algorithm'] = 'CRNN'
@@ -126,8 +126,8 @@ def get_default_config():
         dc['vis_font_path'] = '/usr/share/fonts/opentype/ipaexfont-gothic/ipaexg.ttf'
     dc['drop_score'] = 0.5  # this is threshold of rec
     dc['rec_bbox_padding'] = 0.1
-    dc['limited_max_width'] = 1280
-    dc['limited_min_width'] = 16
+    dc['limited_max_width'] = 3200
+    dc['limited_min_width'] = 48
 
     # params for text classifier
     dc['use_angle_cls'] = True
@@ -425,75 +425,71 @@ class DBPostProcess(object):
 
         return np.array(boxes, dtype=np.int16), scores
 
-    def xyrotate(self, coord_xy, angle, center_xy):
-        # exec rotate
-        rotation_matrix = cv2.getRotationMatrix2D((center_xy[0], center_xy[1]), angle, 1)
-        # make variable for output
-        coord_xy_rotated = np.zeros(np.shape(coord_xy))
-        # loop of coordinate
-        for coord_i in range(len(coord_xy)):
-            # set x, y
-            coord_x_tmp = coord_xy[coord_i, 0]
-            coord_y_tmp = coord_xy[coord_i, 1]
-            # slide to suit center of rotation
-            coord_x_tmp -= center_xy[0]
-            coord_y_tmp -= center_xy[1]
-            # exec rotation
-            coord_xy_tmp = np.array([coord_x_tmp, coord_y_tmp])[:, np.newaxis]
-            rotation_matrix_tmp = np.array([
-                [np.cos(-angle / 180 * np.pi), -np.sin(-angle / 180 * np.pi)],
-                [np.sin(-angle / 180 * np.pi), np.cos(-angle / 180 * np.pi)]
-            ])
-            coord_xy_tmp = rotation_matrix_tmp @ coord_xy_tmp
-            # re-slide to suit center of rotation
-            coord_xy_tmp = coord_xy_tmp.reshape(-1)
-            coord_xy_tmp[0] += center_xy[0]
-            coord_xy_tmp[1] += center_xy[1]
-            # stock
-            coord_xy_rotated[coord_i, :] = coord_xy_tmp
-
-        return coord_xy_rotated
-
     def unclip(self, box):
         unclip_ratio = self.unclip_ratio
-        poly_area = (np.sqrt(np.sum((box[0, :] - box[1, :]) ** 2)) *
-                     np.sqrt(np.sum((box[0, :] - box[3, :]) ** 2)))
-        poly_length = (np.sqrt(np.sum((box[0, :] - box[1, :]) ** 2)) +
-                       np.sqrt(np.sum((box[0, :] - box[3, :]) ** 2))) * 2
-        distance = poly_area * unclip_ratio / poly_length
-        # calc angle between upper side of bbox with x axis
-        u = box[1] - box[0]
-        v = box[1] - box[0]
-        v[1] = 0
-        i = np.inner(u, v)
-        n = np.linalg.norm(u) * np.linalg.norm(v)
-        c = i / n
-        angle = np.rad2deg(np.arccos(np.clip(c, -1.0, 1.0)))
-        # exec coordinates rotation 
-        box_ = self.xyrotate(coord_xy=box, angle=angle,
-                             center_xy=np.mean(box, axis=0))
-        # calculate circle coordinates
-        pitch = 10
-        x_upper = np.cos(np.arange(1, 0, (-1 / pitch)) * np.pi) * distance
-        y_upper = -np.sqrt(distance ** 2 - x_upper ** 2)
-        x_lower = np.cos(np.arange(0, 1, (1 / pitch)) * np.pi) * distance
-        y_lower = np.sqrt(distance ** 2 - x_lower ** 2)
-        x = np.concatenate([x_upper, x_lower])
-        y = np.concatenate([y_upper, y_lower])
-        circle = np.concatenate([x[:, np.newaxis], y[:, np.newaxis]], axis=1)
-        # calculate circle coordinates around four corners
-        expanded = []
-        for box_tmp in box_:
-            expanded.append(circle + box_tmp)
-        expanded = np.array(expanded).reshape(-1, 2)
-        # narrow down circle coordinates to outside 
-        expanded = expanded[[25, 26, 27, 28, 29, 30, 50, 51, 52, 53, 54, 55,
-                             75, 76, 77, 78, 79, 60, 0, 1, 2, 3, 4, 5]]
-        # exec coordinates re-rotation 
-        expanded = self.xyrotate(coord_xy=expanded, angle=-angle,
-                                 center_xy=np.mean(box_, axis=0))
-        expanded = np.round(expanded).astype(np.int64)
-        return expanded
+        poly_area = cv2.contourArea(box)
+        poly_length = cv2.arcLength(box, True)
+        delta = poly_area * unclip_ratio / poly_length
+
+        tolerance = 1.0e-20
+        if (abs(delta) < tolerance):
+            return box
+
+        normals = []
+        for i in range(len(box)):
+            pt1 = box[i]
+            pt2 = box[(i + 1) % len(box)]
+            if pt2[0] == pt1[0] and pt2[1] == pt1[1]:
+                normals.append([0, 0])
+                continue
+            dx = pt2[0] - pt1[0]
+            dy = pt2[1] - pt1[1]
+            f = 1.0 / math.hypot(dx, dy)
+            dx = dx * f
+            dy = dy * f
+            normals.append([dy, -dx])
+
+        arc_tolerance = 0.25
+
+        y = max(abs(delta) * arc_tolerance, arc_tolerance)
+        steps = min(math.pi / math.acos(1 - y / abs(delta)), abs(delta) * math.pi)
+        sin = math.sin(2.0 * math.pi / steps)
+        cos = math.cos(2.0 * math.pi / steps)
+        steps_per_rad = steps / (2.0 * math.pi)
+        if delta < 0.0:
+            sin = -sin
+
+        dest_poly = []
+        k = len(box) - 1
+        for j in range(len(box)):
+            sina = normals[k][0] * normals[j][1] - normals[j][0] * normals[k][1]
+            if abs(sina * delta) < 1.0:
+                cosa = normals[k][0] * normals[j][0] + normals[j][1] * normals[k][1]
+                if cosa > 0.0:
+                    dest_poly.append(int(round(box[j][0] + normals[k][0] * delta)))
+                    dest_poly.append(int(round(box[j][1] + normals[k][1] * delta)))
+                    continue
+            sina = min(max(sina, -1.0), 1.0)
+            if sina * delta < 0.0:
+                dest_poly.append(int(round(box[j][0] + normals[k][0] * delta)))
+                dest_poly.append(int(round(box[j][1] + normals[k][1] * delta)))
+                dest_poly.append(int(box[j][0]))
+                dest_poly.append(int(box[j][1]))
+                dest_poly.append(int(round(box[j][0] + normals[j][0] * delta)))
+                dest_poly.append(int(round(box[j][1] + normals[j][1] * delta)))
+            else:
+                a = math.atan2(sina, normals[k][0] * normals[j][0] + normals[k][1] * normals[j][1])
+                x = normals[k][0]
+                y = normals[k][1]
+                for i in range(max(int(round(steps_per_rad * abs(a))), 1)):
+                    dest_poly.append(int(round(box[j][0] + x * delta)))
+                    dest_poly.append(int(round(box[j][1] + y * delta)))
+                    x, y = (x * cos - sin * y, x * sin + y * cos)
+                dest_poly.append(int(round(box[j][0] + normals[j][0] * delta)))
+                dest_poly.append(int(round(box[j][1] + normals[j][1] * delta)))
+            k = j
+
+        return np.array(dest_poly).reshape(-1, 2)
 
     def get_mini_boxes(self, contour):
         bounding_box = cv2.minAreaRect(contour)
@@ -697,7 +693,7 @@ class TextDetector(object):
             "box_thresh": config['det_db_box_thresh'],
             "max_candidates": 1000,
             "unclip_ratio": config['det_db_unclip_ratio'],
-            "use_dilation": True
+            "use_dilation": False
         }
         if self.det_algorithm == "DB++":
             pre_process_list[1] = {
@@ -898,8 +894,7 @@ class TextRecognizer(object):
     def resize_norm_img(self, img, max_wh_ratio):
         imgC, imgH, imgW = self.rec_image_shape
         assert imgC == img.shape[2]
-        if self.character_type == "ch":
-            imgW = int((32 * max_wh_ratio))
+        imgW = int(imgW * max_wh_ratio)
         imgW = max(min(imgW, self.limited_max_width), self.limited_min_width)
         h, w = img.shape[:2]
         ratio = w / float(h)
@@ -991,9 +986,9 @@ class TextSystem(object):
             max(
                 np.linalg.norm(points[0] - points[3]),
                 np.linalg.norm(points[1] - points[2])))
-        pts_std = np.float32([[0, 0], [img_crop_width, 0],
-                              [img_crop_width, img_crop_height],
-                              [0, img_crop_height]])
+        pts_std = np.float32([[0, 0], [img_crop_width - 1, 0],
+                              [img_crop_width - 1, img_crop_height - 1],
+                              [0, img_crop_height - 1]])
         M = cv2.getPerspectiveTransform(points, pts_std)
         dst_img = cv2.warpPerspective(
             img,
@@ -1016,24 +1011,6 @@ class TextSystem(object):
 
         dt_boxes = sorted_boxes(dt_boxes)
 
-        if (len(dt_boxes) > 0):
-            ratio_padding = self.cfg['rec_bbox_padding']
-            dt_boxes = np.array(dt_boxes)
-            height_vec = dt_boxes[:, 2, :] - dt_boxes[:, 1, :]
-            width_vec = dt_boxes[:, 3, :] - dt_boxes[:, 0, :]
-            if (np.sum(height_vec ** 2) > np.sum(width_vec ** 2)):
-                height_vec = width_vec
-            padding_vec_tmp = height_vec * ratio_padding
-            padding_vec = padding_vec_tmp.copy()
-            padding_vec[:, 0] += padding_vec_tmp[:, 1]
-            padding_vec[:, 1] -= padding_vec_tmp[:, 0]
-            padding_vec = np.round(padding_vec)
-            dt_boxes[:, 0, :] -= padding_vec
-            dt_boxes[:, 2, :] += padding_vec
-            padding_vec[:, 0] *= -1
-            dt_boxes[:, 1, :] -= padding_vec
-            dt_boxes[:, 3, :] += padding_vec
-
         for bno in range(len(dt_boxes)):
             tmp_box = copy.deepcopy(dt_boxes[bno])
             img_crop = self.get_rotate_crop_image(ori_im, tmp_box)
@@ -1050,7 +1027,7 @@ class TextSystem(object):
         filter_boxes, filter_rec_res = [], []
         for box, rec_reuslt in zip(dt_boxes, rec_res):
             text, score = rec_reuslt
-            if score >= self.drop_score:
+            if score.size > 0 and score >= self.drop_score:
                 filter_boxes.append(box)
                 filter_rec_res.append(rec_reuslt)
 
