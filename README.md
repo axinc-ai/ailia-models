@@ -24,21 +24,17 @@ If you would like to try on your computer:
 [ailia-models wiki](https://deepwiki.com/axinc-ai/ailia-models)
 
 # Supported models
-380 models as of July 17, 2025
+381 models as of September 22, 2025
 
 # Latest update
+- 2025.09.22 Add paddleocr_v3
 - 2025.07.17 Add 6d_repnet_360, siglip2
 - 2025.06.27 Add edge_sam
 - 2025.04.19 Add yolov11-seg, gpt-sovits-v3
 - 2025.02.28 Add multilingual-minilmv2
 - 2025.01.02 Add qwen_audio, audiosep
 - 2025.01.01 Add RT-DETRv2, gazelle, lama, anything_v3, depth_anything_controlnet, deepfacelive, llava-jp
-- 2024.12.31 Add clip-japanese-base, timesfm
-- 2024.12.29 Add SAM2.1, span
-- 2024.12.18 Update ONNX file of prompt encoder for SAM
-- 2024.12.17 Add yolov10, yolov11
-- 2024.11.26 Add fast_sam
-- 2024.11.19 Add qwen2_vl, live_portrait (ailia SDK 1.5)
+
 - More information in our [Wiki](https://github.com/axinc-ai/ailia-models/wiki)
 
 ## Action recognition
