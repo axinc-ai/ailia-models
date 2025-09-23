@@ -32,8 +32,12 @@ logger = getLogger(__name__)
 #WEIGHT_DEC_PATH = "trained_model_005_decoder.onnx"
 #WEIGHT_ENC_PATH = "trained_model_007_encoder.onnx"
 #WEIGHT_DEC_PATH = "trained_model_007_decoder.onnx"
-WEIGHT_ENC_PATH = "trained_model_v11_encoder.onnx"
-WEIGHT_DEC_PATH = "trained_model_v11_decoder.onnx"
+#WEIGHT_ENC_PATH = "trained_model_v11_encoder.onnx"
+#WEIGHT_DEC_PATH = "trained_model_v11_decoder.onnx"
+WEIGHT_ENC_PATH = "trained_model_1024x512_encoder.onnx"
+WEIGHT_DEC_PATH = "trained_model_1024x512_decoder.onnx"
+#WEIGHT_ENC_PATH = "trained_model_512x256_v2_encoder.onnx"
+#WEIGHT_DEC_PATH = "trained_model_512x256_v2_decoder.onnx"
 #WEIGHT_ENC_PATH = "trained_model_v11_encoder_512.onnx"
 #WEIGHT_DEC_PATH = "trained_model_v11_decoder_512.onnx"
 MODEL_ENC_PATH = None#"edge_sam_3x_encoder.onnx.prototxt"
@@ -45,7 +49,14 @@ SAVE_IMAGE_PATH = "output.png"
 
 POINT = (500, 375)
 
+#TARGET_LENGTH = 1024
+#TARGET_WIDTH_DIV = 1
+
 TARGET_LENGTH = 1024
+TARGET_WIDTH_DIV = 2
+
+#TARGET_LENGTH = 512
+#TARGET_WIDTH_DIV = 2
 
 # ======================
 # Arguemnt Parser Config
@@ -210,12 +221,15 @@ def preprocess(img):
     scale = TARGET_LENGTH / max(im_h, im_w)
     ow = int(im_w * scale)
     oh = int(im_h * scale)
+    if TARGET_WIDTH_DIV != 1:
+        ow = TARGET_LENGTH // TARGET_WIDTH_DIV
+        oh = TARGET_LENGTH
     img = np.array(Image.fromarray(img).resize((ow, oh), Image.Resampling.BICUBIC))
 
     img = normalize_image(img, normalize_type="ImageNet")
 
     pad_h = TARGET_LENGTH - oh
-    pad_w = TARGET_LENGTH - ow
+    pad_w = TARGET_LENGTH // TARGET_WIDTH_DIV - ow
     img = np.pad(img, ((0, pad_h), (0, pad_w), (0, 0)), "constant")
 
     img = img.transpose((2, 0, 1))  # HWC -> CHW
@@ -230,7 +244,7 @@ def postprocess_masks(
 ):
     mask = mask.squeeze(0).transpose(1, 2, 0)
     mask = cv2.resize(
-        mask, (TARGET_LENGTH, TARGET_LENGTH), interpolation=cv2.INTER_LINEAR
+        mask, (TARGET_LENGTH // TARGET_WIDTH_DIV, TARGET_LENGTH), interpolation=cv2.INTER_LINEAR
     )
     mask = mask[:input_h, :input_w, :]
     mask = cv2.resize(mask, (orig_w, orig_h), interpolation=cv2.INTER_LINEAR)
