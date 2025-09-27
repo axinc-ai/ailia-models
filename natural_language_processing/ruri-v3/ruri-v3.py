@@ -115,8 +115,8 @@ def predict(models, sentences, header):
         output = net.predict([input_ids, attention_mask])
     else:
         output = net.run(None, {
-            "input_ids": input_ids,
-            "attention_mask": attention_mask
+            "input_ids": input_ids.astype(np.int64),
+            "attention_mask": attention_mask.astype(np.int64)
         })
     embeddings = output[0]
 
