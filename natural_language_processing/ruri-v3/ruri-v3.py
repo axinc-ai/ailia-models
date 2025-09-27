@@ -196,7 +196,7 @@ def main():
     else:
         from ailia_tokenizer import LlamaTokenizer
         tokenizer = LlamaTokenizer.from_pretrained("./tokenizer")
-        tokenizer._pad_token_id = 3
+        #tokenizer._pad_token_id = 3 # ailia tokenizer 1.5.0では0でpadされるがattention maskがあるので影響しない
 
     models = {
         "net": net,
