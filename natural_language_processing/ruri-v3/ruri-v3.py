@@ -18,7 +18,7 @@ logger = getLogger(__name__)
 # ======================
 
 WEIGHT_BASE_PATH = 'ruri-v3-310m.onnx'
-MODEL_BASE_PATH = None#'ruri-v3-310m.onnx.prototxt'
+MODEL_BASE_PATH = 'ruri-v3-310m.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/ruri-v3/'
 
 SENTENCE_PATH = 'sample.txt'
@@ -190,12 +190,13 @@ def main():
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
         net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
 
-    if True:#args.disable_ailia_tokenizer:
+    if args.disable_ailia_tokenizer:
         from transformers import AutoTokenizer
         tokenizer = AutoTokenizer.from_pretrained('tokenizer')
     else:
-        from ailia_tokenizer import XLMRobertaTokenizer
-        tokenizer = XLMRobertaTokenizer.from_pretrained('./tokenizer/')
+        from ailia_tokenizer import LlamaTokenizer
+        tokenizer = LlamaTokenizer.from_pretrained("./tokenizer")
+        tokenizer._pad_token_id = 3
 
     models = {
         "net": net,
