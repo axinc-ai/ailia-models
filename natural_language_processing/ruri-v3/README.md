@@ -35,7 +35,7 @@ $ python3 ruri-v3.py -i FILE_PATH
 
 ```
 User (press q to exit): nnapiの速度
-Text: NNAPIを使用することで、Google PixelのEdgeTPUや、QualcommやMediatekのNPUを 使用した高速推論が可能になります。 (Similarity:0.863)
+Text: NNAPIを使用することで、NPUを使用したAIモデルの高速推論が可能になります。 (Similarity:0.883)
 ```
 
 ## Reference
@@ -52,4 +52,4 @@ ONNX opset=16
 
 ## Netron
 
-[ruri-v3-310m.onnx.prototxt](https://storage.googleapis.com/ailia-models/ruri-v3/ruri-v3-310m.onnx.prototxt)  
+[ruri-v3-310m.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/ruri-v3/ruri-v3-310m.onnx.prototxt)  
