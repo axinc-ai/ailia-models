@@ -13,6 +13,7 @@ import ailia
 
 # import original modules
 sys.path.append("../../util")
+import webcamera_utils  # noqa: E402
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import urlretrieve, progress_print, check_and_download_models  # noqa
 from image_utils import normalize_image  # noqa
@@ -25,10 +26,22 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_ENC_PATH = "edge_sam_3x_encoder.onnx"
-WEIGHT_DEC_PATH = "edge_sam_3x_decoder.onnx"
-MODEL_ENC_PATH = "edge_sam_3x_encoder.onnx.prototxt"
-MODEL_DEC_PATH = "edge_sam_3x_decoder.onnx.prototxt"
+#WEIGHT_ENC_PATH = "edge_sam_3x_encoder.onnx"
+#WEIGHT_DEC_PATH = "edge_sam_3x_decoder.onnx"
+#WEIGHT_ENC_PATH = "trained_model_005_encoder.onnx"
+#WEIGHT_DEC_PATH = "trained_model_005_decoder.onnx"
+#WEIGHT_ENC_PATH = "trained_model_007_encoder.onnx"
+#WEIGHT_DEC_PATH = "trained_model_007_decoder.onnx"
+#WEIGHT_ENC_PATH = "trained_model_v11_encoder.onnx"
+#WEIGHT_DEC_PATH = "trained_model_v11_decoder.onnx"
+WEIGHT_ENC_PATH = "trained_model_1024x512_encoder.onnx"
+WEIGHT_DEC_PATH = "trained_model_1024x512_decoder.onnx"
+#WEIGHT_ENC_PATH = "trained_model_512x256_v2_encoder.onnx"
+#WEIGHT_DEC_PATH = "trained_model_512x256_v2_decoder.onnx"
+#WEIGHT_ENC_PATH = "trained_model_v11_encoder_512.onnx"
+#WEIGHT_DEC_PATH = "trained_model_v11_decoder_512.onnx"
+MODEL_ENC_PATH = None#"edge_sam_3x_encoder.onnx.prototxt"
+MODEL_DEC_PATH = None#"edge_sam_3x_decoder.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/edge_sam/"
 
 IMAGE_PATH = "truck.jpg"
@@ -36,7 +49,14 @@ SAVE_IMAGE_PATH = "output.png"
 
 POINT = (500, 375)
 
+#TARGET_LENGTH = 1024
+#TARGET_WIDTH_DIV = 1
+
 TARGET_LENGTH = 1024
+TARGET_WIDTH_DIV = 2
+
+#TARGET_LENGTH = 512
+#TARGET_WIDTH_DIV = 2
 
 # ======================
 # Arguemnt Parser Config
@@ -94,7 +114,7 @@ def apply_coords(coords, h, w):
 
 
 def show_mask(mask, img):
-    color = np.array([255, 144, 30], dtype=np.uint8)
+    color = np.array([0, 0, 255], dtype=np.uint8)
     color = color.reshape(1, 1, -1)
 
     h, w = mask.shape[-2:]
@@ -201,12 +221,15 @@ def preprocess(img):
     scale = TARGET_LENGTH / max(im_h, im_w)
     ow = int(im_w * scale)
     oh = int(im_h * scale)
+    if TARGET_WIDTH_DIV != 1:
+        ow = TARGET_LENGTH // TARGET_WIDTH_DIV
+        oh = TARGET_LENGTH
     img = np.array(Image.fromarray(img).resize((ow, oh), Image.Resampling.BICUBIC))
 
     img = normalize_image(img, normalize_type="ImageNet")
 
     pad_h = TARGET_LENGTH - oh
-    pad_w = TARGET_LENGTH - ow
+    pad_w = TARGET_LENGTH // TARGET_WIDTH_DIV - ow
     img = np.pad(img, ((0, pad_h), (0, pad_w), (0, 0)), "constant")
 
     img = img.transpose((2, 0, 1))  # HWC -> CHW
@@ -221,7 +244,7 @@ def postprocess_masks(
 ):
     mask = mask.squeeze(0).transpose(1, 2, 0)
     mask = cv2.resize(
-        mask, (TARGET_LENGTH, TARGET_LENGTH), interpolation=cv2.INTER_LINEAR
+        mask, (TARGET_LENGTH // TARGET_WIDTH_DIV, TARGET_LENGTH), interpolation=cv2.INTER_LINEAR
     )
     mask = mask[:input_h, :input_w, :]
     mask = cv2.resize(mask, (orig_w, orig_h), interpolation=cv2.INTER_LINEAR)
@@ -240,6 +263,9 @@ def predict(models, img, point_coords, point_labels, num_multimask_outputs=1):
     else:
         output = encoder.run(None, {"image": img})
     features = output[0]
+
+    point_coords = [[0, 0], [im_w, im_h]]
+    point_labels = [2, 3]
 
     point_coords = np.array(point_coords, dtype=np.float32)[None]
     point_labels = np.array(point_labels, dtype=np.float32)[None]
@@ -348,22 +374,109 @@ def recognize_from_image(models):
 
         masks, scores = output
 
+        print(scores)
+
         mask = np.expand_dims(masks[scores.argmax()], axis=0)
         res_img = show_mask(mask, img)
 
         sel = label_list < 2
         coord_list = coord_list[sel]
         label_list = label_list[sel]
-        if 0 < len(label_list):
-            res_img = show_points(coord_list, label_list, res_img)
-        if box is not None:
-            res_img = show_box(box, res_img)
+        #if 0 < len(label_list):
+        #    res_img = show_points(coord_list, label_list, res_img)
+        #if box is not None:
+        #    res_img = show_box(box, res_img)
 
         # plot result
         savepath = get_savepath(args.savepath, image_path, ext=".png")
         cv2.imwrite(savepath, res_img)
         logger.info(f"saved at : {savepath}")
 
+
+def recognize_from_video(models):
+    capture = webcamera_utils.get_capture(args.video)
+
+    pos_points = args.pos
+    neg_points = args.neg
+    box = args.box
+    num_multimask_outputs = args.num_multimask_outputs
+
+    if pos_points is None:
+        if neg_points is None and box is None:
+            pos_points = [POINT]
+        else:
+            pos_points = []
+    if neg_points is None:
+        neg_points = []
+    if box is not None:
+        box = np.array(box).reshape(2, 2)
+
+    lf = "\n"
+    logger.info(f"Positive coordinate: {pos_points}")
+    logger.info(f"Negative coordinate: {neg_points}")
+    logger.info(f"Box coordinate: {lf if box is not None else ''}{box}")
+
+    coord_list = []
+    label_list = []
+    if box is not None:
+        coord_list.append(box)
+        label_list.append(np.array([2, 3]))
+    if pos_points:
+        coord_list.append(np.array(pos_points))
+        label_list.append(np.ones(len(pos_points)))
+    if neg_points:
+        coord_list.append(np.array(neg_points))
+        label_list.append(np.zeros(len(neg_points)))
+
+    coord_list = np.concatenate(coord_list, axis=0)
+    label_list = np.concatenate(label_list, axis=0)
+
+    if args.savepath != SAVE_IMAGE_PATH:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        save_h, save_w = f_h, f_w
+        writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
+    else:
+        writer = None
+
+    frame_shown = False
+    while(True):
+        ret, frame = capture.read()
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+            break
+
+        img = frame
+
+        output = predict(models, img, coord_list, label_list, num_multimask_outputs)
+
+        masks, scores = output
+
+        mask = np.expand_dims(masks[scores.argmax()], axis=0)
+        res_img = show_mask(mask, img)
+
+        sel = label_list < 2
+        coord_list = coord_list[sel]
+        label_list = label_list[sel]
+        #if 0 < len(label_list):
+        #    res_img = show_points(coord_list, label_list, res_img)
+        #if box is not None:
+        #    res_img = show_box(box, res_img)
+
+        # plot result
+        cv2.imshow('frame', res_img)
+        frame_shown = True
+
+        # save results
+        if writer is not None:
+            writer.write(res_img)
+
+    capture.release()
+    cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
+    logger.info('Script finished successfully.')
 
 def main():
     # model files check and download
@@ -388,10 +501,13 @@ def main():
         decoder=decoder,
     )
 
-    if not args.gui:
-        recognize_from_image(models)
+    if args.video is not None:
+        recognize_from_video(models)
     else:
-        show_gui(models, args.input[0])
+        if not args.gui:
+            recognize_from_image(models)
+        else:
+            show_gui(models, args.input[0])
 
 
 if __name__ == "__main__":
