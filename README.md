@@ -24,9 +24,10 @@ If you would like to try on your computer:
 [ailia-models wiki](https://deepwiki.com/axinc-ai/ailia-models)
 
 # Supported models
-381 models as of September 22, 2025
+382 models as of September 29, 2025
 
 # Latest update
+- 2025.09.29 Add ruri-v3 (embedding)
 - 2025.09.22 Add paddleocr_v3
 - 2025.07.17 Add 6d_repnet_360, siglip2
 - 2025.06.27 Add edge_sam
