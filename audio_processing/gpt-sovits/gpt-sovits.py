@@ -85,7 +85,7 @@ if args.normal:
     WEIGHT_PATH_T2S_STAGE_DECODER = 't2s_sdec.onnx'
 else:
     WEIGHT_PATH_T2S_STAGE_DECODER = 't2s_sdec' + FP16_PREFIX + '.opt3.onnx'
-WEIGHT_PATH_VITS = 'vits.onnx'
+WEIGHT_PATH_VITS = 'vits' + FP16_PREFIX + '.onnx'
 
 MODEL_PATH_SSL = WEIGHT_PATH_SSL + '.prototxt'
 MODEL_PATH_T2S_ENCODER = WEIGHT_PATH_T2S_ENCODER + '.prototxt'
