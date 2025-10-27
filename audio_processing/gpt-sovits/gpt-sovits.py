@@ -69,15 +69,22 @@ parser.add_argument(
     '--ailia_voice', action='store_true',
     help='use ailia voice for G2P'
 )
+parser.add_argument(
+    "--fp16", action="store_true", help="use fp16 model (default : fp32 model)."
+)
 args = update_parser(parser, check_input_type=False)
 
-WEIGHT_PATH_SSL = 'cnhubert.onnx'
-WEIGHT_PATH_T2S_ENCODER = 't2s_encoder.onnx'
-WEIGHT_PATH_T2S_FIRST_DECODER = 't2s_fsdec.onnx'
+FP16_PREFIX = ""
+if args.fp16:
+    FP16_PREFIX = "_fp16"
+
+WEIGHT_PATH_SSL = 'cnhubert' + FP16_PREFIX + '.onnx'
+WEIGHT_PATH_T2S_ENCODER = 't2s_encoder' + FP16_PREFIX + '.onnx'
+WEIGHT_PATH_T2S_FIRST_DECODER = 't2s_fsdec' + FP16_PREFIX + '.onnx'
 if args.normal:
     WEIGHT_PATH_T2S_STAGE_DECODER = 't2s_sdec.onnx'
 else:
-    WEIGHT_PATH_T2S_STAGE_DECODER = 't2s_sdec.opt3.onnx'
+    WEIGHT_PATH_T2S_STAGE_DECODER = 't2s_sdec' + FP16_PREFIX + '.opt3.onnx'
 WEIGHT_PATH_VITS = 'vits.onnx'
 
 MODEL_PATH_SSL = WEIGHT_PATH_SSL + '.prototxt'
