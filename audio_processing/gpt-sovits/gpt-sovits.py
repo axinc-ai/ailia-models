@@ -315,6 +315,8 @@ def generate_voice(ssl, t2s_encoder, t2s_first_decoder, t2s_stage_decoder, vits)
     ssl_content = ssl.forward(ref_audio_16k)
 
     a = gpt_sovits.forward(ref_seq, text_seq, ref_bert, text_bert, wav32k, ssl_content)
+    if args.fp16:
+        a = a.astype(np.float32)
 
     savepath = args.savepath
     logger.info(f'saved at : {savepath}')
