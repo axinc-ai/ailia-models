@@ -2,6 +2,7 @@ import sys
 
 import numpy as np
 import cv2
+import json
 
 import ailia
 
@@ -42,6 +43,11 @@ parser.add_argument(
     action='store_true',
     help="Don't display preview in GUI."
 )
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='save result to json'
+)
 args = update_parser(parser)
 
 
@@ -67,6 +73,18 @@ def render_frame(frame, display_text):
     cv2.putText(frame, display_text, text_loc, FONT_STYLE, FONT_SIZE, FONT_COLOR)
 
     return frame
+
+
+def save_json(json_path, results):
+    out = []
+    for r in results:
+        if r is None:
+            continue
+        else:
+            r['prob'] = float(r['prob'])
+            out.append(r)
+    with open(json_path, 'w') as f:
+        json.dump(out, f, indent=2)
 
 
 # ======================
@@ -102,7 +120,7 @@ def recognize_from_video(enc, dec):
     assert capture.isOpened(), 'Cannot capture source'
 
     # create video writer if savepath is specified as video format
-    if args.savepath != None:
+    if args.savepath != None and not args.cui:
         logger.warning(
             'currently, video results cannot be output correctly...'
         )
@@ -115,6 +133,7 @@ def recognize_from_video(enc, dec):
     sequence_size = 16
 
     embeddings = []
+    results_per_frame = []
     frame_shown = False
     while True:
         ret, frame = capture.read()
@@ -132,7 +151,9 @@ def recognize_from_video(enc, dec):
 
         embeddings.append(embedding)
         embeddings = embeddings[-sequence_size:]
+        result = None
         if len(embeddings) == sequence_size:
+
             decoder_input = np.concatenate(embeddings, axis=0)
             decoder_input = np.expand_dims(decoder_input, axis=0)
 
@@ -143,9 +164,16 @@ def recognize_from_video(enc, dec):
             probs = probs[0]
 
             i = np.argmax(probs)
+            result = {
+                'label': LABELS[i],
+                'prob': probs[np.argmax(probs)] * 100
+            }
+        results_per_frame.append(result)
+
+        if result is not None:
             display_text = '{} - {:.2f}%'.format(
-                LABELS[i],
-                probs[np.argmax(probs)] * 100
+                result['label'],
+                result['prob']
             )
         else:
             display_text = 'Preparing...'
@@ -166,6 +194,14 @@ def recognize_from_video(enc, dec):
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
+
+    if args.write_json:
+        if not args.savepath:
+            logger.warning('json file was not saved because savepath is not specified.')
+        else:
+            json_path = args.savepath.rsplit('.', 1)[0] + '.json'
+            save_json(json_path, results_per_frame)
+            logger.info(f'result saved to {json_path}')
 
     logger.info('Script finished successfully.')
 
