@@ -22,7 +22,7 @@ from scipy.io.wavfile import write
 
 
 # ======================
-# Arguemnt Parser Config
+# Argument Parser Config
 # ======================
 DEFAULT_INPUT = '吾輩は猫である'
 DEFAULT_EMO = "私はいまとても嬉しいです"
@@ -180,7 +180,7 @@ def prepare_inputs(text, style_text, sid, emo, emo_audio_path, bert, tokenizer, 
             'attention_mask': emo_input['attention_mask']
         })[0]
     else:
-        ValueError('At least one of emo or emo_audio must be present')
+        raise ValueError('At least one of emo or emo_audio must be present')
 
     return x, tones, lang_ids, bert, sid, emo_embed
 

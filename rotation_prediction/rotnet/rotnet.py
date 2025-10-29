@@ -32,6 +32,7 @@ IMAGE_PATH = 'test.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 224
 IMAGE_WIDTH = 224
+IMAGE_CHANNELS = 3
 
 
 # ======================
@@ -88,6 +89,9 @@ def recognize_from_image():
             rotation_angle = 0
             rotated_img = cv2.resize(org_img, (IMAGE_HEIGHT, IMAGE_WIDTH))
             input_data = rotated_img.reshape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 3))
+        
+        if IMAGE_CHANNELS == 1:
+            input_data = input_data[:, :, :, 1:2]
 
         net.set_input_shape(input_data.shape)
 
@@ -161,6 +165,9 @@ def recognize_from_video():
             rotated_img = resized_img
             input_data = rotated_img.reshape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 3))
 
+        if IMAGE_CHANNELS == 1:
+            input_data = input_data[:, :, :, 1:2]
+
         # inference
         preds_ailia = net.predict(input_data)
 
@@ -188,6 +195,12 @@ def recognize_from_video():
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+
+    if args.model == "mnist":
+        global IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_CHANNELS
+        IMAGE_WIDTH = 28
+        IMAGE_HEIGHT = 28
+        IMAGE_CHANNELS = 1
 
     if args.video is not None:
         # video mode

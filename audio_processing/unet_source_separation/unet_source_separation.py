@@ -73,7 +73,7 @@ else:
 if args.arch == 'base' : # for general voice separation
     WEIGHT_PATH = "second_voice_bank.best.opt2.onnx"
 else :  # for singing voice separation
-    WEIGHT_PATH = "RefineSpectrogramUnet.best.opt2.onnx"
+    WEIGHT_PATH = "RefineSpectrogramUnet.best.opt.onnx"
 MODEL_PATH = WEIGHT_PATH + ".prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/unet_source_separation/"
 

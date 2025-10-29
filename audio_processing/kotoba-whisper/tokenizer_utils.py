@@ -388,7 +388,7 @@ def _merge_punctuations(words, tokens, indices, prepended, appended):
     tokens[:] = [token for token in tokens if token]
     indices[:] = [idx for idx in indices if idx]
 
-def decode_asr(tokenizer, model_outputs, *, return_timestamps, return_language, time_precision):
+def decode_asr(tokenizer, model_outputs, *, return_timestamps, return_language, time_precision, logger):
     """
     Internal method meant to only be used by asr pipeline. Handles all the little quirks specific to whisper to handle
     the various options not allowed in other seq2seq models

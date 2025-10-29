@@ -1,6 +1,7 @@
 import yaml
 import sys
 import matplotlib.pyplot as plt
+import time
 
 from pyannote_audio_utils.audio.pipelines.speaker_diarization import SpeakerDiarization
 from pyannote_audio_utils.core import Segment, Annotation
@@ -90,7 +91,10 @@ def repr_annotation(args, annotation: Annotation, notebook:Notebook, ground:bool
 def main(args):
     check_and_download_models(WEIGHT_SEGMENTATION_PATH, MODEL_SEGMENTATION_PATH, remote_path=REMOTE_PATH)
     check_and_download_models(WEIGHT_EMBEDDING_PATH, MODEL_EMBEDDING_PATH, remote_path=REMOTE_PATH)
-    
+
+    if args.benchmark:
+        start = int(round(time.time() * 1000))
+
     with open(YAML_PATH, 'r') as yml:
         config = yaml.safe_load(yml)
 
@@ -137,7 +141,11 @@ def main(args):
             diarization = pipeline(audio_file, min_speakers=args.min, max_speaker=args.max)
         else:
             diarization = pipeline(audio_file)
-    
+
+    if args.benchmark:
+        end = int(round(time.time() * 1000))
+        print(f'\tailia processing time {end - start} ms')
+
     if args.ig:
         _, groundtruth = load_rttm(args.ig).popitem()
         metric = DiarizationErrorRate()

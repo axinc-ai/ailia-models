@@ -1,0 +1,105 @@
+ailia SDK 1.2.14をリリース
+
+クロスプラットフォームで利⽤できるGPU対応の⾼速AI推論フレームワークであるailia SDKのバージョン1.2.14のご紹介です。ailia SDKについてはこちらをご覧ください。
+
+ailia SDK 1.2.14の新機能は下記となります。
+
+新しく対応するレイヤー
+DFT、Mean、LpPool、Upsampleレイヤーに対応します。DFTはopset=17で追加されたレイヤーで、離散フーリエ変換を⾏うレイヤーとなります。将来的に、⾳声の前処理などへの活⽤が期待されています。
+
+AVX512対応
+GemmとConvolutionのAVX512対応を⾏いました。サイズの⼤きいGemmなどで最⼤で1.61倍程度、⾼速化されます。
+
+Whisper向けの最適化
+CPU推論においてWhisper向けの最適化を⾏い、Whisperの推論速度が⼤きく向上しました。M1 Max + macOSでの評価において、ONNX Runtimeと⽐較して、2.3倍程度、⾼速に推論可能です。また、Whisper公式のPytorchと⽐較して、1.7枚程度、⾼速に推論可能です。Whisperのベンチマーク（40秒の⽇本語⾳声の変換時間、Whisper Small、Beam Size 1での評価）グラフは縦軸が推論に要した時間であり、短いほど⾼速に動作していることを⽰しています。normal modelはPytorchから変換したONNXモデル、opt modelはONNXモデルにailia Optimizerを通したONNXモデルです。Whisperはgithubのailia MODELSからお試しいただけます。
+
+省メモリモードのメモリ使⽤量の削減
+CPU推論でメモリ再利⽤モード（AILIA_MEMORY_REDUCE_INTERSTAGE）を使⽤した場合のメモリ使⽤量を削減しました。特に、DeticやWhisperなどの複雑なモデルで、従来よりもメモリ使⽤量が削減されます。例えば、WhisperのDecoder Smallにおいては、ailia SDK 1.2.13で1886MB使⽤していたのが、ailia SDK 1.2.14で1252MB程度まで削減されます。
+
+Android NDKのバージョン間の互換性の修正
+soにlibc++_staticのシンボルが公開されている問題を修正し、ailia SDKとは異なるバージョンのAndroid NDKを使⽤した場合の互換性を修正しました。
+
+Vulkanのバージョンが混在する場合の問題の修正
+Vulkan1.0のデバイスとVulkan1.1のデバイスが混在する場合に、デバイスの列挙に失敗する問題を修正しました。
+
+プロファイルの改善
+プロファイルモードでレイヤー別の消費時間を出⼒する機能を追加しました。これにより、ボトルネックの解析が容易になります。
+Unity Plugin
+AiliaModelクラスでIDisposableを継承するように変更しました。これにより、Editorの開発中にメモリ不⾜になる可能性を低減します。
+また、AppleSiliconではdylibをbundleにリネームしても読み込めない問題を修正するため、ailia.audioにbundleビルドを追加しました。
+
+ailia AI showcaseのアップデート
+ailia AI showcaseをailia SDK 1.2.14相当にアップデートし、Detic、Whisper、BlazeHand、FaceMesh、RoadSegmentationAdasが使⽤可能になりました。また、Android環境において、⼀部のモデルのailia TFLite Runtimeを使⽤したNPU推論に対応しました。iOS版はAppStoreから、Android版はGooglePlayからダウンロード可能です。
+
+Deticによる物体検出
+Whisperによる⾳声認識
+BlazeHandによる⼿のキーポイント検出
+RoadSegmentationAdasによる路⾯検知
+
+ax株式会社はAIを実⽤化する会社として、クロスプラットフォームでGPUを使⽤した⾼速な推論を⾏うことができるailia SDKを開発しています。ax株式会社ではコンサルティングからモデル作成、SDKの提供、AIを利⽤したアプリ・システム開発、サポートまで、 AIに関するトータルソリューションを提供していますのでお気軽にお問い合わせください。
+
+
+
+NNAPI : AndroidでNPUを使用するためのローレベルAPI
+
+AndroidでNPUを使用するためのローレベルAPIであるNNAPIの解説です。NNAPIを使用することで、NPUを使用したAIモデルの高速推論が可能になります。
+
+NNAPIの概要
+NNAPIはAndroidでNPU (Neural Processing Unit)を使用するためのローレベルAPIです。NVIDIA GPUでいうところのcuDNNに相当します。NNAPIを使用することで、Google PixelのEdgeTPUや、QualcommやMediatekのNPUを使用した高速推論が可能になります。
+
+NNAPIを使用することで、Convolutionなどのオペレータを繋いでグラフを構築し、デバイスベンダーのドライバを通じて、NPUを使用したAI推論を行うことが可能です。
+
+NNAPIはC++のAPIで定義されており、Android NDKから使用することが可能です。
+
+NNAPIのテンソル形式
+NNAPIはtfliteの仕様をベースに設計されています。テンソルはfloatとint8の両方に対応しています。ただし、NPUはint8にのみ対応していることが多く、floatのモデルを与えた場合はCPUもしくはGPUで実行されます。そのため、NPUを使用するには、int8に量子化したモデルを使用する必要があります。
+
+NNAPIのバージョン
+NNAPIにはAndroid10以前で使えるFeatureLevel3 (NNAPI 1.2)と、Android11以降で使えるFeatureLevel4 (NNAPI 1.3)があります。tfliteで一般的に使用されているZERO_POINT可変量子化のTENSOR_QUANT8_ASYMMはFeatureLevel4以上が必要であるため、TensorFlowで量子化した一般的なtfliteモデルを推論する場合、実質的にAndroid11以降が必要です。
+
+NNAPIのデバイス
+NNAPIでは、使用するデバイスのリストを与えることで、NNAPIが最適なデバイスを自動的に選択します。
+
+NNAPIには、必ずnnapi_referenceというソフトウェア実装のデバイスが含まれるため、NNAPIでは定義されているが、NPUでは非対応のレイヤーはnnapi_referenceによるCPU実装にオフロードされます。
+
+そのため、特定のレイヤーやレイヤーパラメータがNPU非対応だった場合、自動的にnnapi_referenceにオフロードされた結果、速度が低下する場合があります。
+
+NNAPIで実行可能なオペレータ
+NNAPIで実行可能なオペレータは下記に定義されています。
+
+NNAPIで実行不可能なオペレータ
+NON_MAX_SUPPRESSION、LEAKY_RELU、PACK、SHAPE、SPLIT_Vはサポートされていません。フレームワーク側で対応する必要があります。
+
+NNAPIで実行可能だが注意が必要なオペレータ
+NNAPIはデバイスベンダーが実装を提供する仕組みとなっているため、まだAPIの挙動が安定していません。そのため、特定のデバイス向けのワークアラウンドが必要です。
+
+Conv
+bias_scaleにはtfliteの制約であるinput_scale * filter_scaleを明示的に指定する必要があります。Snapdragon855では、この値は無視され、input、filter、outputから自動的に判断されます。Snapdragon 8+では、bias_scaleを参照するため、異なる値を入れた場合は結果が不一致になります。
+
+また、PerChannelQuantParamsでscalesに0が含まれるとNNAPIはエラーになります。そのため、0を検知した場合は、floatの最小値を設定する必要があります。
+
+FC
+biasが存在しない場合はNNAPIはエラーになります。biasが存在しない場合は明示的にbiasが0のテンソルを生成して与える必要があります。
+
+Pad
+チャンネル方向にパディングする場合、Snapdragon 8+のPADでは不正な値が出力され、PAD_V2では正しい値が出力されます。ただし、PAD_V2はPADよりも低速です。
+
+Mean
+tfliteのMeanはinputとoutputのscaleとzero pointが同一であるという制約はありませんが、NNAPIのmeanはinputとoutputのscaleとzero pointが同一であるという制約があります。そのため、Meanの入力と出力でスケール変換を行う必要があります。
+
+NNAPIのデバッグ
+NNAPIに不正なオペレータを供給した場合、logcatにオペレータエラーが出力されることが多いため、まずはlogcatのエラーを確認します。
+
+NNAPIのベンチマーク
+NNAPIのSoCごとのベンチマークは下記にまとめられています。例えば、Snapdragon 8+ Gen1だと、CPU-Fで17506に対して、FP16 NNAPI 1.3だと112237、INT8 NNAPI 1.3だと441100のスコアとなり、25倍高速に動作します。
+
+実際、弊社でもSnapdragon 8+ Gen1とyolox_tinyにおいて、CPU（float）に比べてNNAPI NPU（int8）で15倍高速に動作することを確認しています。
+
+NNAPIのデモ
+
+ax株式会社がGooglePlayで公開しているailia AI showcaseを使用することで、NNAPIとNPUを使用した推論を行うことが可能です。現在、YOLOX_TINY、YOLOX_S、HRNET、MobileNetV2、ResNet50、BlazeFace、FaceMeshがNPU推論に対応しています。
+ailia AI showcaseでは、ax株式会社と株式会社アクセルが開発するailia TFLite Runtimeを使用してNPU推論を行なっています。ailia TFLite Runtimeはtfliteを推論するためのSDKで、NNAPIで実行不可能なオペレータをサブグラフ分割してCPU実行することで、YOLOXなどの複雑なグラフをNNAPIで実行可能としています。
+
+また、NNAPIで使用できる量子化済みモデルをailia-models-tfliteで公開しています。
+
+ax株式会社はAIを実用化する会社として、クロスプラットフォームでGPUを使用した高速な推論を行うことができるailia SDKを開発しています。ax株式会社ではコンサルティングからモデル作成、SDKの提供、AIを利用したアプリ・システム開発、サポートまで、 AIに関するトータルソリューションを提供していますのでお気軽にお問い合わせください。

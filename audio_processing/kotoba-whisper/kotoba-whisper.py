@@ -632,7 +632,8 @@ def predict(models, audio, chunk_length_s=0):
             model_outputs,
             return_timestamps=True,
             return_language=None,
-            time_precision=time_precision)
+            time_precision=time_precision,
+            logger=logger)
 
     return {"text": text, **optional}
 
