@@ -5,6 +5,7 @@ from logging import getLogger
 import numpy as np
 import cv2
 from PIL import Image
+from torch.utils.data import DataLoader
 
 import ailia
 
@@ -16,7 +17,7 @@ from image_utils import normalize_image  # noqa
 from detector_utils import load_image  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
 
-from .nuscenes_dataset import NuScenesDataset
+from nuscenes_dataset import NuScenesDataset
 
 
 logger = getLogger(__name__)
@@ -124,37 +125,29 @@ def preprocess(img, image_shape):
     return img
 
 
-def predict(models, img):
-    # shape = (IMAGE_HEIGHT, IMAGE_WIDTH)
-    # img = preprocess(img, shape)
-    # img = np.load("img_0.npy")
-    # can_bus = np.load("can_bus_0.npy")
-    # lidar2img = np.load("lidar2img_0.npy")
-    # img_shape = np.load("img_shape_0.npy")
-    # prev_bev = np.load("prev_bev_0.npy")
-    img = np.load("img_1.npy")
-    can_bus = np.load("can_bus_1.npy")
-    lidar2img = np.load("lidar2img_1.npy")
-    img_shape = np.load("img_shape_1.npy")
-    prev_bev = np.load("prev_bev_1.npy")
+def predict(models, img, img_metas, prev_bev=None):
+    can_bus = img_metas["can_bus"].astype(np.float32)
+    lidar2img = img_metas["lidar2img"].astype(np.float32)
+    img_shape = img_metas["img_shape"]
+    if prev_bev is None:
+        prev_bev = np.zeros((40000, 1, 256), dtype=np.float32)
 
-    # bev_encoder = models["bev_encoder"]
-
-    # # feedforward
-    # if not args.onnx:
-    #     output = bev_encoder.predict([img, can_bus, lidar2img, img_shape, prev_bev])
-    # else:
-    #     output = bev_encoder.run(
-    #         None,
-    #         {
-    #             "img": img,
-    #             "can_bus": can_bus,
-    #             "lidar2img": lidar2img,
-    #             "img_shape": img_shape,
-    #             "prev_bev": prev_bev,
-    #         },
-    #     )
-    # bev_embed, bev_pos = output
+    # feedforward
+    bev_encoder = models["bev_encoder"]
+    if not args.onnx:
+        output = bev_encoder.predict([img, can_bus, lidar2img, img_shape, prev_bev])
+    else:
+        output = bev_encoder.run(
+            None,
+            {
+                "img": img,
+                "can_bus": can_bus,
+                "lidar2img": lidar2img,
+                "img_shape": img_shape,
+                "prev_bev": prev_bev,
+            },
+        )
+    bev_embed, bev_pos = output
 
     # print("bev_embed---", bev_embed.shape)
     # print(bev_embed)
@@ -243,7 +236,7 @@ def recognize_from_image(models):
         **{
             "type": "NuScenesE2EDataset",
             "data_root": "data/nuscenes/",
-            "ann_file": "data/infos/nuscenes_infos_temporal_val.pkl",
+            "ann_file": ann_file,
             "pipeline": [
                 {
                     "type": "LoadMultiViewImageFromFilesInCeph",
@@ -360,9 +353,21 @@ def recognize_from_image(models):
         }
     )
 
-    data_loader = []
+    def collate_fn(batch):
+        return batch
+
+    data_loader = DataLoader(
+        dataset,
+        collate_fn=collate_fn,
+    )
+
     for i, data in enumerate(data_loader):
-        result = predict(models, None)
+        img = data[0]["img"]
+        img_metas = data[0]["img_metas"]
+        img = np.stack(img).transpose(0, 3, 1, 2)  # N, C, H, W
+        img = np.expand_dims(img, axis=0)  # B, N, C, H, W
+
+        result = predict(models, img, img_metas)
 
     logger.info("Script finished successfully.")
 

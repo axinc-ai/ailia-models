@@ -53,15 +53,18 @@ class NuScenesDataset(Dataset):
                 data_dict[key] = to_tensor(value[0])
             else:
                 data_dict[key] = value
+
+        img_metas = {}
+        for key in ("can_bus", "lidar2img", "img_shape"):
+            if key in data_dict:
+                img_metas[key] = data_dict[key]
+        data_dict["img_metas"] = img_metas
+
         return data_dict
 
     def get_data_info(self, index):
         """Get data info according to the given index."""
         info = self.data_infos[index]
-
-        location = self.nusc.get(
-            "log", self.nusc.get("scene", info["scene_token"])["log_token"]
-        )["location"]
 
         input_dict = dict(
             sample_idx=info["token"],
@@ -76,6 +79,24 @@ class NuScenesDataset(Dataset):
             frame_idx=info["frame_idx"],
             timestamp=info["timestamp"] / 1e6,
         )
+
+        image_paths = []
+        lidar2img_rts = []
+        for cam_type, cam_info in info["cams"].items():
+            image_paths.append(cam_info["data_path"])
+            # obtain lidar to image transformation matrix
+            lidar2cam_r = np.linalg.inv(cam_info["sensor2lidar_rotation"])
+            lidar2cam_t = cam_info["sensor2lidar_translation"] @ lidar2cam_r.T
+            lidar2cam_rt = np.eye(4)
+            lidar2cam_rt[:3, :3] = lidar2cam_r.T
+            lidar2cam_rt[3, :3] = -lidar2cam_t
+            intrinsic = cam_info["cam_intrinsic"]
+            viewpad = np.eye(4)
+            viewpad[: intrinsic.shape[0], : intrinsic.shape[1]] = intrinsic
+            lidar2img_rt = viewpad @ lidar2cam_rt.T
+            lidar2img_rts.append(lidar2img_rt)
+        input_dict["img_filename"] = image_paths
+        input_dict["lidar2img"] = lidar2img_rts
 
         rotation = Quaternion(input_dict["ego2global_rotation"])
         translation = input_dict["ego2global_translation"]
@@ -109,14 +130,11 @@ class NuScenesDataset(Dataset):
         img = img.astype(np.float32)
 
         results["filename"] = filename
-        results["img"] = [img[..., i] for i in range(img.shape[-1])]
-        results["img_shape"] = img.shape
-        results["ori_shape"] = img.shape
-        results["scale_factor"] = 1.0
+        results["img"] = ori_img = [img[..., i] for i in range(img.shape[-1])]
 
         ### NormalizeMultiviewImage
 
-        def _imnormalize(img, mean, std):
+        def imnormalize(img, mean, std):
             mean = np.array(mean, dtype=np.float32)
             std = np.array(std, dtype=np.float32)
             img = (img - mean) / std
@@ -124,4 +142,33 @@ class NuScenesDataset(Dataset):
 
         mean = np.array([103.53, 116.28, 123.675])
         std = np.array([1, 1, 1])
-        results["img"] = [_imnormalize(img, mean, std) for img in results["img"]]
+        results["img"] = norm_img = [imnormalize(img, mean, std) for img in ori_img]
+
+        ### PadMultiViewImage
+
+        def impad_to_multiple(img, divisor, pad_val=0):
+            pad_h = int(np.ceil(img.shape[0] / divisor)) * divisor
+            pad_w = int(np.ceil(img.shape[1] / divisor)) * divisor
+            # shape = (pad_h, pad_w)
+            width = max(pad_w - img.shape[1], 0)
+            height = max(pad_h - img.shape[0], 0)
+            padding = (0, 0, width, height)
+
+            img = cv2.copyMakeBorder(
+                img,
+                padding[1],
+                padding[3],
+                padding[0],
+                padding[2],
+                cv2.BORDER_CONSTANT,
+                value=pad_val,
+            )
+            return img
+
+        size_divisor = 32
+        results["img"] = padded_img = [
+            impad_to_multiple(img, size_divisor) for img in norm_img
+        ]
+        results["img_shape"] = [img.shape for img in padded_img]
+
+        return results
