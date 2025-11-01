@@ -3,11 +3,10 @@ import time
 from logging import getLogger
 
 import numpy as np
-import cv2
-from PIL import Image
 from torch.utils.data import DataLoader
 
 import ailia
+
 
 # import original modules
 sys.path.append("../../util")
@@ -18,6 +17,7 @@ from detector_utils import load_image  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
 
 from nuscenes_dataset import NuScenesDataset
+from track_instance import Instances
 
 
 logger = getLogger(__name__)
@@ -39,11 +39,6 @@ REMOTE_PATH = "https://storage.googleapis.com/ailia-models/xxx/"
 IMAGE_PATH = "nuscenes"
 SAVE_IMAGE_PATH = "output.png"
 
-IMAGE_HEIGHT = 224
-IMAGE_WIDTH = 224
-
-THRESHOLD = 0.4
-IOU = 0.45
 
 # ======================
 # Arguemnt Parser Config
@@ -58,8 +53,22 @@ args = update_parser(parser)
 # Secondary Functions
 # ======================
 
-# def draw_bbox(img, bboxes):
-#     return img
+
+def empty_tracks():
+    track_instances = Instances((1, 1))
+    query = np.load("query_embedding.npy")
+    num_queries, dim = query.shape
+    reference_points_weight = np.load("reference_points_weight.npy")
+    reference_points_bias = np.load("reference_points_bias.npy")
+    track_instances.ref_pts = (
+        query[..., : dim // 2] @ reference_points_weight.T + reference_points_bias
+    )
+
+    track_instances.query = query
+
+    track_instances.obj_idxes = np.full((len(track_instances)), -1, dtype=np.int64)
+
+    return track_instances
 
 
 # ======================
@@ -67,65 +76,7 @@ args = update_parser(parser)
 # ======================
 
 
-def preprocess(img, image_shape):
-    h, w = image_shape
-    im_h, im_w, _ = img.shape
-
-    # adaptive_resize
-    scale = h / min(im_h, im_w)
-    ow, oh = int(im_w * scale), int(im_h * scale)
-    if ow != im_w or oh != im_h:
-        img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
-
-    img = np.array(Image.fromarray(img).resize((ow, oh), Image.Resampling.BICUBIC))
-
-    # resize
-    IMAGE_SIZE = 224
-    short, long = (im_w, im_h) if im_w <= im_h else (im_h, im_w)
-    new_short, new_long = IMAGE_SIZE, (IMAGE_SIZE * long) // short
-    ow, oh = (new_short, new_long) if im_w <= im_h else (new_long, new_short)
-    if ow != im_w or oh != im_h:
-        img = np.array(Image.fromarray(img).resize((ow, oh), Image.Resampling.BICUBIC))
-
-    # center_crop
-    if ow > w:
-        x = (ow - w) // 2
-        img = img[:, x : x + w, :]
-    if oh > h:
-        y = (oh - h) // 2
-        img = img[y : y + h, :, :]
-
-    # center_crop
-    # In case size is odd, (image_shape[0] + size[0]) // 2 won't give the proper result.
-    top = (oh - IMAGE_SIZE) // 2
-    bottom = top + IMAGE_SIZE
-    # In case size is odd, (image_shape[1] + size[1]) // 2 won't give the proper result.
-    left = (ow - IMAGE_SIZE) // 2
-    right = left + IMAGE_SIZE
-    if top >= 0 and bottom <= oh and left >= 0 and right <= ow:
-        img = img[top:bottom, left:right, :]
-    else:
-        # If the image is too small, pad it with zeros
-        pad_h = max(IMAGE_SIZE, oh)
-        pad_w = max(IMAGE_SIZE, ow)
-        pad_img = np.zeros((pad_h, pad_w, 3))
-
-        top_pad = (pad_h - oh) // 2
-        left_pad = (pad_w - ow) // 2
-        pad_img[top_pad : top_pad + oh, left_pad : left_pad + ow, :] = img
-        img = pad_img
-
-    img = normalize_image(img, normalize_type="ImageNet")
-
-    img = img / 255
-    img = img.transpose(2, 0, 1)  # HWC -> CHW
-    img = np.expand_dims(img, axis=0)
-    img = img.astype(np.float32)
-
-    return img
-
-
-def predict(models, img, img_metas, prev_bev=None):
+def predict(models, img, img_metas, prev_bev=None, track_instances=None):
     can_bus = img_metas["can_bus"].astype(np.float32)
     lidar2img = img_metas["lidar2img"].astype(np.float32)
     img_shape = img_metas["img_shape"]
@@ -149,20 +100,13 @@ def predict(models, img, img_metas, prev_bev=None):
         )
     bev_embed, bev_pos = output
 
-    # print("bev_embed---", bev_embed.shape)
-    # print(bev_embed)
-    # print("bev_pos---", bev_pos.shape)
-    # print(bev_pos)
-
-    bev_embed = np.load("bev_embed_3.npy")
-    query = np.load("query_3.npy")
-    ref_pts = np.load("ref_pts_3.npy")
-
-    track_head = models["track_head"]
+    query = track_instances.query
+    ref_pts = track_instances.ref_pts
 
     # feedforward
+    track_head = models["track_head"]
     if not args.onnx:
-        output = track_head.predict([img, bev_embed, query, ref_pts])
+        output = track_head.predict([bev_embed, query, ref_pts])
     else:
         output = track_head.run(
             None,
@@ -172,9 +116,25 @@ def predict(models, img, img_metas, prev_bev=None):
                 "ref_pts": ref_pts,
             },
         )
-    # bev_embed, bev_pos = output
+    (
+        output_classes,
+        output_coords,
+        last_ref_pts,
+        query_feats,
+        all_past_traj_preds,
+    ) = output
 
-    return output
+    out = {
+        "pred_logits": output_classes,
+        "pred_boxes": output_coords,
+        "ref_pts": last_ref_pts,
+        "bev_embed": bev_embed,
+        "query_embeddings": query_feats,
+        "all_past_traj_preds": all_past_traj_preds,
+        "bev_pos": bev_pos,
+    }
+
+    return out
 
 
 def recognize_from_image(models):
@@ -361,13 +321,26 @@ def recognize_from_image(models):
         collate_fn=collate_fn,
     )
 
+    track_instances = empty_tracks()
+
     for i, data in enumerate(data_loader):
         img = data[0]["img"]
         img_metas = data[0]["img_metas"]
         img = np.stack(img).transpose(0, 3, 1, 2)  # N, C, H, W
         img = np.expand_dims(img, axis=0)  # B, N, C, H, W
 
-        result = predict(models, img, img_metas)
+        active_inst = track_instances[track_instances.obj_idxes >= 0]
+        other_inst = track_instances[track_instances.obj_idxes < 0]
+        track_instances = Instances.cat([other_inst, active_inst])
+
+        output = predict(models, img, img_metas, track_instances=track_instances)
+
+        # Apply sigmoid and get max values along last axis
+        logits = output["pred_logits"][-1, 0, :]
+        sigmoid_logits = 1 / (1 + np.exp(-logits))
+        track_scores = np.max(sigmoid_logits, axis=-1)
+
+        pass
 
     logger.info("Script finished successfully.")
 

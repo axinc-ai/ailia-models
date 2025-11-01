@@ -54,10 +54,11 @@ class NuScenesDataset(Dataset):
             else:
                 data_dict[key] = value
 
-        img_metas = {}
-        for key in ("can_bus", "lidar2img", "img_shape"):
-            if key in data_dict:
-                img_metas[key] = data_dict[key]
+        img_metas = dict(
+            can_bus=data_dict["can_bus"],
+            lidar2img=np.array(data_dict["lidar2img"]),
+            img_shape=np.array(data_dict["img_shape"]),
+        )
         data_dict["img_metas"] = img_metas
 
         return data_dict
