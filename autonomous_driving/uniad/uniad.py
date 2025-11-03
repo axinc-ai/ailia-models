@@ -4,22 +4,23 @@ import sys
 import time
 from logging import getLogger
 
+import ailia
 import cv2
 import numpy as np
 from torch.utils.data import DataLoader
 
-import ailia
-
 # import original modules
 sys.path.append("../../util")
-from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
-from model_utils import check_and_download_models  # noqa
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa
 from math_utils import sigmoid
+from model_utils import check_and_download_models  # noqa
 
+# local modules
+from nuscenes import NuScenes
 from nuscenes_dataset import NuScenesDataset
+from render import BEVRender, CameraRender
 from track_instance import Instances
 from tracker import RuntimeTrackerBase
-
 
 logger = getLogger(__name__)
 
@@ -32,9 +33,11 @@ logger = getLogger(__name__)
 # MODEL_PATH = "bev_encoder.onnx.prototxt"
 WEIGHT_PATH = "bev_encoder.msfix.onnx"
 MODEL_PATH = "bev_encoder.msfix.onnx.prototxt"
-WEIGHT_XXX_PATH = "track_head.onnx"
-MODEL_XXX_PATH = "track_head.onnx.prototxt"
-REMOTE_PATH = "https://storage.googleapis.com/ailia-models/xxx/"
+WEIGHT_TRACK_HEAD_PATH = "track_head.onnx"
+MODEL_TRACK_HEAD_PATH = "track_head.onnx.prototxt"
+WEIGHT_QUERY_INTERACTION_PATH = "query_interact.onnx"
+MODEL_QUERY_INTERACTION_PATH = "query_interact.onnx.prototxt"
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/uniad/"
 
 IMAGE_PATH = "nuscenes"
 SAVE_IMAGE_PATH = "output.png"
@@ -52,6 +55,207 @@ args = update_parser(parser)
 # ======================
 # Secondary Functions
 # ======================
+
+
+class AgentPredictionData:
+    """
+    Agent data class, includes bbox, traj, and occflow
+    """
+
+    def __init__(
+        self,
+        pred_score,
+        pred_label,
+        pred_center,
+        pred_dim,
+        pred_yaw,
+        pred_vel,
+        pred_traj,
+        pred_traj_score,
+        pred_track_id=None,
+        pred_occ_map=None,
+        is_sdc=False,
+        past_pred_traj=None,
+        command=None,
+        attn_mask=None,
+    ):
+        self.pred_score = pred_score
+        self.pred_label = pred_label
+        self.pred_center = pred_center
+        self.pred_dim = pred_dim
+        # TODO(box3d): we have changed yaw to mmdet3d 1.0.0rc6 format, maybe we should change this. [DONE]
+        # self.pred_yaw = pred_yaw
+        self.pred_yaw = -pred_yaw - np.pi / 2
+        self.pred_vel = pred_vel
+        self.pred_traj = pred_traj
+        self.pred_traj_score = pred_traj_score
+        self.pred_track_id = pred_track_id
+        self.pred_occ_map = pred_occ_map
+        if self.pred_traj is not None:
+            if isinstance(self.pred_traj_score, int):
+                self.pred_traj_max = self.pred_traj
+            else:
+                self.pred_traj_max = self.pred_traj[self.pred_traj_score.argmax()]
+        else:
+            self.pred_traj_max = None
+        self.nusc_box = Box(
+            center=pred_center,
+            size=pred_dim,
+            orientation=Quaternion(axis=[0, 0, 1], radians=self.pred_yaw),
+            label=pred_label,
+            score=pred_score,
+        )
+        if is_sdc:
+            self.pred_center = [0, 0, -1.2 + 1.56 / 2]
+        self.is_sdc = is_sdc
+        self.past_pred_traj = past_pred_traj
+        self.command = command
+        self.attn_mask = attn_mask
+
+
+class Visualizer:
+    def __init__(
+        self,
+        bbox_results,
+        dataroot="data/nuscenes",
+        version="v1.0-mini",
+        show_gt_boxes=False,
+    ):
+        self.nusc = NuScenes(version=version, dataroot=dataroot, verbose=True)
+
+        self.token_set = set()
+        self.predictions = self._parse_predictions(bbox_results)
+        self.bev_render = BEVRender(show_gt_boxes=show_gt_boxes)
+        self.cam_render = CameraRender(show_gt_boxes=show_gt_boxes)
+
+    def _parse_predictions(self, bbox_results):
+        outputs = bbox_results
+        prediction_dict = dict()
+        for k in range(len(outputs)):
+            token = outputs[k]["token"]
+            self.token_set.add(token)
+
+            # detection
+            bboxes = outputs[k]["boxes_3d"]
+            scores = outputs[k]["scores_3d"]
+            labels = outputs[k]["labels_3d"]
+
+            track_scores = scores.cpu().detach().numpy()
+            track_labels = labels.cpu().detach().numpy()
+            track_boxes = bboxes.tensor.cpu().detach().numpy()
+
+            track_centers = bboxes.gravity_center.cpu().detach().numpy()
+            track_dims = bboxes.dims.cpu().detach().numpy()
+            track_yaw = bboxes.yaw.cpu().detach().numpy()
+
+            track_ids = outputs[k]["track_ids"].cpu().detach().numpy()
+
+            # speed
+            track_velocity = bboxes.tensor.cpu().detach().numpy()[:, -2:]
+
+            # trajectories
+            trajs = outputs[k][f"traj"].numpy()
+            traj_scores = outputs[k][f"traj_scores"].numpy()
+
+            predicted_agent_list = []
+            for i in range(track_scores.shape[0]):
+                if track_scores[i] < 0.25:
+                    continue
+
+                if i < len(track_ids):
+                    track_id = track_ids[i]
+                else:
+                    track_id = 0
+
+                predicted_agent_list.append(
+                    AgentPredictionData(
+                        track_scores[i],
+                        track_labels[i],
+                        track_centers[i],
+                        track_dims[i],
+                        track_yaw[i],
+                        track_velocity[i],
+                        trajs[i],
+                        traj_scores[i],
+                        pred_track_id=track_id,
+                        pred_occ_map=None,
+                        past_pred_traj=None,
+                    )
+                )
+
+            # detection
+            bboxes = outputs[k]["sdc_boxes_3d"]
+            scores = outputs[k]["sdc_scores_3d"]
+            labels = 0
+
+            track_scores = scores.cpu().detach().numpy()
+            track_labels = labels
+
+            track_centers = bboxes.gravity_center.cpu().detach().numpy()
+            track_dims = bboxes.dims.cpu().detach().numpy()
+            track_yaw = bboxes.yaw.cpu().detach().numpy()
+            track_velocity = bboxes.tensor.cpu().detach().numpy()[:, -2:]
+
+            command = outputs[k]["command"][0].cpu().detach().numpy()
+            planning_agent = AgentPredictionData(
+                track_scores[0],
+                track_labels,
+                track_centers[0],
+                track_dims[0],
+                track_yaw[0],
+                track_velocity[0],
+                outputs[k]["planning_traj"][0].cpu().detach().numpy(),
+                1,
+                pred_track_id=-1,
+                pred_occ_map=None,
+                past_pred_traj=None,
+                is_sdc=True,
+                command=command,
+            )
+            predicted_agent_list.append(planning_agent)
+
+            prediction_dict[token] = dict(
+                predicted_agent_list=predicted_agent_list,
+                # predicted_map_seg=None,
+                predicted_planning=planning_agent,
+            )
+        return prediction_dict
+
+    def visualize_bev(self, sample_token):
+        self.bev_render.render_pred_box_data(
+            self.predictions[sample_token]["predicted_agent_list"]
+        )
+        self.bev_render.render_pred_traj(
+            self.predictions[sample_token]["predicted_agent_list"]
+        )
+        self.bev_render.render_pred_box_data(
+            [self.predictions[sample_token]["predicted_planning"]]
+        )
+        self.bev_render.render_planning_data(
+            self.predictions[sample_token]["predicted_planning"],
+            show_command=self.show_command,
+        )
+        self.bev_render.render_sdc_car()
+        self.bev_render.render_legend()
+
+        self.cam_render.reset_canvas(dx=2, dy=3, tight_layout=True)
+        self.cam_render.render_image_data(sample_token, self.nusc)
+
+    def visualize_cam(self, sample_token, out_filename):
+        self.cam_render.reset_canvas(dx=2, dy=3, tight_layout=True)
+        self.cam_render.render_image_data(sample_token, self.nusc)
+        # self.cam_render.render_pred_track_bbox(
+        #     self.predictions[sample_token]["predicted_agent_list"],
+        #     sample_token,
+        #     self.nusc,
+        # )
+        # self.cam_render.render_pred_traj(
+        #     self.predictions[sample_token]["predicted_agent_list"],
+        #     sample_token,
+        #     self.nusc,
+        #     render_sdc=self.with_planning,
+        # )
+        self.cam_render.save_fig(out_filename + "_cam.jpg")
 
 
 def empty_tracks():
@@ -343,6 +547,30 @@ def predict(models, img, img_metas, prev_bev=None, track_instances=None):
     return out
 
 
+def query_interact(models, track_instances):
+    active_track_instances = track_instances[track_instances.obj_idxes >= 0]
+
+    query_interact = models["query_interact"]
+    if not args.onnx:
+        output = query_interact.predict(
+            [track_instances.query, track_instances.output_embedding]
+        )
+    else:
+        output = query_interact.run(
+            None,
+            {
+                "query": track_instances.query,
+                "output_embedding": track_instances.output_embedding,
+            },
+        )
+    updated_query = output[0]
+    track_instances.query = updated_query
+
+    merged_track_instances = Instances.cat([empty_tracks(), active_track_instances])
+
+    return merged_track_instances
+
+
 def recognize_from_image(models):
     ann_file = "data/infos/nuscenes_infos_temporal_val.pkl"
 
@@ -569,11 +797,30 @@ def recognize_from_image(models):
         track_instances.ref_pts = last_ref_pts[0]
         # hard_code: assume the 901 query is sdc query
         track_instances.obj_idxes[900] = -2
+        """ update track base """
+        # track_base.update(track_instances, None)
 
-        track_base.update(track_instances, None)
+        filter_score_thresh = 0.35
+        active_index = (track_instances.obj_idxes >= 0) & (
+            track_instances.scores >= filter_score_thresh
+        )  # filter out sleep objects
+        out = {
+            "pred_logits": output_classes,
+            "pred_boxes": output_coords,
+            "ref_pts": last_ref_pts,
+            # "bev_embed": bev_embed,
+            "query_embeddings": query_feats,
+            # "all_past_traj_preds": det_output["all_past_traj_preds"],
+            # "bev_pos": bev_pos,
+        }
 
-        frame_res = output
-        track_instances = frame_res["track_instances"]
+        out_track_instances = query_interact(models, track_instances)
+        out["track_instances_fordet"] = track_instances
+        out["track_instances"] = out_track_instances
+        out["track_obj_idxes"] = track_instances.obj_idxes
+
+        frame_res = out
+        # track_instances = frame_res["track_instances"]
         track_instances_fordet = frame_res["track_instances_fordet"]
 
         results = [dict()]
@@ -613,10 +860,18 @@ def recognize_from_image(models):
         batch_size = len(result)
         bbox_results.extend(result)
 
-    ret_results = dict()
-    ret_results["bbox_results"] = bbox_results
+    vis = Visualizer(
+        version="v1.0-mini",
+        bbox_results=bbox_results,
+        dataroot="data/nuscenes",
+    )
+    for i in range(len(vis.nusc.sample)):
+        sample_token = vis.nusc.sample[i]["token"]
 
-    to_video("output_folder", "output_video.avi")
+        vis.visualize_bev()
+        vis.visualize_cam(sample_token, os.path.join("vis_output", str(i).zfill(3)))
+
+    to_video("vis_output", "output_video.avi", fps=4, downsample=2)
 
     logger.info("Script finished successfully.")
 
@@ -631,19 +886,27 @@ def main():
     # initialize
     if not args.onnx:
         bev_encoder = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-        track_head = ailia.Net(MODEL_XXX_PATH, WEIGHT_XXX_PATH, env_id=env_id)
+        track_head = ailia.Net(
+            MODEL_TRACK_HEAD_PATH, WEIGHT_TRACK_HEAD_PATH, env_id=env_id
+        )
+        query_interact = ailia.Net(
+            MODEL_QUERY_INTERACTION_PATH, WEIGHT_QUERY_INTERACTION_PATH, env_id=env_id
+        )
     else:
         import onnxruntime
 
         providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
         bev_encoder = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
-        track_head = onnxruntime.InferenceSession(WEIGHT_XXX_PATH, providers=providers)
+        track_head = onnxruntime.InferenceSession(
+            WEIGHT_TRACK_HEAD_PATH, providers=providers
+        )
+        query_interact = onnxruntime.InferenceSession(
+            WEIGHT_QUERY_INTERACTION_PATH, providers=providers
+        )
 
     models = dict(
-        bev_encoder=bev_encoder,
-        track_head=track_head,
+        bev_encoder=bev_encoder, track_head=track_head, query_interact=query_interact
     )
-
     recognize_from_image(models)
 
 
