@@ -1,28 +1,28 @@
+import glob
+import os
 import sys
 import time
 from logging import getLogger
 
+import cv2
 import numpy as np
 from torch.utils.data import DataLoader
 
 import ailia
 
-
 # import original modules
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
-from image_utils import normalize_image  # noqa
-from detector_utils import load_image  # noqa
-from webcamera_utils import get_capture, get_writer  # noqa
+from math_utils import sigmoid
 
 from nuscenes_dataset import NuScenesDataset
 from track_instance import Instances
+from tracker import RuntimeTrackerBase
 
 
 logger = getLogger(__name__)
 
-# from sample_utils import decode_batch, mask_to_bboxes, draw_bbox
 
 # ======================
 # Parameters
@@ -67,8 +67,214 @@ def empty_tracks():
     track_instances.query = query
 
     track_instances.obj_idxes = np.full((len(track_instances)), -1, dtype=np.int64)
+    track_instances.matched_gt_idxes = np.full(
+        (len(track_instances)), -1, dtype=np.int64
+    )
+    track_instances.disappear_time = np.zeros((len(track_instances)), dtype=np.int64)
+
+    track_instances.iou = np.zeros((len(track_instances),), dtype=np.float32)
+    track_instances.scores = np.zeros((len(track_instances),), dtype=np.float32)
+    track_instances.track_scores = np.zeros((len(track_instances),), dtype=np.float32)
+
+    # init boxes: xy, wl, z, h, sin, cos, vx, vy, vz
+    num_box_dims = 10
+    track_instances.pred_boxes = np.zeros(
+        (len(track_instances), num_box_dims), dtype=np.float32
+    )
+
+    num_classes = 10  # number of classes from the dataset config
+    track_instances.pred_logits = np.zeros(
+        (len(track_instances), num_classes), dtype=np.float32
+    )
+
+    mem_bank_len = 4  # typical memory bank length
+    track_instances.mem_bank = np.zeros(
+        (len(track_instances), mem_bank_len, dim // 2), dtype=np.float32
+    )
+    track_instances.mem_padding_mask = np.ones(
+        (len(track_instances), mem_bank_len), dtype=bool
+    )
+    track_instances.save_period = np.zeros((len(track_instances),), dtype=np.float32)
 
     return track_instances
+
+
+def decode_single(
+    cls_scores, bbox_preds, track_scores, obj_idxes, with_mask=True, img_metas=None
+):
+    """Decode bboxes.
+    Args:
+        cls_scores (Tensor): Outputs from the classification head, \
+            shape [num_query, cls_out_channels]. Note \
+            cls_out_channels should includes background.
+        bbox_preds (Tensor): Outputs from the regression \
+            head with normalized coordinate format (cx, cy, w, l, cz, h, rot_sine, rot_cosine, vx, vy). \
+            Shape [num_query, 9].
+
+    Returns:
+        list[dict]: Decoded boxes.
+    """
+    max_num = self.max_num
+    max_num = min(cls_scores.size(0), self.max_num)
+
+    cls_scores = cls_scores.sigmoid()
+    _, indexs = cls_scores.max(dim=-1)
+    labels = indexs % self.num_classes
+
+    _, bbox_index = track_scores.topk(max_num)
+
+    labels = labels[bbox_index]
+    bbox_preds = bbox_preds[bbox_index]
+    track_scores = track_scores[bbox_index]
+    obj_idxes = obj_idxes[bbox_index]
+
+    scores = track_scores
+
+    final_box_preds = denormalize_bbox(bbox_preds, self.pc_range)
+    final_scores = track_scores
+    final_preds = labels
+
+    # use score threshold
+    if self.score_threshold is not None:
+        thresh_mask = final_scores > self.score_threshold
+
+    if self.with_nms:
+        boxes_for_nms = xywhr2xyxyr(
+            img_metas[0]["box_type_3d"](final_box_preds[:, :], 9).bev
+        )
+        nms_mask = boxes_for_nms.new_zeros(boxes_for_nms.shape[0]) > 0
+        # print(self.nms_iou_thres)
+        try:
+            selected = nms_bev(boxes_for_nms, final_scores, thresh=self.nms_iou_thres)
+            nms_mask[selected] = True
+        except:
+            print("Error", boxes_for_nms, final_scores)
+            nms_mask = boxes_for_nms.new_ones(boxes_for_nms.shape[0]) > 0
+    if self.post_center_range is not None:
+        self.post_center_range = torch.tensor(
+            self.post_center_range, device=scores.device
+        )
+        mask = (final_box_preds[..., :3] >= self.post_center_range[:3]).all(1)
+        mask &= (final_box_preds[..., :3] <= self.post_center_range[3:]).all(1)
+
+        if self.score_threshold:
+            mask &= thresh_mask
+        if not with_mask:
+            mask = torch.ones_like(mask) > 0
+        if self.with_nms:
+            mask &= nms_mask
+
+        boxes3d = final_box_preds[mask]
+        scores = final_scores[mask]
+        labels = final_preds[mask]
+        track_scores = track_scores[mask]
+        obj_idxes = obj_idxes[mask]
+        predictions_dict = {
+            "bboxes": boxes3d,
+            "scores": scores,
+            "labels": labels,
+            "track_scores": track_scores,
+            "obj_idxes": obj_idxes,
+            "bbox_index": bbox_index,
+            "mask": mask,
+        }
+
+    else:
+        raise NotImplementedError(
+            "Need to reorganize output as a batch, only "
+            "support post_center_range is not None for now!"
+        )
+    return predictions_dict
+
+
+def det_instances2results(instances, results, img_metas):
+    """
+    Outs:
+    active_instances. keys:
+    - 'pred_logits':
+    - 'pred_boxes': normalized bboxes
+    - 'scores'
+    - 'obj_idxes'
+    out_dict. keys:
+        - boxes_3d (torch.Tensor): 3D boxes.
+        - scores (torch.Tensor): Prediction scores.
+        - labels_3d (torch.Tensor): Box labels.
+        - attrs_3d (torch.Tensor, optional): Box attributes.
+        - track_ids
+        - tracking_score
+    """
+    # filter out sleep querys
+    if instances.pred_logits.numel() == 0:
+        return [None]
+    bbox_dict = dict(
+        cls_scores=instances.pred_logits,
+        bbox_preds=instances.pred_boxes,
+        track_scores=instances.scores,
+        obj_idxes=instances.obj_idxes,
+    )
+    # bboxes_dict = self.bbox_coder.decode(bbox_dict, img_metas=img_metas)[0]
+    # decode
+    with_mask = True
+    all_cls_scores = bbox_dict["cls_scores"]
+    all_bbox_preds = bbox_dict["bbox_preds"]
+    track_scores = bbox_dict["track_scores"]
+    obj_idxes = bbox_dict["obj_idxes"]
+
+    batch_size = all_cls_scores.size()[0]
+    predictions_list = []
+    # bs size = 1
+    predictions_list.append(
+        decode_single(
+            all_cls_scores,
+            all_bbox_preds,
+            track_scores,
+            obj_idxes,
+            with_mask,
+            img_metas,
+        )
+    )
+
+    bboxes_dict = predictions_list[0]
+    bboxes = bboxes_dict["bboxes"]
+    bboxes = img_metas[0]["box_type_3d"](bboxes, 9)
+    labels = bboxes_dict["labels"]
+    scores = bboxes_dict["scores"]
+
+    track_scores = bboxes_dict["track_scores"]
+    obj_idxes = bboxes_dict["obj_idxes"]
+    result_dict = results[0]
+    result_dict_det = dict(
+        boxes_3d_det=bboxes.to("cpu"),
+        scores_3d_det=scores.cpu(),
+        labels_3d_det=labels.cpu(),
+    )
+    if result_dict is not None:
+        result_dict.update(result_dict_det)
+    else:
+        result_dict = None
+
+    return [result_dict]
+
+
+def to_video(folder_path, out_path, fps=4, downsample=1):
+    imgs_path = glob.glob(os.path.join(folder_path, "*.jpg"))
+    imgs_path = sorted(imgs_path)
+    img_array = []
+    for img_path in imgs_path:
+        img = cv2.imread(img_path)
+        height, width, channel = img.shape
+        img = cv2.resize(
+            img,
+            (width // downsample, height // downsample),
+            interpolation=cv2.INTER_AREA,
+        )
+        height, width, channel = img.shape
+        size = (width, height)
+        img_array.append(img)
+    out = cv2.VideoWriter(out_path, cv2.VideoWriter_fourcc(*"DIVX"), fps, size)
+    for i in range(len(img_array)):
+        out.write(img_array[i])
+    out.release()
 
 
 # ======================
@@ -321,8 +527,18 @@ def recognize_from_image(models):
         collate_fn=collate_fn,
     )
 
+    score_thresh = 0.4
+    filter_score_thresh = 0.35
+    miss_tolerance = 5
+    track_base = RuntimeTrackerBase(
+        score_thresh=score_thresh,
+        filter_score_thresh=filter_score_thresh,
+        miss_tolerance=miss_tolerance,
+    )
+
     track_instances = empty_tracks()
 
+    bbox_results = []
     for i, data in enumerate(data_loader):
         img = data[0]["img"]
         img_metas = data[0]["img_metas"]
@@ -334,13 +550,73 @@ def recognize_from_image(models):
         track_instances = Instances.cat([other_inst, active_inst])
 
         output = predict(models, img, img_metas, track_instances=track_instances)
+        output_classes = output["pred_logits"]
+        output_coords = output["pred_boxes"]
+        last_ref_pts = output["ref_pts"]
+        query_feats = output["query_embeddings"]
 
         # Apply sigmoid and get max values along last axis
-        logits = output["pred_logits"][-1, 0, :]
-        sigmoid_logits = 1 / (1 + np.exp(-logits))
+        logits = output_classes[-1, 0, :]
+        sigmoid_logits = sigmoid(logits)
         track_scores = np.max(sigmoid_logits, axis=-1)
 
-        pass
+        # each track will be assigned an unique global id by the track base.
+        track_instances.scores = track_scores
+        # track_instances.track_scores = track_scores  # [300]
+        track_instances.pred_logits = output_classes[-1, 0]  # [300, num_cls]
+        track_instances.pred_boxes = output_coords[-1, 0]  # [300, box_dim]
+        track_instances.output_embedding = query_feats[-1][0]  # [300, feat_dim]
+        track_instances.ref_pts = last_ref_pts[0]
+        # hard_code: assume the 901 query is sdc query
+        track_instances.obj_idxes[900] = -2
+
+        track_base.update(track_instances, None)
+
+        frame_res = output
+        track_instances = frame_res["track_instances"]
+        track_instances_fordet = frame_res["track_instances_fordet"]
+
+        results = [dict()]
+        get_keys = [
+            "bev_embed",
+            "bev_pos",
+            "track_query_embeddings",
+            "track_bbox_results",
+            "boxes_3d",
+            "scores_3d",
+            "labels_3d",
+            "track_scores",
+            "track_ids",
+            "sdc_boxes_3d",
+            "sdc_scores_3d",
+            "sdc_track_scores",
+            "sdc_track_bbox_results",
+            "sdc_embedding",
+        ]
+        results[0].update({k: frame_res[k] for k in get_keys})
+        result_track = det_instances2results(track_instances_fordet, results, img_metas)
+
+        result = [dict() for i in range(len(img_metas))]
+
+        # seg_head
+        # result_seg =  self.seg_head.forward_test(bev_embed, gt_lane_labels, gt_lane_masks, img_metas, rescale)
+        result_seg = [dict(pts_bbox=None, ret_iou=None, args_tuple=None)]
+
+        for i, res in enumerate(result):
+            res["token"] = img_metas[i]["sample_idx"]
+            res.update(result_track[i])
+            # if self.with_motion_head:
+            #     res.update(result_motion[i])
+            # if self.with_seg_head:
+            #     res.update(result_seg[i])
+
+        batch_size = len(result)
+        bbox_results.extend(result)
+
+    ret_results = dict()
+    ret_results["bbox_results"] = bbox_results
+
+    to_video("output_folder", "output_video.avi")
 
     logger.info("Script finished successfully.")
 
