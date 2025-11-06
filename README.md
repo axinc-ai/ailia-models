@@ -27,6 +27,7 @@ If you would like to try on your computer:
 382 models as of September 29, 2025
 
 # Latest update
+- 2025.11.03 Add fp16 version of whisper tiny and base
 - 2025.09.29 Add ruri-v3 (embedding)
 - 2025.09.22 Add paddleocr_v3
 - 2025.07.17 Add 6d_repnet_360, siglip2
