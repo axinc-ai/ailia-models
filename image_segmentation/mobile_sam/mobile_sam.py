@@ -172,7 +172,7 @@ def recognize(image_path,  pos_points, neg_points=None,env_id=0):
             if i != 0:
                 total_time_estimation = total_time_estimation + estimation_time
 
-                logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
+        logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
     else:
 
         input_point = np.expand_dims(POINT[0],axis=0)
