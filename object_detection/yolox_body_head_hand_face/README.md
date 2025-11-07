@@ -44,6 +44,8 @@ The default setting is to use the optimized model and weights, but you can also 
 
 [YOLOX-Body-Head-Hand-Face](https://github.com/PINTO0309/PINTO_model_zoo/tree/main/434_YOLOX-Body-Head-Hand-Face)
 
+[demo_yolox_onnx_tfite.py](https://github.com/PINTO0309/PINTO_model_zoo/blob/main/434_YOLOX-Body-Head-Hand-Face/demo/demo_yolox_onnx_tfite.py)
+
 ## Framework
 
 Onnx
