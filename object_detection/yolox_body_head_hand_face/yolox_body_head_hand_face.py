@@ -44,22 +44,17 @@ MODEL_YOLOX_L_NAME = 'yolox_l_body_head_hand_face_0086_0.5143_post_1x3x480x640'
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser('yolox body head hand face model', IMAGE_PATH, SAVE_IMAGE_PATH)
+#parser.add_argument(
+#    '-w', '--write_prediction',
+#    nargs='?',
+#    const='txt',
+#    choices=['txt', 'json'],
+#    type=str,
+#    help='Output results to txt or json file.'
+#)
 parser.add_argument(
-    '-m', '--model_name',
-    default='l',
-    help='[n, t, s, m, l, x]'
-)
-parser.add_argument(
-    '-w', '--write_prediction',
-    nargs='?',
-    const='txt',
-    choices=['txt', 'json'],
-    type=str,
-    help='Output results to txt or json file.'
-)
-parser.add_argument(
-    '-m', '--model', default='m',
-    choices=('l', 'm', 'n', 's', 't', 'x'),
+    '-m', '--model_name', default='l',
+    choices=('l'),#, 'm', 'n', 's', 't', 'x'),
     help='model type'
 )
 parser.add_argument(
