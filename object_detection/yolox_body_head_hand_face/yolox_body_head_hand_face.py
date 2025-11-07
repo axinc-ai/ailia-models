@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-from __future__ import annotations
-import os
 import sys
 import copy
 import cv2
@@ -9,8 +7,7 @@ import time
 import numpy as np
 from enum import Enum
 from dataclasses import dataclass
-from typing import Tuple, Optional, List, Dict
-import importlib.util
+from typing import Tuple, Optional, List
 from abc import ABC, abstractmethod
 import ailia
 
