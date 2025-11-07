@@ -47,7 +47,7 @@ threshold = 0.0
 # ======================
 
 parser = get_base_parser(
-    'Mobile Sam', IMAGE_PATH, SAVE_IMAGE_PATH
+    'Mobile Sam', IMAGE_PATH, SAVE_IMAGE_PATH, fp16_support = False
 )
 parser.add_argument(
     '-p', '--pos', action='append', type=int, metavar="X", nargs=2,
