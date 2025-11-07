@@ -252,6 +252,8 @@ if not args.onnx:
         ailia.set_temporary_cache_path("./")
 else:
     LAYER_NORM_ENABLE = False
+    if args.fp16:
+        LAYER_NORM_ENABLE = True
 
 # ======================
 # Models
@@ -279,10 +281,10 @@ if args.fp16:
 
 if not args.dynamic_kv_cache:
     # 高速化のためKV_CACHEのサイズを最大サイズで固定化したバージョン
-    WEIGHT_DEC_TINY_PATH = "decoder_tiny_fix_kv_cache" + OPT2 + ".onnx"
-    MODEL_DEC_TINY_PATH = "decoder_tiny_fix_kv_cache" + OPT2 + ".onnx.prototxt"
-    WEIGHT_DEC_BASE_PATH = "decoder_base_fix_kv_cache" + OPT2 + ".onnx"
-    MODEL_DEC_BASE_PATH = "decoder_base_fix_kv_cache" + OPT2 + ".onnx.prototxt"
+    WEIGHT_DEC_TINY_PATH = "decoder_tiny_fix_kv_cache" +  FP16 + OPT2 + ".onnx"
+    MODEL_DEC_TINY_PATH = "decoder_tiny_fix_kv_cache" +  FP16 + OPT2 + ".onnx.prototxt"
+    WEIGHT_DEC_BASE_PATH = "decoder_base_fix_kv_cache" + FP16 + OPT2 + ".onnx"
+    MODEL_DEC_BASE_PATH = "decoder_base_fix_kv_cache" + FP16 + OPT2 + ".onnx.prototxt"
     WEIGHT_DEC_SMALL_PATH = "decoder_small_fix_kv_cache" + FP16 + OPT2 + ".onnx"
     MODEL_DEC_SMALL_PATH = "decoder_small_fix_kv_cache" + FP16 + OPT2 + ".onnx.prototxt"
     WEIGHT_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache" + FP16 + OPT2 + ".onnx"
@@ -310,10 +312,10 @@ else:
     WEIGHT_DEC_TURBO_PATH = "decoder_turbo.onnx"
     MODEL_DEC_TURBO_PATH = "decoder_turbo.onnx.prototxt"
 
-WEIGHT_ENC_TINY_PATH = "encoder_tiny" + OPT + ".onnx"
-MODEL_ENC_TINY_PATH = "encoder_tiny" + OPT + ".onnx.prototxt"
-WEIGHT_ENC_BASE_PATH = "encoder_base" + OPT + ".onnx"
-MODEL_ENC_BASE_PATH = "encoder_base" + OPT + ".onnx.prototxt"
+WEIGHT_ENC_TINY_PATH = "encoder_tiny" + FP16 + OPT + ".onnx"
+MODEL_ENC_TINY_PATH = "encoder_tiny" + FP16 + OPT + ".onnx.prototxt"
+WEIGHT_ENC_BASE_PATH = "encoder_base" + FP16 + OPT + ".onnx"
+MODEL_ENC_BASE_PATH = "encoder_base" + FP16 + OPT + ".onnx.prototxt"
 WEIGHT_ENC_SMALL_PATH = "encoder_small" + FP16 + OPT + ".onnx"
 MODEL_ENC_SMALL_PATH = "encoder_small" + FP16 + OPT + ".onnx.prototxt"
 WEIGHT_ENC_MEDIUM_PATH = "encoder_medium" + FP16 + OPT + ".onnx"
