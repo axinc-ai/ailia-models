@@ -410,7 +410,7 @@ class YOLOX(AbstractModel):
                     result_boxes.append(
                         Box(
                             classid=int(box[1]),
-                            score=float(score),
+                            score=float(score[0]),
                             x1=x_min,
                             y1=y_min,
                             x2=x_max,
