@@ -47,3 +47,7 @@ The default setting is to use the optimized model and weights, but you can also 
 ## Framework
 
 Onnx
+
+## Netron
+
+[yolox_l_body_head_hand_face_0086_0.5143_post_1x3x480x640.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolox_body_head_hand_face/yolox_l_body_head_hand_face_0086_0.5143_post_1x3x480x640.onnx.prototxt)

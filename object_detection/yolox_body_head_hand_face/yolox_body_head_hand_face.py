@@ -1,13 +1,5 @@
 #!/usr/bin/env python
 
-"""
-This demo code is for evaluation of an end-to-end model with
-post-processing merged. Automatic determination of the runtime
-that should be executed based on the file extension.
-
-runtime: https://github.com/microsoft/onnxruntime
-runtime: https://github.com/PINTO0309/TensorflowLite-bin
-"""
 from __future__ import annotations
 import os
 import sys
@@ -214,35 +206,6 @@ class AbstractModel(ABC):
             self._input_names = [self._interpreter.get_blob_name(0)]
             self._model = self._interpreter.predict
         
-
-        # elif self._runtime in ['tflite_runtime', 'tensorflow']:
-        #     if self._runtime == 'tflite_runtime':
-        #         from tflite_runtime.interpreter import Interpreter # type: ignore
-        #         self._interpreter = Interpreter(model_path=model_path)
-        #     elif self._runtime == 'tensorflow':
-        #         import tensorflow as tf # type: ignore
-        #         self._interpreter = tf.lite.Interpreter(model_path=model_path)
-        #     self._input_details = self._interpreter.get_input_details()
-        #     self._output_details = self._interpreter.get_output_details()
-        #     self._input_shapes = [
-        #         input.get('shape', None) for input in self._input_details
-        #     ]
-        #     self._input_names = [
-        #         input.get('name', None) for input in self._input_details
-        #     ]
-        #     self._input_dtypes = [
-        #         input.get('dtype', None) for input in self._input_details
-        #     ]
-        #     self._output_shapes = [
-        #         output.get('shape', None) for output in self._output_details
-        #     ]
-        #     self._output_names = [
-        #         output.get('name', None) for output in self._output_details
-        #     ]
-        #     self._model = self._interpreter.get_signature_runner()
-        #     self._swap = (0, 1, 2)
-        #     self._h_index = 1
-        #     self._w_index = 2
 
     @abstractmethod
     def __call__(
