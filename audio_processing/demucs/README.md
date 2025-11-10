@@ -1,17 +1,14 @@
-# Distil-Whisper
+# Demucs Music Source Separation
 
 ## Input
 
 Audio file
 
-https://user-images.githubusercontent.com/29946532/197575850-d4b76831-7a14-41f0-9253-8bcf477b3f7e.mov
+https://github.com/facebookresearch/demucs/blob/main/test.mp3
 
 ## Output
 
-Recognized speech text
-```
-He hoped there would be stew for dinner, turnips and carrots and bruised potatoes and fat mutton pieces to be ladled out in thick, peppered, flour-fattened sauce.
-```
+Audio file with separated sound sources
 
 ## Requirements
 
@@ -26,18 +23,17 @@ It is necessary to be connected to the Internet while downloading.
 
 For the sample wav,
 ```bash
-$ python3 distil-whisper.py
+$ python3 demucs.py
 ```
 
 If you want to specify the audio, put the file path after the `--input` option.
 ```bash
-$ python3 distil-whisper.py --input AUDIO_FILE
+$ python3 demucs.py --input AUDIO_FILE
 ```
 
 ## Reference
 
-- [Hugging Face - Distil-Whisper](https://github.com/huggingface/distil-whisper)
-- [Whisper](https://github.com/openai/whisper)
+- [Demucs](https://github.com/facebookresearch/demucs)
 
 ## Framework
 
@@ -45,9 +41,11 @@ Pytorch
 
 ## Model Format
 
-ONNX opset=11
+ONNX opset=17
 
 ## Netron
 
-[distil-large-v2_encoder.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/distil-whisper/distil-large-v2_encoder.onnx.prototxt)  
-[distil-large-v2_decoder.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/distil-whisper/distil-large-v2_decoder.onnx.prototxt)  
+- [htdemucs_ft_bass.onnx](https://netron.app/?url=https://storage.googleapis.com/ailia-models/demucs/htdemucs_ft_bass.onnx.prototxt)  
+- [htdemucs_ft_drums.onnx](https://netron.app/?url=https://storage.googleapis.com/ailia-models/demucs/htdemucs_ft_drums.onnx.prototxt)  
+- [htdemucs_ft_other.onnx](https://netron.app/?url=https://storage.googleapis.com/ailia-models/demucs/htdemucs_ft_other.onnx.prototxt)  
+- [htdemucs_ft_vocals.onnx](https://netron.app/?url=https://storage.googleapis.com/ailia-models/demucs/htdemucs_ft_vocals.onnx.prototxt)  
