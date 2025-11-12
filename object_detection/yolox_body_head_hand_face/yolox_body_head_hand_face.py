@@ -145,21 +145,24 @@ class AbstractModel(ABC):
         env_id: Optional[int] = 0
     ):
         self._env_id = env_id
-        match self._env_id:
-            case 0:
-                providers = ['CPUExecutionProvider']
-            case 2:
-                providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
 
         self._runtime = runtime
         self._model_path = model_path
         self._weight_path = weight_path
         self._class_score_th = class_score_th
-        self._providers = providers
         
         # Model loading
         if self._runtime == 'onnx':
             import onnxruntime # type: ignore
+
+            match self._env_id:
+                case 0:
+                    providers = ['CPUExecutionProvider']
+                case 2:
+                    providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+                case _:
+                    providers = None
+
             session_option = onnxruntime.SessionOptions()
             session_option.log_severity_level = 3
             self._interpreter = \
