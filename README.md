@@ -32,11 +32,6 @@ If you would like to try on your computer:
 - 2025.09.29 Add ruri-v3 (embedding)
 - 2025.09.22 Add paddleocr_v3
 - 2025.07.17 Add 6d_repnet_360, siglip2
-- 2025.06.27 Add edge_sam
-- 2025.04.19 Add yolov11-seg, gpt-sovits-v3
-- 2025.02.28 Add multilingual-minilmv2
-- 2025.01.02 Add qwen_audio, audiosep
-- 2025.01.01 Add RT-DETRv2, gazelle, lama, anything_v3, depth_anything_controlnet, deepfacelive, llava-jp
 
 - More information in our [Wiki](https://github.com/axinc-ai/ailia-models/wiki)
 
