@@ -1,5 +1,6 @@
 import itertools
 from typing import Any, Dict, List, Tuple, Union
+
 import numpy as np
 
 

@@ -7,16 +7,17 @@ from logging import getLogger
 import ailia
 import cv2
 import numpy as np
+from nuscenes import NuScenes
 from torch.utils.data import DataLoader
 
 # import original modules
 sys.path.append("../../util")
-from arg_utils import get_base_parser, get_savepath, update_parser  # noqa
+from arg_utils import get_base_parser, get_savepath, update_parser
 from math_utils import sigmoid
-from model_utils import check_and_download_models  # noqa
+from model_utils import check_and_download_models
 
-# local modules
-from nuscenes import NuScenes
+# import local modules
+from lidar_box3d import LiDARInstance3DBoxes
 from nuscenes_dataset import NuScenesDataset
 from render import BEVRender, CameraRender
 from track_instance import Instances
@@ -303,6 +304,35 @@ def empty_tracks():
     return track_instances
 
 
+def denormalize_bbox(normalized_bboxes):
+    # rotation
+    rot_sine = normalized_bboxes[..., 6:7]
+
+    rot_cosine = normalized_bboxes[..., 7:8]
+    rot = np.arctan2(rot_sine, rot_cosine)
+
+    # center in the bev
+    cx = normalized_bboxes[..., 0:1]
+    cy = normalized_bboxes[..., 1:2]
+    cz = normalized_bboxes[..., 4:5]
+
+    # size
+    w = normalized_bboxes[..., 2:3]
+    l = normalized_bboxes[..., 3:4]
+    h = normalized_bboxes[..., 5:6]
+
+    w = np.exp(w)
+    l = np.exp(l)
+    h = np.exp(h)
+
+    # velocity
+    vx = normalized_bboxes[:, 8:9]
+    vy = normalized_bboxes[:, 9:10]
+    denormalized_bboxes = np.concatenate([cx, cy, cz, w, l, h, rot, vx, vy], axis=-1)
+
+    return denormalized_bboxes
+
+
 def decode_single(
     cls_scores, bbox_preds, track_scores, obj_idxes, with_mask=True, img_metas=None
 ):
@@ -318,14 +348,16 @@ def decode_single(
     Returns:
         list[dict]: Decoded boxes.
     """
-    max_num = self.max_num
-    max_num = min(cls_scores.size(0), self.max_num)
+    max_num = 300
+    max_num = min(cls_scores.shape[0], max_num)
 
-    cls_scores = cls_scores.sigmoid()
-    _, indexs = cls_scores.max(dim=-1)
-    labels = indexs % self.num_classes
+    num_classes = 10
+    cls_scores = sigmoid(cls_scores)
+    indexs = np.argmax(cls_scores, axis=-1)
+    labels = indexs % num_classes
 
-    _, bbox_index = track_scores.topk(max_num)
+    bbox_index = np.argpartition(track_scores, -max_num)[-max_num:]
+    bbox_index = bbox_index[np.argsort(track_scores[bbox_index])[::-1]]
 
     labels = labels[bbox_index]
     bbox_preds = bbox_preds[bbox_index]
@@ -334,61 +366,74 @@ def decode_single(
 
     scores = track_scores
 
-    final_box_preds = denormalize_bbox(bbox_preds, self.pc_range)
+    final_box_preds = denormalize_bbox(bbox_preds)
     final_scores = track_scores
     final_preds = labels
 
-    # use score threshold
-    if self.score_threshold is not None:
-        thresh_mask = final_scores > self.score_threshold
+    post_center_range = np.array(
+        [-61.2000, -61.2000, -10.0000, 61.2000, 61.2000, 10.0000]
+    )
+    mask = (final_box_preds[..., :3] >= post_center_range[:3]).all(1)
+    mask &= (final_box_preds[..., :3] <= post_center_range[3:]).all(1)
 
-    if self.with_nms:
-        boxes_for_nms = xywhr2xyxyr(
-            img_metas[0]["box_type_3d"](final_box_preds[:, :], 9).bev
-        )
-        nms_mask = boxes_for_nms.new_zeros(boxes_for_nms.shape[0]) > 0
-        # print(self.nms_iou_thres)
-        try:
-            selected = nms_bev(boxes_for_nms, final_scores, thresh=self.nms_iou_thres)
-            nms_mask[selected] = True
-        except:
-            print("Error", boxes_for_nms, final_scores)
-            nms_mask = boxes_for_nms.new_ones(boxes_for_nms.shape[0]) > 0
-    if self.post_center_range is not None:
-        self.post_center_range = torch.tensor(
-            self.post_center_range, device=scores.device
-        )
-        mask = (final_box_preds[..., :3] >= self.post_center_range[:3]).all(1)
-        mask &= (final_box_preds[..., :3] <= self.post_center_range[3:]).all(1)
+    boxes3d = final_box_preds[mask]
+    scores = final_scores[mask]
+    labels = final_preds[mask]
+    track_scores = track_scores[mask]
+    obj_idxes = obj_idxes[mask]
+    predictions_dict = {
+        "bboxes": boxes3d,
+        "scores": scores,
+        "labels": labels,
+        "track_scores": track_scores,
+        "obj_idxes": obj_idxes,
+        "bbox_index": bbox_index,
+        "mask": mask,
+    }
 
-        if self.score_threshold:
-            mask &= thresh_mask
-        if not with_mask:
-            mask = torch.ones_like(mask) > 0
-        if self.with_nms:
-            mask &= nms_mask
-
-        boxes3d = final_box_preds[mask]
-        scores = final_scores[mask]
-        labels = final_preds[mask]
-        track_scores = track_scores[mask]
-        obj_idxes = obj_idxes[mask]
-        predictions_dict = {
-            "bboxes": boxes3d,
-            "scores": scores,
-            "labels": labels,
-            "track_scores": track_scores,
-            "obj_idxes": obj_idxes,
-            "bbox_index": bbox_index,
-            "mask": mask,
-        }
-
-    else:
-        raise NotImplementedError(
-            "Need to reorganize output as a batch, only "
-            "support post_center_range is not None for now!"
-        )
     return predictions_dict
+
+
+def track_instances2results(track_instances, img_metas, with_mask=True):
+    all_cls_scores = track_instances.pred_logits
+    all_bbox_preds = track_instances.pred_boxes
+    track_scores = track_instances.scores
+    obj_idxes = track_instances.obj_idxes
+    bboxes_dict = decode_single(
+        all_cls_scores,
+        all_bbox_preds,
+        track_scores,
+        obj_idxes,
+        with_mask,
+        img_metas,
+    )
+
+    bboxes = bboxes_dict["bboxes"]
+    bboxes = LiDARInstance3DBoxes(bboxes, 9)
+    labels = bboxes_dict["labels"]
+    scores = bboxes_dict["scores"]
+    bbox_index = bboxes_dict["bbox_index"]
+    track_scores = bboxes_dict["track_scores"]
+    obj_idxes = bboxes_dict["obj_idxes"]
+    result_dict = dict(
+        boxes_3d=bboxes,
+        scores_3d=scores,
+        labels_3d=labels,
+        track_scores=track_scores,
+        bbox_index=bbox_index,
+        track_ids=obj_idxes,
+        mask=bboxes_dict["mask"],
+        track_bbox_results=[
+            [
+                bboxes,
+                scores,
+                labels,
+                bbox_index,
+                bboxes_dict["mask"],
+            ]
+        ],
+    )
+    return result_dict
 
 
 def det_instances2results(instances, results, img_metas):
@@ -410,35 +455,22 @@ def det_instances2results(instances, results, img_metas):
     # filter out sleep querys
     if instances.pred_logits.numel() == 0:
         return [None]
-    bbox_dict = dict(
-        cls_scores=instances.pred_logits,
-        bbox_preds=instances.pred_boxes,
-        track_scores=instances.scores,
-        obj_idxes=instances.obj_idxes,
-    )
-    # bboxes_dict = self.bbox_coder.decode(bbox_dict, img_metas=img_metas)[0]
+
     # decode
     with_mask = True
-    all_cls_scores = bbox_dict["cls_scores"]
-    all_bbox_preds = bbox_dict["bbox_preds"]
-    track_scores = bbox_dict["track_scores"]
-    obj_idxes = bbox_dict["obj_idxes"]
-
-    batch_size = all_cls_scores.size()[0]
-    predictions_list = []
-    # bs size = 1
-    predictions_list.append(
-        decode_single(
-            all_cls_scores,
-            all_bbox_preds,
-            track_scores,
-            obj_idxes,
-            with_mask,
-            img_metas,
-        )
+    all_cls_scores = instances.pred_logits
+    all_bbox_preds = instances.pred_boxes
+    track_scores = instances.scores
+    obj_idxes = instances.obj_idxes
+    bboxes_dict = decode_single(
+        all_cls_scores,
+        all_bbox_preds,
+        track_scores,
+        obj_idxes,
+        with_mask,
+        img_metas,
     )
 
-    bboxes_dict = predictions_list[0]
     bboxes = bboxes_dict["bboxes"]
     bboxes = img_metas[0]["box_type_3d"](bboxes, 9)
     labels = bboxes_dict["labels"]
@@ -509,6 +541,15 @@ def predict(models, img, img_metas, prev_bev=None, track_instances=None):
             },
         )
     bev_embed, bev_pos = output
+
+    # print("bev_embed---", bev_embed.shape)
+    # print(bev_embed)
+    # print("bev_pos---", bev_pos.shape)
+    # print(bev_pos)
+
+    # bev_embed = np.load("bev_embed_3.npy")
+    # query = np.load("query_3.npy")
+    # ref_pts = np.load("ref_pts_3.npy")
 
     query = track_instances.query
     ref_pts = track_instances.ref_pts
@@ -628,7 +669,7 @@ def recognize_from_image(models):
 
     dataset = NuScenesDataset(
         **{
-            "type": "NuScenesE2EDataset",
+            # "type": "NuScenesE2EDataset",
             "data_root": "data/nuscenes/",
             "ann_file": ann_file,
             "pipeline": [
@@ -734,16 +775,16 @@ def recognize_from_image(models):
             },
             "test_mode": True,
             "box_type_3d": "LiDAR",
-            "file_client_args": {"backend": "disk"},
-            "patch_size": [102.4, 102.4],
-            "canvas_size": (200, 200),
-            "bev_size": (200, 200),
-            "predict_steps": 12,
-            "past_steps": 4,
-            "fut_steps": 4,
-            "occ_n_future": 6,
-            "use_nonlinear_optimizer": True,
-            "eval_mod": ["det", "map", "track", "motion"],
+            # "file_client_args": {"backend": "disk"},
+            # "patch_size": [102.4, 102.4],
+            # "canvas_size": (200, 200),
+            # "bev_size": (200, 200),
+            # "predict_steps": 12,
+            # "past_steps": 4,
+            # "fut_steps": 4,
+            # "occ_n_future": 6,
+            # "use_nonlinear_optimizer": True,
+            # "eval_mod": ["det", "map", "track", "motion"],
         }
     )
 
@@ -783,6 +824,16 @@ def recognize_from_image(models):
         last_ref_pts = output["ref_pts"]
         query_feats = output["query_embeddings"]
 
+        out = {
+            "pred_logits": output_classes,
+            "pred_boxes": output_coords,
+            "ref_pts": last_ref_pts,
+            # "bev_embed": bev_embed,
+            "query_embeddings": query_feats,
+            # "all_past_traj_preds": det_output["all_past_traj_preds"],
+            # "bev_pos": bev_pos,
+        }
+
         # Apply sigmoid and get max values along last axis
         logits = output_classes[-1, 0, :]
         sigmoid_logits = sigmoid(logits)
@@ -798,26 +849,43 @@ def recognize_from_image(models):
         # hard_code: assume the 901 query is sdc query
         track_instances.obj_idxes[900] = -2
         """ update track base """
-        # track_base.update(track_instances, None)
+        track_base.update(track_instances)
 
         filter_score_thresh = 0.35
         active_index = (track_instances.obj_idxes >= 0) & (
             track_instances.scores >= filter_score_thresh
         )  # filter out sleep objects
-        out = {
-            "pred_logits": output_classes,
-            "pred_boxes": output_coords,
-            "ref_pts": last_ref_pts,
-            # "bev_embed": bev_embed,
-            "query_embeddings": query_feats,
-            # "all_past_traj_preds": det_output["all_past_traj_preds"],
-            # "bev_pos": bev_pos,
-        }
+        # select_active_track_query
+        result_dict = track_instances2results(
+            track_instances[active_index], img_metas, with_mask=True
+        )
+        result_dict["track_query_embeddings"] = track_instances.output_embedding[
+            active_index
+        ][result_dict["bbox_index"]][result_dict["mask"]]
+        result_dict["track_query_matched_idxes"] = track_instances.matched_gt_idxes[
+            active_index
+        ][result_dict["bbox_index"]][result_dict["mask"]]
+        out.update(result_dict)
+        # select_sdc_track_query
+        sdc_instance = track_instances[track_instances.obj_idxes == -2]
+        result_dict = track_instances2results(sdc_instance, img_metas, with_mask=False)
+        out.update(
+            dict(
+                sdc_boxes_3d=result_dict["boxes_3d"],
+                sdc_scores_3d=result_dict["scores_3d"],
+                sdc_track_scores=result_dict["track_scores"],
+                sdc_track_bbox_results=result_dict["track_bbox_results"],
+                sdc_embedding=sdc_instance.output_embedding[0],
+            )
+        )
 
+        """ update with memory_bank """
+
+        """  Update track instances using matcher """
         out_track_instances = query_interact(models, track_instances)
         out["track_instances_fordet"] = track_instances
         out["track_instances"] = out_track_instances
-        out["track_obj_idxes"] = track_instances.obj_idxes
+        # out["track_obj_idxes"] = track_instances.obj_idxes
 
         frame_res = out
         # track_instances = frame_res["track_instances"]
