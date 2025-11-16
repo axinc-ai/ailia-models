@@ -36,6 +36,10 @@ WEIGHT_PATH = "bev_encoder.msfix.onnx"
 MODEL_PATH = "bev_encoder.msfix.onnx.prototxt"
 WEIGHT_TRACK_HEAD_PATH = "track_head.onnx"
 MODEL_TRACK_HEAD_PATH = "track_head.onnx.prototxt"
+WEIGHT_MEMORY_BANK_PATH = "memory_bank.onnx"
+MODEL_MEMORY_BANK_PATH = "memory_bank.onnx.prototxt"
+WEIGHT_MEMORY_BANK_UPD_PATH = "memory_bank_update.onnx"
+MODEL_MEMORY_BANK_UPD_PATH = "memory_bank_update.onnx.prototxt"
 WEIGHT_QUERY_INTERACTION_PATH = "query_interact.onnx"
 MODEL_QUERY_INTERACTION_PATH = "query_interact.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/uniad/"
@@ -453,7 +457,7 @@ def det_instances2results(instances, results, img_metas):
         - tracking_score
     """
     # filter out sleep querys
-    if instances.pred_logits.numel() == 0:
+    if instances.pred_logits.size == 0:
         return [None]
 
     # decode
@@ -588,24 +592,86 @@ def predict(models, img, img_metas, prev_bev=None, track_instances=None):
     return out
 
 
+def memory_bank(models, track_instances):
+    key_padding_mask = track_instances.mem_padding_mask  # [n_, memory_bank_len]
+    valid_idxes = key_padding_mask[:, -1] == 0
+    embed = track_instances.output_embedding[valid_idxes]  # (n, 256)
+
+    if 0 < len(embed):
+        net = models["memory_bank"]
+        if not args.onnx:
+            output = net.predict(
+                [
+                    track_instances.mem_padding_mask,
+                    track_instances.output_embedding,
+                    track_instances.mem_bank,
+                ]
+            )
+        else:
+            output = net.run(
+                None,
+                {
+                    "mem_padding_mask": track_instances.mem_padding_mask,
+                    "output_embedding": track_instances.output_embedding,
+                    "mem_bank": track_instances.mem_bank,
+                },
+            )
+        track_instances.output_embedding = output[0]
+
+    embed = track_instances.output_embedding[:, None]  # ( N, 1, 256)
+    save_period = track_instances.save_period
+    saved_idxes = (save_period == 0) & (track_instances.scores > 0)
+    saved_embed = embed[saved_idxes]
+
+    if 0 < len(saved_embed):
+        net = models["memory_bank_update"]
+        if not args.onnx:
+            output = net.predict(
+                [
+                    track_instances.output_embedding,
+                    track_instances.scores,
+                    track_instances.mem_padding_mask,
+                    track_instances.save_period,
+                    track_instances.mem_bank,
+                ]
+            )
+        else:
+            output = net.run(
+                None,
+                {
+                    "output_embedding": track_instances.output_embedding,
+                    "scores": track_instances.scores,
+                    "mem_padding_mask": track_instances.mem_padding_mask,
+                    "save_period": track_instances.save_period,
+                    "mem_bank": track_instances.mem_bank,
+                },
+            )
+        mem_padding_mask, mem_bank, save_period = output
+        track_instances.mem_padding_mask = mem_padding_mask
+        track_instances.mem_bank = mem_bank
+        track_instances.save_period = save_period
+
+    return track_instances
+
+
 def query_interact(models, track_instances):
     active_track_instances = track_instances[track_instances.obj_idxes >= 0]
 
-    query_interact = models["query_interact"]
+    net = models["query_interact"]
     if not args.onnx:
-        output = query_interact.predict(
-            [track_instances.query, track_instances.output_embedding]
+        output = net.predict(
+            [active_track_instances.query, active_track_instances.output_embedding]
         )
     else:
-        output = query_interact.run(
+        output = net.run(
             None,
             {
-                "query": track_instances.query,
-                "output_embedding": track_instances.output_embedding,
+                "query": active_track_instances.query,
+                "output_embedding": active_track_instances.output_embedding,
             },
         )
     updated_query = output[0]
-    track_instances.query = updated_query
+    active_track_instances.query = updated_query
 
     merged_track_instances = Instances.cat([empty_tracks(), active_track_instances])
 
@@ -819,12 +885,13 @@ def recognize_from_image(models):
         track_instances = Instances.cat([other_inst, active_inst])
 
         output = predict(models, img, img_metas, track_instances=track_instances)
+        bev_embed = output["bev_embed"]
         output_classes = output["pred_logits"]
         output_coords = output["pred_boxes"]
         last_ref_pts = output["ref_pts"]
         query_feats = output["query_embeddings"]
 
-        out = {
+        item = {
             "pred_logits": output_classes,
             "pred_boxes": output_coords,
             "ref_pts": last_ref_pts,
@@ -865,11 +932,11 @@ def recognize_from_image(models):
         result_dict["track_query_matched_idxes"] = track_instances.matched_gt_idxes[
             active_index
         ][result_dict["bbox_index"]][result_dict["mask"]]
-        out.update(result_dict)
+        item.update(result_dict)
         # select_sdc_track_query
         sdc_instance = track_instances[track_instances.obj_idxes == -2]
         result_dict = track_instances2results(sdc_instance, img_metas, with_mask=False)
-        out.update(
+        item.update(
             dict(
                 sdc_boxes_3d=result_dict["boxes_3d"],
                 sdc_scores_3d=result_dict["scores_3d"],
@@ -880,35 +947,30 @@ def recognize_from_image(models):
         )
 
         """ update with memory_bank """
+        track_instances = memory_bank(models, track_instances)
 
         """  Update track instances using matcher """
-        out_track_instances = query_interact(models, track_instances)
-        out["track_instances_fordet"] = track_instances
-        out["track_instances"] = out_track_instances
-        # out["track_obj_idxes"] = track_instances.obj_idxes
+        track_instances_fordet = track_instances
+        track_instances = query_interact(models, track_instances)
 
-        frame_res = out
-        # track_instances = frame_res["track_instances"]
-        track_instances_fordet = frame_res["track_instances_fordet"]
-
-        results = [dict()]
-        get_keys = [
-            "bev_embed",
-            "bev_pos",
-            "track_query_embeddings",
-            "track_bbox_results",
-            "boxes_3d",
-            "scores_3d",
-            "labels_3d",
-            "track_scores",
-            "track_ids",
-            "sdc_boxes_3d",
-            "sdc_scores_3d",
-            "sdc_track_scores",
-            "sdc_track_bbox_results",
-            "sdc_embedding",
+        results = [
+            dict(
+                bev_embed=bev_embed,
+                # bev_pos=item["bev_pos"],
+                track_query_embeddings=item["track_query_embeddings"],
+                track_bbox_results=item["track_bbox_results"],
+                boxes_3d=item["boxes_3d"],
+                scores_3d=item["scores_3d"],
+                labels_3d=item["labels_3d"],
+                track_scores=item["track_scores"],
+                track_ids=item["track_ids"],
+                sdc_boxes_3d=item["sdc_boxes_3d"],
+                sdc_scores_3d=item["sdc_scores_3d"],
+                sdc_track_scores=item["sdc_track_scores"],
+                sdc_track_bbox_results=item["sdc_track_bbox_results"],
+                sdc_embedding=item["sdc_embedding"],
+            )
         ]
-        results[0].update({k: frame_res[k] for k in get_keys})
         result_track = det_instances2results(track_instances_fordet, results, img_metas)
 
         result = [dict() for i in range(len(img_metas))]
@@ -957,6 +1019,12 @@ def main():
         track_head = ailia.Net(
             MODEL_TRACK_HEAD_PATH, WEIGHT_TRACK_HEAD_PATH, env_id=env_id
         )
+        memory_bank = ailia.Net(
+            MODEL_MEMORY_BANK_PATH, WEIGHT_MEMORY_BANK_PATH, env_id=env_id
+        )
+        memory_bank_update = ailia.Net(
+            MODEL_MEMORY_BANK_UPD_PATH, WEIGHT_MEMORY_BANK_UPD_PATH, env_id=env_id
+        )
         query_interact = ailia.Net(
             MODEL_QUERY_INTERACTION_PATH, WEIGHT_QUERY_INTERACTION_PATH, env_id=env_id
         )
@@ -968,12 +1036,22 @@ def main():
         track_head = onnxruntime.InferenceSession(
             WEIGHT_TRACK_HEAD_PATH, providers=providers
         )
+        memory_bank = onnxruntime.InferenceSession(
+            WEIGHT_MEMORY_BANK_PATH, providers=providers
+        )
+        memory_bank_update = onnxruntime.InferenceSession(
+            WEIGHT_MEMORY_BANK_UPD_PATH, providers=providers
+        )
         query_interact = onnxruntime.InferenceSession(
             WEIGHT_QUERY_INTERACTION_PATH, providers=providers
         )
 
     models = dict(
-        bev_encoder=bev_encoder, track_head=track_head, query_interact=query_interact
+        bev_encoder=bev_encoder,
+        track_head=track_head,
+        memory_bank=memory_bank,
+        memory_bank_update=memory_bank_update,
+        query_interact=query_interact,
     )
     recognize_from_image(models)
 
