@@ -54,11 +54,38 @@ class NuScenesDataset(Dataset):
             else:
                 data_dict[key] = value
 
-        img_metas = dict(
-            can_bus=data_dict["can_bus"],
-            lidar2img=np.array(data_dict["lidar2img"]),
-            img_shape=np.array(data_dict["img_shape"]),
-        )
+        meta_keys = [
+            # "filename",
+            # "ori_shape",
+            "sample_idx",
+            "img_shape",
+            "lidar2img",
+            # "depth2img",
+            # "cam2img",
+            # "pad_shape",
+            # "scale_factor",
+            # "flip",
+            # "pcd_horizontal_flip",
+            # "pcd_vertical_flip",
+            # "box_mode_3d",
+            # "box_type_3d",
+            # "img_norm_cfg",
+            # "pcd_trans",
+            # "prev_idx",
+            # "next_idx",
+            # "pcd_scale_factor",
+            # "pcd_rotation",
+            # "pts_filename",
+            # "transformation_3d_flow",
+            # "scene_token",
+            "can_bus",
+        ]
+        img_metas = {}
+        for key in meta_keys:
+            if key in data_dict:
+                img_metas[key] = data_dict[key]
+        img_metas["lidar2img"] = np.array(img_metas["lidar2img"])
+        img_metas["img_shape"] = np.array(img_metas["img_shape"])
         data_dict["img_metas"] = img_metas
 
         return data_dict

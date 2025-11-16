@@ -141,26 +141,26 @@ class Visualizer:
             self.token_set.add(token)
 
             # detection
-            bboxes = outputs[k]["boxes_3d"]
+            bboxes: LiDARInstance3DBoxes = outputs[k]["boxes_3d"]
             scores = outputs[k]["scores_3d"]
             labels = outputs[k]["labels_3d"]
 
-            track_scores = scores.cpu().detach().numpy()
-            track_labels = labels.cpu().detach().numpy()
-            track_boxes = bboxes.tensor.cpu().detach().numpy()
+            track_scores = scores
+            track_labels = labels
+            track_boxes = bboxes.tensor
 
-            track_centers = bboxes.gravity_center.cpu().detach().numpy()
-            track_dims = bboxes.dims.cpu().detach().numpy()
-            track_yaw = bboxes.yaw.cpu().detach().numpy()
+            track_centers = bboxes.gravity_center
+            track_dims = bboxes.dims
+            track_yaw = bboxes.yaw
 
-            track_ids = outputs[k]["track_ids"].cpu().detach().numpy()
+            track_ids = outputs[k]["track_ids"]
 
             # speed
-            track_velocity = bboxes.tensor.cpu().detach().numpy()[:, -2:]
+            track_velocity = bboxes.tensor[:, -2:]
 
             # trajectories
-            trajs = outputs[k][f"traj"].numpy()
-            traj_scores = outputs[k][f"traj_scores"].numpy()
+            trajs = outputs[k]["traj"]
+            traj_scores = outputs[k]["traj_scores"]
 
             predicted_agent_list = []
             for i in range(track_scores.shape[0]):
@@ -193,15 +193,15 @@ class Visualizer:
             scores = outputs[k]["sdc_scores_3d"]
             labels = 0
 
-            track_scores = scores.cpu().detach().numpy()
+            track_scores = scores
             track_labels = labels
 
-            track_centers = bboxes.gravity_center.cpu().detach().numpy()
-            track_dims = bboxes.dims.cpu().detach().numpy()
-            track_yaw = bboxes.yaw.cpu().detach().numpy()
-            track_velocity = bboxes.tensor.cpu().detach().numpy()[:, -2:]
+            track_centers = bboxes.gravity_center
+            track_dims = bboxes.dims
+            track_yaw = bboxes.yaw
+            track_velocity = bboxes.tensor[:, -2:]
 
-            command = outputs[k]["command"][0].cpu().detach().numpy()
+            command = outputs[k]["command"][0]
             planning_agent = AgentPredictionData(
                 track_scores[0],
                 track_labels,
@@ -209,7 +209,7 @@ class Visualizer:
                 track_dims[0],
                 track_yaw[0],
                 track_velocity[0],
-                outputs[k]["planning_traj"][0].cpu().detach().numpy(),
+                outputs[k]["planning_traj"][0],
                 1,
                 pred_track_id=-1,
                 pred_occ_map=None,
@@ -337,9 +337,7 @@ def denormalize_bbox(normalized_bboxes):
     return denormalized_bboxes
 
 
-def decode_single(
-    cls_scores, bbox_preds, track_scores, obj_idxes, with_mask=True, img_metas=None
-):
+def decode_single(cls_scores, bbox_preds, track_scores, obj_idxes, with_mask=True):
     """Decode bboxes.
     Args:
         cls_scores (Tensor): Outputs from the classification head, \
@@ -379,6 +377,8 @@ def decode_single(
     )
     mask = (final_box_preds[..., :3] >= post_center_range[:3]).all(1)
     mask &= (final_box_preds[..., :3] <= post_center_range[3:]).all(1)
+    if not with_mask:
+        mask = np.ones_like(mask) > 0
 
     boxes3d = final_box_preds[mask]
     scores = final_scores[mask]
@@ -398,7 +398,7 @@ def decode_single(
     return predictions_dict
 
 
-def track_instances2results(track_instances, img_metas, with_mask=True):
+def track_instances2results(track_instances, with_mask=True):
     all_cls_scores = track_instances.pred_logits
     all_bbox_preds = track_instances.pred_boxes
     track_scores = track_instances.scores
@@ -409,11 +409,10 @@ def track_instances2results(track_instances, img_metas, with_mask=True):
         track_scores,
         obj_idxes,
         with_mask,
-        img_metas,
     )
 
     bboxes = bboxes_dict["bboxes"]
-    bboxes = LiDARInstance3DBoxes(bboxes, 9)
+    bboxes = LiDARInstance3DBoxes(bboxes, box_dim=9)
     labels = bboxes_dict["labels"]
     scores = bboxes_dict["scores"]
     bbox_index = bboxes_dict["bbox_index"]
@@ -440,7 +439,7 @@ def track_instances2results(track_instances, img_metas, with_mask=True):
     return result_dict
 
 
-def det_instances2results(instances, results, img_metas):
+def det_instances2results(instances, result_dict):
     """
     Outs:
     active_instances. keys:
@@ -472,28 +471,24 @@ def det_instances2results(instances, results, img_metas):
         track_scores,
         obj_idxes,
         with_mask,
-        img_metas,
     )
 
     bboxes = bboxes_dict["bboxes"]
-    bboxes = img_metas[0]["box_type_3d"](bboxes, 9)
+    bboxes = LiDARInstance3DBoxes(bboxes, box_dim=9)
     labels = bboxes_dict["labels"]
     scores = bboxes_dict["scores"]
 
     track_scores = bboxes_dict["track_scores"]
     obj_idxes = bboxes_dict["obj_idxes"]
-    result_dict = results[0]
-    result_dict_det = dict(
-        boxes_3d_det=bboxes.to("cpu"),
-        scores_3d_det=scores.cpu(),
-        labels_3d_det=labels.cpu(),
+    result_dict.update(
+        dict(
+            boxes_3d_det=bboxes,
+            scores_3d_det=scores,
+            labels_3d_det=labels,
+        )
     )
-    if result_dict is not None:
-        result_dict.update(result_dict_det)
-    else:
-        result_dict = None
 
-    return [result_dict]
+    return result_dict
 
 
 def to_video(folder_path, out_path, fps=4, downsample=1):
@@ -924,7 +919,7 @@ def recognize_from_image(models):
         )  # filter out sleep objects
         # select_active_track_query
         result_dict = track_instances2results(
-            track_instances[active_index], img_metas, with_mask=True
+            track_instances[active_index], with_mask=True
         )
         result_dict["track_query_embeddings"] = track_instances.output_embedding[
             active_index
@@ -935,7 +930,7 @@ def recognize_from_image(models):
         item.update(result_dict)
         # select_sdc_track_query
         sdc_instance = track_instances[track_instances.obj_idxes == -2]
-        result_dict = track_instances2results(sdc_instance, img_metas, with_mask=False)
+        result_dict = track_instances2results(sdc_instance, with_mask=False)
         item.update(
             dict(
                 sdc_boxes_3d=result_dict["boxes_3d"],
@@ -953,42 +948,50 @@ def recognize_from_image(models):
         track_instances_fordet = track_instances
         track_instances = query_interact(models, track_instances)
 
-        results = [
-            dict(
-                bev_embed=bev_embed,
-                # bev_pos=item["bev_pos"],
-                track_query_embeddings=item["track_query_embeddings"],
-                track_bbox_results=item["track_bbox_results"],
-                boxes_3d=item["boxes_3d"],
-                scores_3d=item["scores_3d"],
-                labels_3d=item["labels_3d"],
-                track_scores=item["track_scores"],
-                track_ids=item["track_ids"],
-                sdc_boxes_3d=item["sdc_boxes_3d"],
-                sdc_scores_3d=item["sdc_scores_3d"],
-                sdc_track_scores=item["sdc_track_scores"],
-                sdc_track_bbox_results=item["sdc_track_bbox_results"],
-                sdc_embedding=item["sdc_embedding"],
-            )
-        ]
-        result_track = det_instances2results(track_instances_fordet, results, img_metas)
-
-        result = [dict() for i in range(len(img_metas))]
+        result_dict = dict(
+            bev_embed=bev_embed,
+            # bev_pos=item["bev_pos"],
+            track_query_embeddings=item["track_query_embeddings"],
+            track_bbox_results=item["track_bbox_results"],
+            boxes_3d=item["boxes_3d"],
+            scores_3d=item["scores_3d"],
+            labels_3d=item["labels_3d"],
+            track_scores=item["track_scores"],
+            track_ids=item["track_ids"],
+            sdc_boxes_3d=item["sdc_boxes_3d"],
+            sdc_scores_3d=item["sdc_scores_3d"],
+            sdc_track_scores=item["sdc_track_scores"],
+            sdc_track_bbox_results=item["sdc_track_bbox_results"],
+            sdc_embedding=item["sdc_embedding"],
+        )
+        result_track = det_instances2results(track_instances_fordet, result_dict)
 
         # seg_head
-        # result_seg =  self.seg_head.forward_test(bev_embed, gt_lane_labels, gt_lane_masks, img_metas, rescale)
-        result_seg = [dict(pts_bbox=None, ret_iou=None, args_tuple=None)]
+        # result_seg = seg_head_forward(
+        #     bev_embed, gt_lane_labels, gt_lane_masks, img_metas, rescale
+        # )
 
-        for i, res in enumerate(result):
-            res["token"] = img_metas[i]["sample_idx"]
-            res.update(result_track[i])
-            # if self.with_motion_head:
-            #     res.update(result_motion[i])
-            # if self.with_seg_head:
-            #     res.update(result_seg[i])
+        result = dict()
+        result["token"] = img_metas["sample_idx"]
+        # result["occ"] = outs_occ
+        # result["planning"] = dict(
+        #     planning_gt=planning_gt,
+        #     result_planning=result_planning,
+        # )
+        result.update(result_track)
+        # result.update(
+        #     result_motion
+        # )  # 'traj_0', 'traj_scores_0', 'traj_1', 'traj_scores_1', 'traj', 'traj_scores'
+        # result.update(result_seg)  # ret_iou
 
-        batch_size = len(result)
-        bbox_results.extend(result)
+        ### End of forward_test ###
+
+        bbox_results.append(result)
+        # occ_results_computed = occ_results
+        # planning_results_computed = occ_results
+        # mask_results = mask_results
+
+        ### End of custom_multi_gpu_test ###
 
     vis = Visualizer(
         version="v1.0-mini",
