@@ -126,11 +126,15 @@ def recognize_from_image():
         logger.info('Start inference...')
         if args.benchmark:
             logger.info('BENCHMARK mode')
+            average_time = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
                 classifier.compute(img, MAX_CLASS_COUNT)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
+                if i != 0:
+                    average_time = average_time + (end - start)
+            logger.info(f'\taverage time {average_time / (args.benchmark_count-1)} ms')
         else:
             classifier.compute(img, MAX_CLASS_COUNT)
 
