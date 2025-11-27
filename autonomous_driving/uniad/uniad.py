@@ -42,6 +42,10 @@ WEIGHT_MEMORY_BANK_UPD_PATH = "memory_bank_update.onnx"
 MODEL_MEMORY_BANK_UPD_PATH = "memory_bank_update.onnx.prototxt"
 WEIGHT_QUERY_INTERACTION_PATH = "query_interact.onnx"
 MODEL_QUERY_INTERACTION_PATH = "query_interact.onnx.prototxt"
+WEIGHT_SEG_HEAD_PATH = "seg_head.onnx"
+MODEL_SEG_HEAD_PATH = "seg_head.onnx.prototxt"
+WEIGHT_MOTION_HEAD_PATH = "motion_head.onnx"
+MODEL_MOTION_HEAD_PATH = "motion_head.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/uniad/"
 
 IMAGE_PATH = "nuscenes"
@@ -491,6 +495,26 @@ def det_instances2results(instances, result_dict):
     return result_dict
 
 
+def get_trajs(preds_dicts, bbox_results):
+    """
+    Generates trajectories from the prediction results, bounding box results.
+    """
+    num_samples = len(bbox_results)
+    num_layers = preds_dicts["all_traj_preds"].shape[0]
+    ret_list = []
+    for i in range(num_samples):
+        preds = dict()
+        for j in range(num_layers):
+            subfix = "_" + str(j) if j < (num_layers - 1) else ""
+            traj = preds_dicts["all_traj_preds"][j, i]
+            traj_scores = preds_dicts["all_traj_scores"][j, i]
+
+            preds["traj" + subfix] = traj
+            preds["traj_scores" + subfix] = traj_scores
+        ret_list.append(preds)
+    return ret_list
+
+
 def to_video(folder_path, out_path, fps=4, downsample=1):
     imgs_path = glob.glob(os.path.join(folder_path, "*.jpg"))
     imgs_path = sorted(imgs_path)
@@ -671,6 +695,139 @@ def query_interact(models, track_instances):
     merged_track_instances = Instances.cat([empty_tracks(), active_track_instances])
 
     return merged_track_instances
+
+
+def seg_head_forward(models, pts_feats):
+    net = models["seg_head"]
+    if not args.onnx:
+        output = net.predict([pts_feats])
+    else:
+        output = net.run(
+            None,
+            {"bev_embed": pts_feats},
+        )
+    (memory, memory_mask, memory_pos, query, query_pos, hw_lvl, hw_lvl2) = output
+
+    out = [
+        memory,
+        memory_mask,
+        memory_pos,
+        query,
+        query_pos,
+        [hw_lvl, hw_lvl2],
+    ]
+    return out
+
+
+def motion_head_forward(models, bev_embed, outs_track: dict, outs_seg: dict):
+    track_query = outs_track["track_query_embeddings"][None, None, ...]
+    track_boxes: LiDARInstance3DBoxes = outs_track["track_bbox_results"]
+
+    track_query = np.concatenate(
+        [track_query, outs_track["sdc_embedding"][None, None, None, :]], axis=2
+    )
+    sdc_track_boxes = outs_track["sdc_track_bbox_results"]
+
+    track_boxes[0][0].tensor = np.concatenate(
+        [track_boxes[0][0].tensor, sdc_track_boxes[0][0].tensor], axis=0
+    )
+    track_boxes[0][1] = np.concatenate(
+        [track_boxes[0][1], sdc_track_boxes[0][1]], axis=0
+    )
+    track_boxes[0][2] = np.concatenate(
+        [track_boxes[0][2], sdc_track_boxes[0][2]], axis=0
+    )
+    track_boxes[0][3] = np.concatenate(
+        [track_boxes[0][3], sdc_track_boxes[0][3]], axis=0
+    )
+    memory, memory_mask, memory_pos, lane_query, lane_query_pos, hw_lvl = outs_seg
+
+    net = models["motion_head"]
+    if not args.onnx:
+        output = net.predict(
+            [
+                bev_embed,
+                track_query,
+                lane_query,
+                lane_query_pos,
+                track_boxes[0][0].tensor,
+                track_boxes[0][2],
+            ]
+        )
+    else:
+        output = net.run(
+            None,
+            {
+                "bev_embed": bev_embed,
+                "track_query": track_query,
+                "lane_query": lane_query,
+                "lane_query_pos": lane_query_pos,
+                "bboxes": track_boxes[0][0].tensor,
+                "bbox_labels": track_boxes[0][2],
+            },
+        )
+    (
+        outputs_traj_scores,
+        outputs_trajs,
+        valid_traj_masks,
+        inter_states,
+        track_query,
+        track_query_pos,
+    ) = output
+
+    outs_motion = {
+        "all_traj_scores": outputs_traj_scores,
+        "all_traj_preds": outputs_trajs,
+        "valid_traj_masks": valid_traj_masks,
+        "traj_query": inter_states,
+        "track_query": track_query,
+        "track_query_pos": track_query_pos,
+    }
+
+    # get_trajs
+    traj_results = get_trajs(outs_motion, track_boxes)
+    bboxes, scores, labels, bbox_index, mask = track_boxes[0]
+    outs_motion["track_scores"] = scores[None, :]
+    labels[-1] = 0
+
+    def filter_vehicle_query(outs_motion, labels, vehicle_id_list):
+        if len(labels) < 1:  # No other obj query except sdc query.
+            return None
+
+        # select vehicle query according to vehicle_id_list
+        vehicle_mask = np.zeros_like(labels)
+        for veh_id in vehicle_id_list:
+            vehicle_mask |= labels == veh_id
+        outs_motion["traj_query"] = outs_motion["traj_query"][:, :, vehicle_mask > 0]
+        outs_motion["track_query"] = outs_motion["track_query"][:, vehicle_mask > 0]
+        outs_motion["track_query_pos"] = outs_motion["track_query_pos"][
+            :, vehicle_mask > 0
+        ]
+        outs_motion["track_scores"] = outs_motion["track_scores"][:, vehicle_mask > 0]
+        return outs_motion
+
+    # Define vehicle_id_list as a default list
+    vehicle_id_list = [
+        0,
+        1,
+        2,
+        3,
+        4,
+        6,
+        7,
+    ]  # car, truck, bus, trailer, construction_vehicle, motorcycle, bicycle, pedestrian, traffic_cone
+    outs_motion = filter_vehicle_query(outs_motion, labels, vehicle_id_list)
+
+    # filter sdc query
+    outs_motion["sdc_traj_query"] = outs_motion["traj_query"][:, :, -1]
+    outs_motion["sdc_track_query"] = outs_motion["track_query"][:, -1]
+    outs_motion["sdc_track_query_pos"] = outs_motion["track_query_pos"][:, -1]
+    outs_motion["traj_query"] = outs_motion["traj_query"][:, :, :-1]
+    outs_motion["track_query"] = outs_motion["track_query"][:, :-1]
+    outs_motion["track_query_pos"] = outs_motion["track_query_pos"][:, :-1]
+    outs_motion["track_scores"] = outs_motion["track_scores"][:, :-1]
+
+    return traj_results, outs_motion
 
 
 def recognize_from_image(models):
@@ -967,9 +1124,11 @@ def recognize_from_image(models):
         result_track = det_instances2results(track_instances_fordet, result_dict)
 
         # seg_head
-        # result_seg = seg_head_forward(
-        #     bev_embed, gt_lane_labels, gt_lane_masks, img_metas, rescale
-        # )
+        result_seg = seg_head_forward(models, bev_embed)
+        # motion_head
+        result_motion, outs_motion = motion_head_forward(
+            models, bev_embed, outs_track=result_track, outs_seg=result_seg
+        )
 
         result = dict()
         result["token"] = img_metas["sample_idx"]
@@ -979,9 +1138,9 @@ def recognize_from_image(models):
         #     result_planning=result_planning,
         # )
         result.update(result_track)
-        # result.update(
-        #     result_motion
-        # )  # 'traj_0', 'traj_scores_0', 'traj_1', 'traj_scores_1', 'traj', 'traj_scores'
+        result.update(
+            result_motion[0]
+        )  # 'traj_0', 'traj_scores_0', 'traj_1', 'traj_scores_1', 'traj', 'traj_scores'
         # result.update(result_seg)  # ret_iou
 
         ### End of forward_test ###
@@ -1031,6 +1190,10 @@ def main():
         query_interact = ailia.Net(
             MODEL_QUERY_INTERACTION_PATH, WEIGHT_QUERY_INTERACTION_PATH, env_id=env_id
         )
+        seg_head = ailia.Net(MODEL_SEG_HEAD_PATH, WEIGHT_SEG_HEAD_PATH, env_id=env_id)
+        motion_head = ailia.Net(
+            MODEL_MOTION_HEAD_PATH, WEIGHT_MOTION_HEAD_PATH, env_id=env_id
+        )
     else:
         import onnxruntime
 
@@ -1048,6 +1211,12 @@ def main():
         query_interact = onnxruntime.InferenceSession(
             WEIGHT_QUERY_INTERACTION_PATH, providers=providers
         )
+        seg_head = onnxruntime.InferenceSession(
+            WEIGHT_SEG_HEAD_PATH, providers=providers
+        )
+        motion_head = onnxruntime.InferenceSession(
+            WEIGHT_MOTION_HEAD_PATH, providers=providers
+        )
 
     models = dict(
         bev_encoder=bev_encoder,
@@ -1055,6 +1224,8 @@ def main():
         memory_bank=memory_bank,
         memory_bank_update=memory_bank_update,
         query_interact=query_interact,
+        seg_head=seg_head,
+        motion_head=motion_head,
     )
     recognize_from_image(models)
 
