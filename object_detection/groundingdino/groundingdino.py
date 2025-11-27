@@ -14,7 +14,7 @@ from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from image_utils import normalize_image  # noqa
 from math_utils import sigmoid
-from detector_utils import load_image, plot_results, hsv_to_rgb  # noqa
+from detector_utils import load_image, plot_results, hsv_to_rgb, write_predictions  # noqa
 
 # logger
 from logging import getLogger  # noqa
@@ -50,7 +50,19 @@ parser.add_argument(
     action='store_true',
     help='disable ailia tokenizer.'
 )
-parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
+parser.add_argument(
+    "--onnx",
+    action="store_true",
+    help="execute onnxruntime version."
+)
+parser.add_argument(
+    '-w', '--write_prediction',
+    nargs='?',
+    const='txt',
+    choices=['txt', 'json'],
+    type=str,
+    help='Output results to txt or json file.'
+)
 args = update_parser(parser)
 
 
@@ -100,12 +112,12 @@ def generate_masks_with_special_tokens(input_ids, special_tokens_list):
     return attention_mask, position_ids
 
 
-def draw_predictions(
+def get_detector_objects(
     image: np.ndarray,
     boxes: np.ndarray,
     logits: np.ndarray,
     phrases: list,
-) -> np.ndarray:
+) -> list:
     height, width, _ = image.shape
     boxes = boxes * np.array([width, height, width, height])
 
@@ -116,79 +128,20 @@ def draw_predictions(
     y2 = cy + 0.5 * h
     xyxy = np.concatenate((x1, y1, x2, y2), axis=-1)
 
-    mode_ailia = True
-    if mode_ailia:
-        detect_objects = []
-        for i in range(len(xyxy)):
-            x1, y1, x2, y2 = xyxy[i].astype(int)
-            r = ailia.DetectorObject(
-                category=phrases[i],
-                prob=logits[i],
-                x=x1 / width,
-                y=y1 / height,
-                w=(x2 - x1) / width,
-                h=(y2 - y1) / height,
-            )
-            detect_objects.append(r)
-
-        res_img = plot_results(detect_objects, image)
-        return res_img
-
-    labels = [f"{phrase} {logit:.2f}" for phrase, logit in zip(phrases, logits)]
-
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    thickness = 2
-    text_scale = 0.5
-    text_thickness = 1
-    text_padding = 10
+    detect_objects = []
     for i in range(len(xyxy)):
         x1, y1, x2, y2 = xyxy[i].astype(int)
-        color = hsv_to_rgb(256 * i / (len(xyxy) + 1), 255, 255)
-        cv2.rectangle(
-            img=image,
-            pt1=(x1, y1),
-            pt2=(x2, y2),
-            color=color,
-            thickness=thickness,
+        r = ailia.DetectorObject(
+            category=phrases[i],
+            prob=logits[i],
+            x=x1 / width,
+            y=y1 / height,
+            w=(x2 - x1) / width,
+            h=(y2 - y1) / height,
         )
+        detect_objects.append(r)
 
-        text = labels[i]
-
-        text_width, text_height = cv2.getTextSize(
-            text=text,
-            fontFace=font,
-            fontScale=text_scale,
-            thickness=text_thickness,
-        )[0]
-
-        text_x = x1 + text_padding
-        text_y = y1 - text_padding
-
-        text_background_x1 = x1
-        text_background_y1 = y1 - 2 * text_padding - text_height
-
-        text_background_x2 = x1 + 2 * text_padding + text_width
-        text_background_y2 = y1
-
-        cv2.rectangle(
-            img=image,
-            pt1=(text_background_x1, text_background_y1),
-            pt2=(text_background_x2, text_background_y2),
-            color=color,
-            thickness=cv2.FILLED,
-        )
-        cv2.putText(
-            img=image,
-            text=text,
-            org=(text_x, text_y),
-            fontFace=font,
-            fontScale=text_scale,
-            color=(0, 0, 0),
-            thickness=text_thickness,
-            lineType=cv2.LINE_AA,
-        )
-
-    return image
+    return detect_objects
 
 
 # ======================
@@ -360,13 +313,21 @@ def recognize_from_image(models):
 
         logger.info("detected %d instances" % len(boxes))
 
+        detect_objects = get_detector_objects(img, boxes, logits, phrases)
+
         # draw prediction
-        res_img = draw_predictions(img, boxes, logits, phrases)
+        res_img = plot_results(detect_objects, img)
 
         # plot result
         savepath = get_savepath(args.savepath, image_path, ext=".png")
         logger.info(f"saved at : {savepath}")
         cv2.imwrite(savepath, res_img)
+
+        # write prediction
+        if args.write_prediction is not None:
+            ext = args.write_prediction
+            pred_file = "%s.%s" % (savepath.rsplit('.', 1)[0], ext)
+            write_predictions(pred_file, detect_objects, img, category=None, file_type=ext)
 
     logger.info("Script finished successfully.")
 
