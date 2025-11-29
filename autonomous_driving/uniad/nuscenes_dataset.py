@@ -46,13 +46,7 @@ class NuScenesDataset(Dataset):
 
     def __getitem__(self, idx):
         input_dict = self.get_data_info(idx)
-        example = self.pipeline(input_dict)
-        data_dict = {}
-        for key, value in example.items():
-            if "l2g" in key:
-                data_dict[key] = to_tensor(value[0])
-            else:
-                data_dict[key] = value
+        data_dict = self.pipeline(input_dict)
 
         meta_keys = [
             # "filename",
@@ -77,7 +71,7 @@ class NuScenesDataset(Dataset):
             # "pcd_rotation",
             # "pts_filename",
             # "transformation_3d_flow",
-            # "scene_token",
+            "scene_token",
             "can_bus",
         ]
         img_metas = {}
@@ -108,6 +102,21 @@ class NuScenesDataset(Dataset):
             timestamp=info["timestamp"] / 1e6,
         )
 
+        l2e_r = info["lidar2ego_rotation"]
+        l2e_t = info["lidar2ego_translation"]
+        e2g_r = info["ego2global_rotation"]
+        e2g_t = info["ego2global_translation"]
+        l2e_r_mat = Quaternion(l2e_r).rotation_matrix
+        e2g_r_mat = Quaternion(e2g_r).rotation_matrix
+
+        l2g_r_mat = l2e_r_mat.T @ e2g_r_mat.T
+        l2g_t = l2e_t @ e2g_r_mat.T + e2g_t
+
+        input_dict.update(
+            dict(l2g_r_mat=l2g_r_mat.astype(np.float32), l2g_t=l2g_t.astype(np.float32))
+        )
+
+        # use_camera
         image_paths = []
         lidar2img_rts = []
         for cam_type, cam_info in info["cams"].items():

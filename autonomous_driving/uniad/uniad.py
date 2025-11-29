@@ -1,3 +1,4 @@
+import copy
 import glob
 import os
 import sys
@@ -8,13 +9,15 @@ import ailia
 import cv2
 import numpy as np
 from nuscenes import NuScenes
-from torch.utils.data import DataLoader
 
 # import original modules
 sys.path.append("../../util")
+# isort: off
 from arg_utils import get_base_parser, get_savepath, update_parser
 from math_utils import sigmoid
 from model_utils import check_and_download_models
+
+# isort: on
 
 # import local modules
 from lidar_box3d import LiDARInstance3DBoxes
@@ -64,6 +67,12 @@ args = update_parser(parser)
 # ======================
 # Secondary Functions
 # ======================
+
+
+def inverse_sigmoid(x, eps=1e-5):
+    """Numerically stable logit."""
+    x = np.clip(x, eps, 1 - eps)
+    return np.log(x) - np.log(1 - x)
 
 
 class AgentPredictionData:
@@ -267,17 +276,23 @@ class Visualizer:
         self.cam_render.save_fig(out_filename + "_cam.jpg")
 
 
+# Cache for query embedding (load once)
+_query_embedding = None
+
+
 def empty_tracks():
+    global _query_embedding
+
     track_instances = Instances((1, 1))
-    query = np.load("query_embedding.npy")
+
+    if _query_embedding is None:
+        _query_embedding = np.load("query_embedding.npy")
+
+    query = _query_embedding.copy()
     num_queries, dim = query.shape
-    reference_points_weight = np.load("reference_points_weight.npy")
-    reference_points_bias = np.load("reference_points_bias.npy")
-    track_instances.ref_pts = (
-        query[..., : dim // 2] @ reference_points_weight.T + reference_points_bias
-    )
 
     track_instances.query = query
+    track_instances.ref_pts = reference_points(query)
 
     track_instances.obj_idxes = np.full((len(track_instances)), -1, dtype=np.int64)
     track_instances.matched_gt_idxes = np.full(
@@ -310,6 +325,46 @@ def empty_tracks():
     track_instances.save_period = np.zeros((len(track_instances),), dtype=np.float32)
 
     return track_instances
+
+
+def velo_update(ref_pts, velocity, l2g_r1, l2g_t1, l2g_r2, l2g_t2, time_delta):
+    """
+    Args:
+        ref_pts (np.ndarray): (num_query, 3) in inverse sigmoid space.
+        velocity (np.ndarray): (num_query, 2) m/s in the LiDAR frame.
+    Outs:
+        np.ndarray: updated reference points in inverse sigmoid space.
+    """
+
+    num_query = ref_pts.shape[0]
+    velo_pad = np.concatenate(
+        [velocity, np.zeros((num_query, 1), dtype=velocity.dtype)], axis=-1
+    )
+
+    reference_points = sigmoid(ref_pts)
+    pc_range = np.array([-51.2, -51.2, -5.0, 51.2, 51.2, 3.0], dtype=np.float32)
+    reference_points[..., 0:1] = (
+        reference_points[..., 0:1] * (pc_range[3] - pc_range[0]) + pc_range[0]
+    )
+    reference_points[..., 1:2] = (
+        reference_points[..., 1:2] * (pc_range[4] - pc_range[1]) + pc_range[1]
+    )
+    reference_points[..., 2:3] = (
+        reference_points[..., 2:3] * (pc_range[5] - pc_range[2]) + pc_range[2]
+    )
+    reference_points = reference_points + velo_pad * time_delta
+
+    ref_pts = reference_points @ l2g_r1 + l2g_t1 - l2g_t2
+    g2l_r = np.linalg.inv(l2g_r2).astype(np.float32)
+    ref_pts = ref_pts @ g2l_r
+
+    ref_pts[..., 0:1] = (ref_pts[..., 0:1] - pc_range[0]) / (pc_range[3] - pc_range[0])
+    ref_pts[..., 1:2] = (ref_pts[..., 1:2] - pc_range[1]) / (pc_range[4] - pc_range[1])
+    ref_pts[..., 2:3] = (ref_pts[..., 2:3] - pc_range[2]) / (pc_range[5] - pc_range[2])
+
+    ref_pts = inverse_sigmoid(ref_pts)
+
+    return ref_pts
 
 
 def denormalize_bbox(normalized_bboxes):
@@ -830,6 +885,129 @@ def motion_head_forward(models, bev_embed, outs_track: dict, outs_seg: dict):
     return traj_results, outs_motion
 
 
+# Cache for reference points weights and bias (loaded once)
+_reference_points_weight = None
+_reference_points_bias = None
+
+
+def reference_points(query):
+    global _reference_points_weight, _reference_points_bias
+
+    if _reference_points_weight is None:
+        _reference_points_weight = np.load("reference_points_weight.npy")
+        _reference_points_bias = np.load("reference_points_bias.npy")
+
+    num_queries, dim = query.shape
+    ref_pts = (
+        query[..., : dim // 2] @ _reference_points_weight.T + _reference_points_bias
+    )
+    return ref_pts
+
+
+def forward(
+    models,
+    track_base: RuntimeTrackerBase,
+    img,
+    img_metas,
+    track_instances,
+    prev_bev=None,
+    l2g_r1=None,
+    l2g_t1=None,
+    l2g_r2=None,
+    l2g_t2=None,
+    time_delta=None,
+):
+    active_inst = track_instances[track_instances.obj_idxes >= 0]
+    other_inst = track_instances[track_instances.obj_idxes < 0]
+
+    if l2g_r2 is not None and len(active_inst) > 0 and l2g_r1 is not None:
+        ref_pts = active_inst.ref_pts
+        velo = active_inst.pred_boxes[:, -2:]
+        ref_pts = velo_update(
+            ref_pts, velo, l2g_r1, l2g_t1, l2g_r2, l2g_t2, time_delta=time_delta
+        )
+        ref_pts = np.squeeze(ref_pts, axis=0)
+        active_inst.ref_pts = reference_points(active_inst.query)
+        active_inst.ref_pts[..., :2] = ref_pts[..., :2]
+
+    track_instances = Instances.cat([other_inst, active_inst])
+
+    output = predict(
+        models, img, img_metas, prev_bev=prev_bev, track_instances=track_instances
+    )
+    bev_embed = output["bev_embed"]
+    output_classes = output["pred_logits"]
+    output_coords = output["pred_boxes"]
+    last_ref_pts = output["ref_pts"]
+    query_feats = output["query_embeddings"]
+    all_past_traj_preds = output["all_past_traj_preds"]
+    bev_pos = output["bev_pos"]
+
+    item = {
+        "pred_logits": output_classes,
+        "pred_boxes": output_coords,
+        "ref_pts": last_ref_pts,
+        "bev_embed": bev_embed,
+        "query_embeddings": query_feats,
+        "all_past_traj_preds": all_past_traj_preds,
+        "bev_pos": bev_pos,
+    }
+
+    # Apply sigmoid and get max values along last axis
+    logits = output_classes[-1, 0, :]
+    sigmoid_logits = sigmoid(logits)
+    track_scores = np.max(sigmoid_logits, axis=-1)
+
+    # each track will be assigned an unique global id by the track base.
+    track_instances.scores = track_scores
+    # track_instances.track_scores = track_scores  # [300]
+    track_instances.pred_logits = output_classes[-1, 0]  # [300, num_cls]
+    track_instances.pred_boxes = output_coords[-1, 0]  # [300, box_dim]
+    track_instances.output_embedding = query_feats[-1][0]  # [300, feat_dim]
+    track_instances.ref_pts = last_ref_pts[0]
+    # hard_code: assume the 901 query is sdc query
+    track_instances.obj_idxes[900] = -2
+
+    """ update track base """
+    track_base.update(track_instances)
+
+    filter_score_thresh = 0.35
+    active_index = (track_instances.obj_idxes >= 0) & (
+        track_instances.scores >= filter_score_thresh
+    )  # filter out sleep objects
+    # select_active_track_query
+    result_dict = track_instances2results(track_instances[active_index], with_mask=True)
+    result_dict["track_query_embeddings"] = track_instances.output_embedding[
+        active_index
+    ][result_dict["bbox_index"]][result_dict["mask"]]
+    result_dict["track_query_matched_idxes"] = track_instances.matched_gt_idxes[
+        active_index
+    ][result_dict["bbox_index"]][result_dict["mask"]]
+    item.update(result_dict)
+    # select_sdc_track_query
+    sdc_instance = track_instances[track_instances.obj_idxes == -2]
+    result_dict = track_instances2results(sdc_instance, with_mask=False)
+    item.update(
+        dict(
+            sdc_boxes_3d=result_dict["boxes_3d"],
+            sdc_scores_3d=result_dict["scores_3d"],
+            sdc_track_scores=result_dict["track_scores"],
+            sdc_track_bbox_results=result_dict["track_bbox_results"],
+            sdc_embedding=sdc_instance.output_embedding[0],
+        )
+    )
+
+    """ update with memory_bank """
+    track_instances = memory_bank(models, track_instances)
+
+    """  Update track instances using matcher """
+    item["track_instances_fordet"] = track_instances
+    item["track_instances"] = track_instances = query_interact(models, track_instances)
+    # item["track_obj_idxes"] = track_instances.obj_idxes
+
+    return item
+
+
 def recognize_from_image(models):
     ann_file = "data/infos/nuscenes_infos_temporal_val.pkl"
 
@@ -1009,7 +1187,17 @@ def recognize_from_image(models):
     def collate_fn(batch):
         return batch
 
-    data_loader = DataLoader(
+    # Simple DataLoader replacement
+    class SimpleDataLoader:
+        def __init__(self, dataset, collate_fn):
+            self.dataset = dataset
+            self.collate_fn = collate_fn
+
+        def __iter__(self):
+            for i in range(len(self.dataset)):
+                yield self.collate_fn([self.dataset[i]])
+
+    data_loader = SimpleDataLoader(
         dataset,
         collate_fn=collate_fn,
     )
@@ -1023,105 +1211,105 @@ def recognize_from_image(models):
         miss_tolerance=miss_tolerance,
     )
 
-    track_instances = empty_tracks()
-
+    track_instances = None
+    tiemestamp = None
+    scene_token = None
+    prev_bev = None
+    prev_frame_info = {
+        "prev_bev": None,
+        "scene_token": None,
+        "prev_pos": 0,
+        "prev_angle": 0,
+    }
     bbox_results = []
     for i, data in enumerate(data_loader):
         img = data[0]["img"]
         img_metas = data[0]["img_metas"]
+        l2g_t = data[0]["l2g_t"]
+        l2g_r_mat = data[0]["l2g_r_mat"]
+        _timestamp = data[0]["timestamp"]
+
         img = np.stack(img).transpose(0, 3, 1, 2)  # N, C, H, W
         img = np.expand_dims(img, axis=0)  # B, N, C, H, W
 
-        active_inst = track_instances[track_instances.obj_idxes >= 0]
-        other_inst = track_instances[track_instances.obj_idxes < 0]
-        track_instances = Instances.cat([other_inst, active_inst])
+        if img_metas["scene_token"] != prev_frame_info["scene_token"]:
+            # the first sample of each scene is truncated
+            prev_frame_info["prev_bev"] = None
+        # update idx
+        prev_frame_info["scene_token"] = img_metas["scene_token"]
 
-        output = predict(models, img, img_metas, track_instances=track_instances)
-        bev_embed = output["bev_embed"]
-        output_classes = output["pred_logits"]
-        output_coords = output["pred_boxes"]
-        last_ref_pts = output["ref_pts"]
-        query_feats = output["query_embeddings"]
+        # Get the delta of ego position and angle between two timestamps.
+        tmp_pos = copy.deepcopy(img_metas["can_bus"][:3])
+        tmp_angle = copy.deepcopy(img_metas["can_bus"][-1])
+        # first frame
+        if prev_frame_info["scene_token"] is None:
+            img_metas["can_bus"][:3] = 0
+            img_metas["can_bus"][-1] = 0
+        # following frames
+        else:
+            img_metas["can_bus"][:3] -= prev_frame_info["prev_pos"]
+            img_metas["can_bus"][-1] -= prev_frame_info["prev_angle"]
+        prev_frame_info["prev_pos"] = tmp_pos
+        prev_frame_info["prev_angle"] = tmp_angle
 
-        item = {
-            "pred_logits": output_classes,
-            "pred_boxes": output_coords,
-            "ref_pts": last_ref_pts,
-            # "bev_embed": bev_embed,
-            "query_embeddings": query_feats,
-            # "all_past_traj_preds": det_output["all_past_traj_preds"],
-            # "bev_pos": bev_pos,
-        }
+        ### simple_test_track logic ###
 
-        # Apply sigmoid and get max values along last axis
-        logits = output_classes[-1, 0, :]
-        sigmoid_logits = sigmoid(logits)
-        track_scores = np.max(sigmoid_logits, axis=-1)
+        if track_instances is None or img_metas["scene_token"] != scene_token:
+            scene_token = img_metas["scene_token"]
+            prev_bev = None
+            track_instances = empty_tracks()
+            time_delta, l2g_r1, l2g_t1, l2g_r2, l2g_t2 = None, None, None, None, None
+        else:
+            time_delta = _timestamp - tiemestamp
+            l2g_r1 = l2g_r2
+            l2g_t1 = l2g_t2
+            l2g_r2 = l2g_r_mat[None, ...]
+            l2g_t2 = l2g_t[None, ...]
 
-        # each track will be assigned an unique global id by the track base.
-        track_instances.scores = track_scores
-        # track_instances.track_scores = track_scores  # [300]
-        track_instances.pred_logits = output_classes[-1, 0]  # [300, num_cls]
-        track_instances.pred_boxes = output_coords[-1, 0]  # [300, box_dim]
-        track_instances.output_embedding = query_feats[-1][0]  # [300, feat_dim]
-        track_instances.ref_pts = last_ref_pts[0]
-        # hard_code: assume the 901 query is sdc query
-        track_instances.obj_idxes[900] = -2
-        """ update track base """
-        track_base.update(track_instances)
-
-        filter_score_thresh = 0.35
-        active_index = (track_instances.obj_idxes >= 0) & (
-            track_instances.scores >= filter_score_thresh
-        )  # filter out sleep objects
-        # select_active_track_query
-        result_dict = track_instances2results(
-            track_instances[active_index], with_mask=True
-        )
-        result_dict["track_query_embeddings"] = track_instances.output_embedding[
-            active_index
-        ][result_dict["bbox_index"]][result_dict["mask"]]
-        result_dict["track_query_matched_idxes"] = track_instances.matched_gt_idxes[
-            active_index
-        ][result_dict["bbox_index"]][result_dict["mask"]]
-        item.update(result_dict)
-        # select_sdc_track_query
-        sdc_instance = track_instances[track_instances.obj_idxes == -2]
-        result_dict = track_instances2results(sdc_instance, with_mask=False)
-        item.update(
-            dict(
-                sdc_boxes_3d=result_dict["boxes_3d"],
-                sdc_scores_3d=result_dict["scores_3d"],
-                sdc_track_scores=result_dict["track_scores"],
-                sdc_track_bbox_results=result_dict["track_bbox_results"],
-                sdc_embedding=sdc_instance.output_embedding[0],
-            )
+        frame_res = forward(
+            models,
+            track_base,
+            img,
+            img_metas,
+            track_instances,
+            prev_bev,
+            l2g_r1,
+            l2g_t1,
+            l2g_r2,
+            l2g_t2,
+            time_delta,
         )
 
-        """ update with memory_bank """
-        track_instances = memory_bank(models, track_instances)
+        """ get time_delta and l2g r/t infos """
+        """ update frame info for next frame"""
+        tiemestamp = _timestamp
+        l2g_r2 = l2g_r_mat[None, ...]
+        l2g_t2 = l2g_t[None, ...]
 
-        """  Update track instances using matcher """
-        track_instances_fordet = track_instances
-        track_instances = query_interact(models, track_instances)
+        bev_embed = prev_bev = frame_res["bev_embed"]
+        track_instances = frame_res["track_instances"]
+        track_instances_fordet = frame_res["track_instances_fordet"]
 
         result_dict = dict(
             bev_embed=bev_embed,
-            # bev_pos=item["bev_pos"],
-            track_query_embeddings=item["track_query_embeddings"],
-            track_bbox_results=item["track_bbox_results"],
-            boxes_3d=item["boxes_3d"],
-            scores_3d=item["scores_3d"],
-            labels_3d=item["labels_3d"],
-            track_scores=item["track_scores"],
-            track_ids=item["track_ids"],
-            sdc_boxes_3d=item["sdc_boxes_3d"],
-            sdc_scores_3d=item["sdc_scores_3d"],
-            sdc_track_scores=item["sdc_track_scores"],
-            sdc_track_bbox_results=item["sdc_track_bbox_results"],
-            sdc_embedding=item["sdc_embedding"],
+            bev_pos=frame_res["bev_pos"],
+            track_query_embeddings=frame_res["track_query_embeddings"],
+            track_bbox_results=frame_res["track_bbox_results"],
+            boxes_3d=frame_res["boxes_3d"],
+            scores_3d=frame_res["scores_3d"],
+            labels_3d=frame_res["labels_3d"],
+            track_scores=frame_res["track_scores"],
+            track_ids=frame_res["track_ids"],
+            sdc_boxes_3d=frame_res["sdc_boxes_3d"],
+            sdc_scores_3d=frame_res["sdc_scores_3d"],
+            sdc_track_scores=frame_res["sdc_track_scores"],
+            sdc_track_bbox_results=frame_res["sdc_track_bbox_results"],
+            sdc_embedding=frame_res["sdc_embedding"],
         )
+
         result_track = det_instances2results(track_instances_fordet, result_dict)
+
+        ### End of simple_test_track ###
 
         # seg_head
         result_seg = seg_head_forward(models, bev_embed)
@@ -1149,8 +1337,6 @@ def recognize_from_image(models):
         # occ_results_computed = occ_results
         # planning_results_computed = occ_results
         # mask_results = mask_results
-
-        ### End of custom_multi_gpu_test ###
 
     vis = Visualizer(
         version="v1.0-mini",
