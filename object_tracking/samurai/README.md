@@ -4,6 +4,12 @@
 - A video file or a directory containing images
 - The bounding box of the object in the first frame
 
+The sample video is included in the official repository.
+https://github.com/yangchris11/samurai/blob/master/assets/samurai_demo.mp4
+
+The following notes are provided.
+"All rights are reserved to the copyright owners (TM & © Universal (2019)). This clip is not intended for commercial use and is solely for academic demonstration in a research paper."
+
 ## Output
 A video file with the segmented object across all frames.
 
