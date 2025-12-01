@@ -799,6 +799,7 @@ If you would like to try on your computer:
 | [<img src="text_recognition/paddleocr_v3/output.png" width=64px>](text_recognition/paddleocr_v3/) |[paddleocr_v3](/text_recognition/paddleocr_v3/) | [PaddleOCR : Awesome multilingual OCR toolkits based on PaddlePaddle](https://github.com/PaddlePaddle/PaddleOCR) | Pytorch | 1.2.17 and later | |
 | [<img src="text_recognition/easyocr/example/chinese.jpg" width=64px>](text_recognition/easyocr/) |[easyocr](/text_recognition/easyocr/) | [Ready-to-use OCR with 80+ supported languages](https://github.com/JaidedAI/EasyOCR) | Pytorch | 1.2.6 and later | |
 | [<img src="text_recognition/ndlocr_text_recognition/demo.png" width=64px>](text_recognition/ndlocr_text_recognition/) |[ndlocr_text_recognition](/text_recognition/ndlocr_text_recognition/) | [NDL OCR](https://github.com/ndl-lab/text_recognition) | Pytorch | 1.2.5 and later | |
+| [<img src="text_recognition/donut/cord_sample_receipt1.png" width=64px>](text_recognition/donut/) |[donut](/text_recognition/donut/) | [Donut](https://github.com/clovaai/donut) | Pytorch | 1.2.16 and later | |
 
 ## Time-Series Forecasting
 
