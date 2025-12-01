@@ -164,7 +164,6 @@ def load_models(env_id=0):
     
     # Additional files for tokenizer
     tokenizer_path = f"tokenizer"
-    check_and_download_file(f"{tokenizer_path}.zip", REMOTE_PATH)
     
     memory_mode = ailia.get_memory_mode(
         reduce_constant=True,
