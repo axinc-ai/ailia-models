@@ -3,6 +3,7 @@ import time
 
 import cv2
 import numpy as np
+import json
 
 import ailia
 
@@ -85,6 +86,11 @@ parser.add_argument(
     '-iou', '--iou',
     default=DETECTION_IOU, type=float,
     help='The detection iou'
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='save result to json'
 )
 args = update_parser(parser)
 
@@ -288,6 +294,21 @@ def vis_pose_result(img, result):
     return img
 
 
+def save_json(pose_results, json_path):
+    output = []
+    for r in pose_results:
+        o = {}
+        o['bbox'] = r['bbox'].tolist()
+        kps = []
+        for k in r['keypoints']:
+            kps.append({'pos': [float(k[0]), float(k[1])], 'prob': float(k[2])})
+        o['keypoints'] = kps
+        output.append(o)
+
+    with open(json_path, 'w') as f:
+        json.dump(output, f, indent=2)
+
+
 # ======================
 # Main functions
 # ======================
@@ -330,6 +351,9 @@ def recognize_from_image(net, det_net):
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, img)
+
+        if args.write_json:
+            save_json(pose_results, (savepath.rsplit('.', 1)[0]) + '.json')
 
     logger.info('Script finished successfully.')
 
