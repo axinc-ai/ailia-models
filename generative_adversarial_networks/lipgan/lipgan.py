@@ -1,6 +1,5 @@
 import numpy as np
 import cv2, audio
-import dlib, subprocess
 import ailia
 import time
 import librosa
@@ -87,6 +86,9 @@ parser.add_argument(
     help="Don't display realtime preview in GUI."
 )
 args = update_parser(parser)
+
+if args.use_dlib:
+	import dlib, subprocess
 
 # ======================
 # Face Detection

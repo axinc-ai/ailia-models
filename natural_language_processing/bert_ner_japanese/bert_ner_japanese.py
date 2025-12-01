@@ -26,6 +26,7 @@ logger = getLogger(__name__)
 WEIGHT_PATH = "model.onnx"
 MODEL_PATH = "model.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_ner_japanese/"
+REMOTE_DIC_PATH = "https://storage.googleapis.com/ailia-models/bert_maskedlm/"
 
 # ======================
 # Arguemnt Parser Config
@@ -54,16 +55,36 @@ args = update_parser(parser, check_input_type=False)
 # Main functions
 # ======================
 
+def create_special_tokens_mask(input_ids, special_token_ids):
+    # Initialize the special tokens mask with zeros
+    special_tokens_mask = np.zeros_like(input_ids, dtype=int)
+    
+    for i, sequence in enumerate(input_ids):
+        for j, token_id in enumerate(sequence):
+            if token_id in special_token_ids:
+                special_tokens_mask[i][j] = 1
+    
+    return special_tokens_mask
 
 def preprocess(tokenizer, sentence):
-    inputs = tokenizer(
-        sentence,
-        return_tensors="np",
-        truncation=True,
-        # max_length=512,
-        return_special_tokens_mask=True,
-        return_offsets_mapping=False,
-    )
+    if args.disable_ailia_tokenizer:
+        inputs = tokenizer(
+            sentence,
+            return_tensors="np",
+            truncation=True,
+            # max_length=512,
+            return_special_tokens_mask=True,
+            return_offsets_mapping=False,
+        )
+    else:
+        inputs = tokenizer(
+            sentence,
+            return_tensors="np",
+            truncation=True,
+            # max_length=512,
+            #return_special_tokens_mask=True,
+            #return_offsets_mapping=False,
+        )
 
     num_chunks = len(inputs["input_ids"])
     for i in range(num_chunks):
@@ -71,13 +92,16 @@ def preprocess(tokenizer, sentence):
         # model_inputs["sentence"] = sentence if i == 0 else None
         # model_inputs["is_last"] = i == num_chunks - 1
 
+        if not args.disable_ailia_tokenizer:
+            model_inputs["special_tokens_mask"] = create_special_tokens_mask(model_inputs["input_ids"], [2, 3])
+
         yield model_inputs
 
 
 def post_processing(tokenizer, all_outputs):
     aggregation = not args.disable_aggregation
 
-    clf = TokenClassification(tokenizer)
+    clf = TokenClassification(tokenizer, args.disable_ailia_tokenizer)
     ignore_labels = ["O"]
     all_entities = []
     for model_outputs in all_outputs:
@@ -199,7 +223,7 @@ def main():
         tokenizer = AutoTokenizer.from_pretrained("tokenizer")
     else:
         from ailia_tokenizer import BertJapaneseWordPieceTokenizer
-        check_and_download_file("unidic-lite.zip", REMOTE_PATH)
+        check_and_download_file("unidic-lite.zip", REMOTE_DIC_PATH)
         if not os.path.exists("unidic-lite"):
             shutil.unpack_archive('unidic-lite.zip', '')
         tokenizer = BertJapaneseWordPieceTokenizer.from_pretrained(dict_path = 'unidic-lite', pretrained_model_name_or_path = './tokenizer/')
