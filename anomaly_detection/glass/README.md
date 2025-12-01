@@ -1,5 +1,7 @@
 # GLASS : A Unified Anomaly Synthesis Strategy with Gradient Ascent for Industrial Anomaly Detection and Localization
 
+This model needs to be trained with a good quality dataset in Pytorch.
+
 ## Input
 
 Normal images
