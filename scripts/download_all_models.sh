@@ -10,6 +10,7 @@ cd ../../anomaly_detection/padim; python3 padim.py ${OPTION}
 cd ../../anomaly_detection/spade-pytorch; python3 spade-pytorch.py ${OPTION}
 cd ../../anomaly_detection/patchcore; python3 patchcore.py ${OPTION}
 cd ../../anomaly_detection/mahalanobisad; python3 mahalanobisad.py ${OPTION}
+cd ../../anomaly_detection/glass; python3 glass.py ${OPTION}
 cd ../../audio_language_model/qwen_audio; python3 qwen_audio.py ${OPTION}
 cd ../../audio_processing/crnn_audio_classification; python3 crnn_audio_classification.py ${OPTION}
 cd ../../audio_processing/deepspeech2; python3 deepspeech2.py ${OPTION}

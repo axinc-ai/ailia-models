@@ -1,4 +1,4 @@
-# GLASS
+# GLASS : A Unified Anomaly Synthesis Strategy with Gradient Ascent for Industrial Anomaly Detection and Localization
 
 ## Input
 
