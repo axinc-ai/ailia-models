@@ -3,9 +3,9 @@ import pickle
 
 import cv2
 import numpy as np
-from torch.utils.data import Dataset
 from nuscenes import NuScenes
-from nuscenes.eval.common.utils import quaternion_yaw, Quaternion
+from nuscenes.eval.common.utils import Quaternion, quaternion_yaw
+from torch.utils.data import Dataset
 
 
 class NuScenesDataset(Dataset):

@@ -8,7 +8,7 @@ from logging import getLogger
 import ailia
 import cv2
 import numpy as np
-from nuscenes import NuScenes
+from nuscenes.utils import splits
 
 # import original modules
 sys.path.append("../../util")
@@ -22,7 +22,7 @@ from model_utils import check_and_download_models
 # import local modules
 from lidar_box3d import LiDARInstance3DBoxes
 from nuscenes_dataset import NuScenesDataset
-from render import BEVRender, CameraRender
+from render import Visualizer
 from track_instance import Instances
 from tracker import RuntimeTrackerBase
 
@@ -73,207 +73,6 @@ def inverse_sigmoid(x, eps=1e-5):
     """Numerically stable logit."""
     x = np.clip(x, eps, 1 - eps)
     return np.log(x) - np.log(1 - x)
-
-
-class AgentPredictionData:
-    """
-    Agent data class, includes bbox, traj, and occflow
-    """
-
-    def __init__(
-        self,
-        pred_score,
-        pred_label,
-        pred_center,
-        pred_dim,
-        pred_yaw,
-        pred_vel,
-        pred_traj,
-        pred_traj_score,
-        pred_track_id=None,
-        pred_occ_map=None,
-        is_sdc=False,
-        past_pred_traj=None,
-        command=None,
-        attn_mask=None,
-    ):
-        self.pred_score = pred_score
-        self.pred_label = pred_label
-        self.pred_center = pred_center
-        self.pred_dim = pred_dim
-        # TODO(box3d): we have changed yaw to mmdet3d 1.0.0rc6 format, maybe we should change this. [DONE]
-        # self.pred_yaw = pred_yaw
-        self.pred_yaw = -pred_yaw - np.pi / 2
-        self.pred_vel = pred_vel
-        self.pred_traj = pred_traj
-        self.pred_traj_score = pred_traj_score
-        self.pred_track_id = pred_track_id
-        self.pred_occ_map = pred_occ_map
-        if self.pred_traj is not None:
-            if isinstance(self.pred_traj_score, int):
-                self.pred_traj_max = self.pred_traj
-            else:
-                self.pred_traj_max = self.pred_traj[self.pred_traj_score.argmax()]
-        else:
-            self.pred_traj_max = None
-        self.nusc_box = Box(
-            center=pred_center,
-            size=pred_dim,
-            orientation=Quaternion(axis=[0, 0, 1], radians=self.pred_yaw),
-            label=pred_label,
-            score=pred_score,
-        )
-        if is_sdc:
-            self.pred_center = [0, 0, -1.2 + 1.56 / 2]
-        self.is_sdc = is_sdc
-        self.past_pred_traj = past_pred_traj
-        self.command = command
-        self.attn_mask = attn_mask
-
-
-class Visualizer:
-    def __init__(
-        self,
-        bbox_results,
-        dataroot="data/nuscenes",
-        version="v1.0-mini",
-        show_gt_boxes=False,
-    ):
-        self.nusc = NuScenes(version=version, dataroot=dataroot, verbose=True)
-
-        self.token_set = set()
-        self.predictions = self._parse_predictions(bbox_results)
-        self.bev_render = BEVRender(show_gt_boxes=show_gt_boxes)
-        self.cam_render = CameraRender(show_gt_boxes=show_gt_boxes)
-
-    def _parse_predictions(self, bbox_results):
-        outputs = bbox_results
-        prediction_dict = dict()
-        for k in range(len(outputs)):
-            token = outputs[k]["token"]
-            self.token_set.add(token)
-
-            # detection
-            bboxes: LiDARInstance3DBoxes = outputs[k]["boxes_3d"]
-            scores = outputs[k]["scores_3d"]
-            labels = outputs[k]["labels_3d"]
-
-            track_scores = scores
-            track_labels = labels
-            track_boxes = bboxes.tensor
-
-            track_centers = bboxes.gravity_center
-            track_dims = bboxes.dims
-            track_yaw = bboxes.yaw
-
-            track_ids = outputs[k]["track_ids"]
-
-            # speed
-            track_velocity = bboxes.tensor[:, -2:]
-
-            # trajectories
-            trajs = outputs[k]["traj"]
-            traj_scores = outputs[k]["traj_scores"]
-
-            predicted_agent_list = []
-            for i in range(track_scores.shape[0]):
-                if track_scores[i] < 0.25:
-                    continue
-
-                if i < len(track_ids):
-                    track_id = track_ids[i]
-                else:
-                    track_id = 0
-
-                predicted_agent_list.append(
-                    AgentPredictionData(
-                        track_scores[i],
-                        track_labels[i],
-                        track_centers[i],
-                        track_dims[i],
-                        track_yaw[i],
-                        track_velocity[i],
-                        trajs[i],
-                        traj_scores[i],
-                        pred_track_id=track_id,
-                        pred_occ_map=None,
-                        past_pred_traj=None,
-                    )
-                )
-
-            # detection
-            bboxes = outputs[k]["sdc_boxes_3d"]
-            scores = outputs[k]["sdc_scores_3d"]
-            labels = 0
-
-            track_scores = scores
-            track_labels = labels
-
-            track_centers = bboxes.gravity_center
-            track_dims = bboxes.dims
-            track_yaw = bboxes.yaw
-            track_velocity = bboxes.tensor[:, -2:]
-
-            command = outputs[k]["command"][0]
-            planning_agent = AgentPredictionData(
-                track_scores[0],
-                track_labels,
-                track_centers[0],
-                track_dims[0],
-                track_yaw[0],
-                track_velocity[0],
-                outputs[k]["planning_traj"][0],
-                1,
-                pred_track_id=-1,
-                pred_occ_map=None,
-                past_pred_traj=None,
-                is_sdc=True,
-                command=command,
-            )
-            predicted_agent_list.append(planning_agent)
-
-            prediction_dict[token] = dict(
-                predicted_agent_list=predicted_agent_list,
-                # predicted_map_seg=None,
-                predicted_planning=planning_agent,
-            )
-        return prediction_dict
-
-    def visualize_bev(self, sample_token):
-        self.bev_render.render_pred_box_data(
-            self.predictions[sample_token]["predicted_agent_list"]
-        )
-        self.bev_render.render_pred_traj(
-            self.predictions[sample_token]["predicted_agent_list"]
-        )
-        self.bev_render.render_pred_box_data(
-            [self.predictions[sample_token]["predicted_planning"]]
-        )
-        self.bev_render.render_planning_data(
-            self.predictions[sample_token]["predicted_planning"],
-            show_command=self.show_command,
-        )
-        self.bev_render.render_sdc_car()
-        self.bev_render.render_legend()
-
-        self.cam_render.reset_canvas(dx=2, dy=3, tight_layout=True)
-        self.cam_render.render_image_data(sample_token, self.nusc)
-
-    def visualize_cam(self, sample_token, out_filename):
-        self.cam_render.reset_canvas(dx=2, dy=3, tight_layout=True)
-        self.cam_render.render_image_data(sample_token, self.nusc)
-        # self.cam_render.render_pred_track_bbox(
-        #     self.predictions[sample_token]["predicted_agent_list"],
-        #     sample_token,
-        #     self.nusc,
-        # )
-        # self.cam_render.render_pred_traj(
-        #     self.predictions[sample_token]["predicted_agent_list"],
-        #     sample_token,
-        #     self.nusc,
-        #     render_sdc=self.with_planning,
-        # )
-        self.cam_render.save_fig(out_filename + "_cam.jpg")
 
 
 # Cache for query embedding (load once)
@@ -487,11 +286,11 @@ def track_instances2results(track_instances, with_mask=True):
         mask=bboxes_dict["mask"],
         track_bbox_results=[
             [
-                bboxes,
-                scores,
-                labels,
-                bbox_index,
-                bboxes_dict["mask"],
+                bboxes.clone(),
+                scores.copy(),
+                labels.copy(),
+                bbox_index.copy(),
+                bboxes_dict["mask"].copy(),
             ]
         ],
     )
@@ -1343,11 +1142,31 @@ def recognize_from_image(models):
         bbox_results=bbox_results,
         dataroot="data/nuscenes",
     )
+
+    val_splits = splits.val
+
+    scene_token_to_name = dict()
+    for i in range(len(vis.nusc.scene)):
+        scene_token_to_name[vis.nusc.scene[i]["token"]] = vis.nusc.scene[i]["name"]
+
     for i in range(len(vis.nusc.sample)):
         sample_token = vis.nusc.sample[i]["token"]
+        scene_token = vis.nusc.sample[i]["scene_token"]
 
-        vis.visualize_bev()
-        vis.visualize_cam(sample_token, os.path.join("vis_output", str(i).zfill(3)))
+        if scene_token_to_name[scene_token] not in val_splits:
+            continue
+
+        if sample_token not in vis.token_set:
+            print(i, sample_token, "not in prediction pkl!")
+            continue
+
+        bev_img = vis.visualize_bev(sample_token)
+        cam_img = vis.visualize_cam(sample_token)
+        out_img = cv2.hconcat([cam_img, bev_img])
+
+        savepath = f"vis_output/{str(i).zfill(3)}.jpg"
+        cv2.imwrite(savepath, out_img)
+        logger.info(f"saved at : {savepath}")
 
     to_video("vis_output", "output_video.avi", fps=4, downsample=2)
 

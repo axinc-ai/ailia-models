@@ -872,30 +872,6 @@ class LiDARInstance3DBoxes(BaseInstance3DBoxes):
                 points.flip(bev_direction)
             return points
 
-    def convert_to(self, dst, rt_mat=None):
-        """Convert self to ``dst`` mode.
-
-        Args:
-            dst (:obj:`Box3DMode`): the target Box mode
-            rt_mat (np.ndarray, optional): The rotation and
-                translation matrix between different coordinates.
-                Defaults to None.
-                The conversion from ``src`` coordinates to ``dst`` coordinates
-                usually comes along the change of sensors, e.g., from camera
-                to LiDAR. This requires a transformation matrix.
-
-        Returns:
-            :obj:`BaseInstance3DBoxes`:
-                The converted box of the same type in the ``dst`` mode.
-        """
-        # Note: This is a placeholder implementation
-        # In a real implementation, you would need to import and use Box3DMode
-        # from .box_3d_mode import Box3DMode
-        # return Box3DMode.convert(box=self, src=Box3DMode.LIDAR, dst=dst, rt_mat=rt_mat)
-
-        # For now, return a copy of self as a placeholder
-        return self.clone()
-
     def enlarged_box(self, extra_width):
         """Enlarge the length, width and height boxes.
 
