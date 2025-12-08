@@ -419,15 +419,6 @@ def predict(models, img, img_metas, prev_bev=None, track_instances=None):
         )
     bev_embed, bev_pos = output
 
-    # print("bev_embed---", bev_embed.shape)
-    # print(bev_embed)
-    # print("bev_pos---", bev_pos.shape)
-    # print(bev_pos)
-
-    # bev_embed = np.load("bev_embed_3.npy")
-    # query = np.load("query_3.npy")
-    # ref_pts = np.load("ref_pts_3.npy")
-
     query = track_instances.query
     ref_pts = track_instances.ref_pts
 
@@ -660,16 +651,20 @@ def motion_head_forward(models, bev_embed, outs_track: dict, outs_seg: dict):
         outs_motion["track_scores"] = outs_motion["track_scores"][:, vehicle_mask > 0]
         return outs_motion
 
-    # Define vehicle_id_list as a default list
+    # NuScenes データセットにおける車両（移動体）カテゴリのクラスID一覧
+    # モーション予測の対象となる動的オブジェクトのみを選択
+    # 0: car (乗用車), 1: truck (トラック), 2: construction_vehicle (建設車両),
+    # 3: bus (バス), 4: trailer (トレーラー), 6: motorcycle (バイク), 7: bicycle (自転車)
+    # 除外: 5: barrier (バリア), 8: pedestrian (歩行者), 9: traffic_cone (三角コーン)
     vehicle_id_list = [
-        0,
-        1,
-        2,
-        3,
-        4,
-        6,
-        7,
-    ]  # car, truck, bus, trailer, construction_vehicle, motorcycle, bicycle, pedestrian, traffic_cone
+        0,  # car
+        1,  # truck
+        2,  # construction_vehicle
+        3,  # bus
+        4,  # trailer
+        6,  # motorcycle
+        7,  # bicycle
+    ]
     outs_motion = filter_vehicle_query(outs_motion, labels, vehicle_id_list)
 
     # filter sdc query
@@ -810,145 +805,10 @@ def forward(
 def recognize_from_image(models):
     ann_file = "data/infos/nuscenes_infos_temporal_val.pkl"
 
-    info = dict(
-        cams=dict(
-            CAM_FRONT=dict(
-                data_path="",
-                lidar2img_path="",
-                img_shape_path="",
-            ),
-            CAM_FRONT_RIGHT=dict(
-                data_path="",
-                lidar2img_path="",
-                img_shape_path="",
-            ),
-            CAM_FRONT_LEFT=dict(
-                data_path="",
-                lidar2img_path="",
-                img_shape_path="",
-            ),
-            CAM_BACK=dict(
-                data_path="",
-                lidar2img_path="",
-                img_shape_path="",
-            ),
-            CAM_BACK_LEFT=dict(
-                data_path="",
-                lidar2img_path="",
-                img_shape_path="",
-            ),
-            CAM_BACK_RIGHT=dict(
-                data_path="",
-                lidar2img_path="",
-                img_shape_path="",
-            ),
-        )
-    )
-
-    # img_filename = [
-    #     "samples/CAM_FRONT/n015-2018-07-11-11-54-16+0800__CAM_FRONT__1531281446912460.jpg",
-    #     "samples/CAM_FRONT_RIGHT/n015-2018-07-11-11-54-16+0800__CAM_FRONT_RIGHT__1531281446920339.jpg",
-    #     "samples/CAM_FRONT_LEFT/n015-2018-07-11-11-54-16+0800__CAM_FRONT_LEFT__1531281446904854.jpg",
-    #     "samples/CAM_BACK/n015-2018-07-11-11-54-16+0800__CAM_BACK__1531281446937525.jpg",
-    #     "samples/CAM_BACK_LEFT/n015-2018-07-11-11-54-16+0800__CAM_BACK_LEFT__1531281446947423.jpg",
-    #     "samples/CAM_BACK_RIGHT/n015-2018-07-11-11-54-16+0800__CAM_BACK_RIGHT__1531281446927893.jpg",
-    # ]
-    img_filename = [
-        "samples/CAM_FRONT/n015-2018-07-11-11-54-16+0800__CAM_FRONT__1531281439762460.jpg",
-        "samples/CAM_FRONT_RIGHT/n015-2018-07-11-11-54-16+0800__CAM_FRONT_RIGHT__1531281439770339.jpg",
-        "samples/CAM_FRONT_LEFT/n015-2018-07-11-11-54-16+0800__CAM_FRONT_LEFT__1531281439754844.jpg",
-        "samples/CAM_BACK/n015-2018-07-11-11-54-16+0800__CAM_BACK__1531281439787525.jpg",
-        "samples/CAM_BACK_LEFT/n015-2018-07-11-11-54-16+0800__CAM_BACK_LEFT__1531281439797423.jpg",
-        "samples/CAM_BACK_RIGHT/n015-2018-07-11-11-54-16+0800__CAM_BACK_RIGHT__1531281439777893.jpg",
-    ]
-
     dataset = NuScenesDataset(
         **{
-            # "type": "NuScenesE2EDataset",
             "data_root": "data/nuscenes/",
             "ann_file": ann_file,
-            "pipeline": [
-                {
-                    "type": "LoadMultiViewImageFromFilesInCeph",
-                    "to_float32": True,
-                    "file_client_args": {"backend": "disk"},
-                    "img_root": "data/nuscenes/",
-                },
-                {
-                    "type": "NormalizeMultiviewImage",
-                    "mean": [103.53, 116.28, 123.675],
-                    "std": [1.0, 1.0, 1.0],
-                    "to_rgb": False,
-                },
-                {"type": "PadMultiViewImage", "size_divisor": 32},
-                {
-                    "type": "LoadAnnotations3D_E2E",
-                    "with_bbox_3d": False,
-                    "with_label_3d": False,
-                    "with_attr_label": False,
-                    "with_future_anns": True,
-                    "with_ins_inds_3d": False,
-                    "ins_inds_add_1": True,
-                },
-                {
-                    "type": "GenerateOccFlowLabels",
-                    "grid_conf": {
-                        "xbound": [-50.0, 50.0, 0.5],
-                        "ybound": [-50.0, 50.0, 0.5],
-                        "zbound": [-10.0, 10.0, 20.0],
-                    },
-                    "ignore_index": 255,
-                    "only_vehicle": True,
-                    "filter_invisible": False,
-                },
-                {
-                    "type": "MultiScaleFlipAug3D",
-                    "img_scale": (1600, 900),
-                    "pts_scale_ratio": 1,
-                    "flip": False,
-                    "transforms": [
-                        {
-                            "type": "DefaultFormatBundle3D",
-                            "class_names": [
-                                "car",
-                                "truck",
-                                "construction_vehicle",
-                                "bus",
-                                "trailer",
-                                "barrier",
-                                "motorcycle",
-                                "bicycle",
-                                "pedestrian",
-                                "traffic_cone",
-                            ],
-                            "with_label": False,
-                        },
-                        {
-                            "type": "CustomCollect3D",
-                            "keys": [
-                                "img",
-                                "timestamp",
-                                "l2g_r_mat",
-                                "l2g_t",
-                                "gt_lane_labels",
-                                "gt_lane_bboxes",
-                                "gt_lane_masks",
-                                "gt_segmentation",
-                                "gt_instance",
-                                "gt_centerness",
-                                "gt_offset",
-                                "gt_flow",
-                                "gt_backward_flow",
-                                "gt_occ_has_invalid_frame",
-                                "gt_occ_img_is_valid",
-                                "sdc_planning",
-                                "sdc_planning_mask",
-                                "command",
-                            ],
-                        },
-                    ],
-                },
-            ],
             "classes": [
                 "car",
                 "truck",
@@ -961,45 +821,19 @@ def recognize_from_image(models):
                 "pedestrian",
                 "traffic_cone",
             ],
-            "modality": {
-                "use_lidar": False,
-                "use_camera": True,
-                "use_radar": False,
-                "use_map": False,
-                "use_external": True,
-            },
-            "test_mode": True,
-            "box_type_3d": "LiDAR",
-            # "file_client_args": {"backend": "disk"},
-            # "patch_size": [102.4, 102.4],
-            # "canvas_size": (200, 200),
-            # "bev_size": (200, 200),
-            # "predict_steps": 12,
-            # "past_steps": 4,
-            # "fut_steps": 4,
-            # "occ_n_future": 6,
-            # "use_nonlinear_optimizer": True,
-            # "eval_mod": ["det", "map", "track", "motion"],
         }
     )
 
-    def collate_fn(batch):
-        return batch
-
     # Simple DataLoader replacement
     class SimpleDataLoader:
-        def __init__(self, dataset, collate_fn):
+        def __init__(self, dataset):
             self.dataset = dataset
-            self.collate_fn = collate_fn
 
         def __iter__(self):
             for i in range(len(self.dataset)):
-                yield self.collate_fn([self.dataset[i]])
+                yield [self.dataset[i]]
 
-    data_loader = SimpleDataLoader(
-        dataset,
-        collate_fn=collate_fn,
-    )
+    data_loader = SimpleDataLoader(dataset)
 
     score_thresh = 0.4
     filter_score_thresh = 0.35
@@ -1163,6 +997,7 @@ def recognize_from_image(models):
         bev_img = vis.visualize_bev(sample_token)
         cam_img = vis.visualize_cam(sample_token)
         out_img = cv2.hconcat([cam_img, bev_img])
+        out_img = out_img[:, :, ::-1]  # RGB to BGR
 
         savepath = f"vis_output/{str(i).zfill(3)}.jpg"
         cv2.imwrite(savepath, out_img)
