@@ -405,8 +405,8 @@ def get_image_size(fname):
     '''Determine the image type of fhandle and return its size.
     from draco'''
     try:
-        img = Image.open(fname)
-        return img.width, img.height
+        with Image.open(fname) as img:
+            return img.width, img.height
     except:
         return
 
