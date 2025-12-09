@@ -679,6 +679,42 @@ def motion_head_forward(models, bev_embed, outs_track: dict, outs_seg: dict):
     return traj_results, outs_motion
 
 
+def occ_head_forward(bev_embed, outs_motion, no_query=False):
+    """Occupancy head forward pass.
+
+    Args:
+        bev_embed: BEV feature embedding
+        outs_motion: Motion head outputs dictionary
+        no_query: Whether there are no track queries
+
+    Returns:
+        dict: Occupancy prediction results
+    """
+    # TODO: Implement occupancy head forward
+    outs_occ = {}
+    return outs_occ
+
+
+def planning_head_forward(bev_embed, outs_motion, outs_occ, command):
+    """Planning head forward pass.
+
+    Args:
+        bev_embed: BEV feature embedding
+        outs_motion: Motion head outputs dictionary
+        outs_occ: Occupancy head outputs dictionary
+        command: Navigation command (e.g., 0=right, 1=left, 2=straight)
+
+    Returns:
+        dict: Planning results containing sdc_traj and sdc_traj_all
+    """
+    # TODO: Implement planning head forward
+    result_planning = {
+        "sdc_traj": None,
+        "sdc_traj_all": None,
+    }
+    return result_planning
+
+
 # Cache for reference points weights and bias (loaded once)
 _reference_points_weight = None
 _reference_points_bias = None
@@ -809,18 +845,6 @@ def recognize_from_image(models):
         **{
             "data_root": "data/nuscenes/",
             "ann_file": ann_file,
-            "classes": [
-                "car",
-                "truck",
-                "construction_vehicle",
-                "bus",
-                "trailer",
-                "barrier",
-                "motorcycle",
-                "bicycle",
-                "pedestrian",
-                "traffic_cone",
-            ],
         }
     )
 
@@ -950,14 +974,37 @@ def recognize_from_image(models):
         result_motion, outs_motion = motion_head_forward(
             models, bev_embed, outs_track=result_track, outs_seg=result_seg
         )
+        # outs_motion["bev_pos"] = result_track["bev_pos"]
 
         result = dict()
         result["token"] = img_metas["sample_idx"]
-        # result["occ"] = outs_occ
-        # result["planning"] = dict(
-        #     planning_gt=planning_gt,
-        #     result_planning=result_planning,
-        # )
+
+        occ_no_query = outs_motion["track_query"].shape[1] == 0
+        outs_occ = occ_head_forward(
+            bev_embed,
+            outs_motion,
+            no_query=occ_no_query,
+            # gt_segmentation=gt_segmentation,
+            # gt_instance=gt_instance,
+            # gt_img_is_valid=gt_occ_img_is_valid,
+        )
+        result["occ"] = outs_occ
+
+        command = 2
+        planning_gt = dict(
+            # segmentation=gt_segmentation,
+            # sdc_planning=sdc_planning,
+            # sdc_planning_mask=sdc_planning_mask,
+            # command=command
+        )
+        # result_planning = dict(sdc_traj=None, sdc_traj_all=None)
+        result_planning = planning_head_forward(
+            bev_embed, outs_motion, outs_occ, command
+        )
+        result["planning"] = dict(
+            # planning_gt=planning_gt,
+            result_planning=result_planning,
+        )
         result.update(result_track)
         result.update(
             result_motion[0]
@@ -965,6 +1012,8 @@ def recognize_from_image(models):
         # result.update(result_seg)  # ret_iou
 
         ### End of forward_test ###
+
+        result["planning_traj"] = result["planning"]["result_planning"]["sdc_traj"]
 
         bbox_results.append(result)
         # occ_results_computed = occ_results
@@ -976,7 +1025,6 @@ def recognize_from_image(models):
         bbox_results=bbox_results,
         dataroot="data/nuscenes",
     )
-
     val_splits = splits.val
 
     scene_token_to_name = dict()

@@ -523,7 +523,7 @@ class Visualizer:
     ):
         self.nusc = NuScenes(version=version, dataroot=dataroot, verbose=True)
 
-        self.with_planning = False
+        self.with_planning = True
 
         self.token_set = set()
         self.predictions = self._parse_predictions(bbox_results)
@@ -585,45 +585,41 @@ class Visualizer:
                     )
                 )
 
-            # # with planning
-            # ## detection
-            # bboxes: LiDARInstance3DBoxes = outputs[k]["sdc_boxes_3d"]
-            # scores = outputs[k]["sdc_scores_3d"]
-            # labels = 0
+            # with planning
+            if self.with_planning:
+                # detection
+                bboxes: LiDARInstance3DBoxes = outputs[k]["sdc_boxes_3d"]
+                scores = outputs[k]["sdc_scores_3d"]
+                labels = 0
 
-            # track_scores = scores
-            # track_labels = labels
+                track_scores = scores
+                track_labels = labels
 
-            # track_centers = bboxes.gravity_center
-            # track_dims = bboxes.dims
-            # track_yaw = bboxes.yaw
-            # track_velocity = bboxes.tensor[:, -2:]
+                track_centers = bboxes.gravity_center
+                track_dims = bboxes.dims
+                track_yaw = bboxes.yaw
+                track_velocity = bboxes.tensor[:, -2:]
 
-            # command = outputs[k]["command"][0]
-            # planning_agent = AgentPredictionData(
-            #     track_scores[0],
-            #     track_labels,
-            #     track_centers[0],
-            #     track_dims[0],
-            #     track_yaw[0],
-            #     track_velocity[0],
-            #     outputs[k]["planning_traj"][0],
-            #     1,
-            #     pred_track_id=-1,
-            #     pred_occ_map=None,
-            #     past_pred_traj=None,
-            #     is_sdc=True,
-            #     command=command,
-            # )
-            # predicted_agent_list.append(planning_agent)
-
-            # prediction_dict[token] = dict(
-            #     predicted_agent_list=predicted_agent_list,
-            #     # predicted_map_seg=None,
-            #     predicted_planning=planning_agent,
-            # )
-            planning_agent = None
-
+                # command = outputs[k]["command"][0]
+                command = None
+                planning_agent = AgentPredictionData(
+                    track_scores[0],
+                    track_labels,
+                    track_centers[0],
+                    track_dims[0],
+                    track_yaw[0],
+                    track_velocity[0],
+                    outputs[k]["planning_traj"][0],
+                    1,
+                    pred_track_id=-1,
+                    pred_occ_map=None,
+                    past_pred_traj=None,
+                    is_sdc=True,
+                    command=command,
+                )
+                predicted_agent_list.append(planning_agent)
+            else:
+                planning_agent = None
             prediction_dict[token] = dict(
                 predicted_agent_list=predicted_agent_list,
                 predicted_map_seg=None,

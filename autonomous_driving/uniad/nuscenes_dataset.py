@@ -11,6 +11,9 @@ from nuscenes.prediction import PredictHelper
 from nuscenes.utils import splits
 from torch.utils.data import Dataset
 
+# isort: off
+from lidar_box3d import LiDARInstance3DBoxes
+
 
 def obtain_sensor2top(
     nusc, sensor_token, l2e_t, l2e_r_mat, e2g_t, e2g_r_mat, sensor_type="lidar"
@@ -135,6 +138,184 @@ def get_future_traj_info(nusc, sample, predict_steps=16):
     return fut_traj_all, fut_traj_valid_mask_all
 
 
+class NuScenesTraj:
+    def __init__(
+        self,
+        nusc,
+    ):
+        self.nusc = nusc
+        self.prepare_sdc_vel_info()
+        self.planning_steps = 6
+        self.with_velocity = True
+
+    def get_vel_transform_mats(self, sample):
+        sd_rec = self.nusc.get("sample_data", sample["data"]["LIDAR_TOP"])
+        cs_record = self.nusc.get(
+            "calibrated_sensor", sd_rec["calibrated_sensor_token"]
+        )
+        pose_record = self.nusc.get("ego_pose", sd_rec["ego_pose_token"])
+
+        l2e_r = cs_record["rotation"]
+        l2e_t = cs_record["translation"]
+        e2g_r = pose_record["rotation"]
+        e2g_t = pose_record["translation"]
+        l2e_r_mat = Quaternion(l2e_r).rotation_matrix
+        e2g_r_mat = Quaternion(e2g_r).rotation_matrix
+
+        return l2e_r_mat, e2g_r_mat
+
+    def get_vel_and_time(self, sample):
+        lidar_token = sample["data"]["LIDAR_TOP"]
+        lidar_top = self.nusc.get("sample_data", lidar_token)
+        pose = self.nusc.get("ego_pose", lidar_top["ego_pose_token"])
+        xyz = pose["translation"]
+        timestamp = sample["timestamp"]
+        return xyz, timestamp
+
+    def prepare_sdc_vel_info(self):
+        # generate sdc velocity info for all samples
+        # Note that these velocity values are converted from
+        # global frame to lidar frame
+        # as aligned with bbox gts
+
+        self.sdc_vel_info = {}
+        for scene in self.nusc.scene:
+            scene_token = scene["token"]
+
+            # we cannot infer vel for the last sample, therefore we skip it
+            last_sample_token = scene["last_sample_token"]
+            sample_token = scene["first_sample_token"]
+            sample = self.nusc.get("sample", sample_token)
+            xyz, time = self.get_vel_and_time(sample)
+            while sample["token"] != last_sample_token:
+                next_sample_token = sample["next"]
+                next_sample = self.nusc.get("sample", next_sample_token)
+                next_xyz, next_time = self.get_vel_and_time(next_sample)
+                dc = np.array(next_xyz) - np.array(xyz)
+                dt = (next_time - time) / 1e6
+                vel = dc / dt
+
+                # global frame to lidar frame
+                l2e_r_mat, e2g_r_mat = self.get_vel_transform_mats(sample)
+                vel = vel @ np.linalg.inv(e2g_r_mat).T @ np.linalg.inv(l2e_r_mat).T
+                vel = vel[:2]
+
+                self.sdc_vel_info[sample["token"]] = vel
+                xyz, time = next_xyz, next_time
+                sample = next_sample
+
+            # set first sample's vel equal to second sample's
+            last_sample = self.nusc.get("sample", last_sample_token)
+            second_last_sample_token = last_sample["prev"]
+            self.sdc_vel_info[last_sample_token] = self.sdc_vel_info[
+                second_last_sample_token
+            ]
+
+    def generate_sdc_info(self, sdc_vel):
+        """Generate SDC (Self-Driving Car) bounding box info.
+
+        Args:
+            sdc_vel: SDC velocity [vx, vy]
+
+        Returns:
+            LiDARInstance3DBoxes: SDC bounding box
+        """
+
+        # sdc dim from https://forum.nuscenes.org/t/dimensions-of-the-ego-vehicle-used-to-gather-data/550
+        # TODO(box3d): we have changed yaw to mmdet3d 1.0.0rc6 format, wlh->lwh -pi->0.5pi
+        psudo_sdc_bbox = np.array([0.0, 0.0, 0.0, 4.08, 1.73, 1.56, 0.5 * np.pi])
+        if self.with_velocity:
+            psudo_sdc_bbox = np.concatenate([psudo_sdc_bbox, sdc_vel], axis=-1)
+        gt_bboxes_3d = np.array([psudo_sdc_bbox]).astype(np.float32)
+
+        # the nuscenes box center is [0.5, 0.5, 0.5], we change it to be
+        # the same as KITTI (0.5, 0.5, 0)
+        gt_bboxes_3d = LiDARInstance3DBoxes(
+            gt_bboxes_3d, box_dim=gt_bboxes_3d.shape[-1], origin=(0.5, 0.5, 0.5)
+        )
+
+        return gt_bboxes_3d
+
+    def get_l2g_transform(self, sample):
+        sd_rec = self.nusc.get("sample_data", sample["data"]["LIDAR_TOP"])
+        cs_record = self.nusc.get(
+            "calibrated_sensor", sd_rec["calibrated_sensor_token"]
+        )
+        pose_record = self.nusc.get("ego_pose", sd_rec["ego_pose_token"])
+
+        l2e_r = cs_record["rotation"]
+        l2e_t = np.array(cs_record["translation"])
+        e2g_r = pose_record["rotation"]
+        e2g_t = np.array(pose_record["translation"])
+        l2e_r_mat = Quaternion(l2e_r).rotation_matrix
+        e2g_r_mat = Quaternion(e2g_r).rotation_matrix
+
+        return l2e_r_mat, l2e_t, e2g_r_mat, e2g_t
+
+    def get_sdc_planning_label(self, sample_token):
+        sd_rec = self.nusc.get("sample", sample_token)
+        l2e_r_mat_init, l2e_t_init, e2g_r_mat_init, e2g_t_init = self.get_l2g_transform(
+            sd_rec
+        )
+
+        planning = []
+        for _ in range(self.planning_steps):
+            next_annotation_token = sd_rec["next"]
+            if next_annotation_token == "":
+                break
+            sd_rec = self.nusc.get("sample", next_annotation_token)
+            l2e_r_mat_curr, l2e_t_curr, e2g_r_mat_curr, e2g_t_curr = (
+                self.get_l2g_transform(sd_rec)
+            )  # (lidar to global at current frame)
+
+            # bbox of sdc under current lidar frame
+            next_bbox3d = self.generate_sdc_info(
+                self.sdc_vel_info[next_annotation_token]
+            )
+
+            # to bbox under curr ego frame
+            next_bbox3d.rotate(l2e_r_mat_curr.T)
+            next_bbox3d.translate(l2e_t_curr)
+
+            # to bbox under world frame
+            next_bbox3d.rotate(e2g_r_mat_curr.T)
+            next_bbox3d.translate(e2g_t_curr)
+
+            # to bbox under initial ego frame, first inverse translate, then inverse rotate
+            next_bbox3d.translate(-e2g_t_init)
+            m1 = np.linalg.inv(e2g_r_mat_init)
+            next_bbox3d.rotate(m1.T)
+
+            # to bbox under curr ego frame, first inverse translate, then inverse rotate
+            next_bbox3d.translate(-l2e_t_init)
+            m2 = np.linalg.inv(l2e_r_mat_init)
+            next_bbox3d.rotate(m2.T)
+
+            planning.append(next_bbox3d)
+
+        planning_all = np.zeros((1, self.planning_steps, 3))
+        planning_mask_all = np.zeros((1, self.planning_steps, 2))
+        n_valid_timestep = len(planning)
+        if n_valid_timestep > 0:
+            planning = [p.tensor.squeeze(0) for p in planning]
+            planning = np.stack(planning, axis=0)  # (valid_t, 9)
+            planning = planning[:, [0, 1, 6]]  # (x, y, yaw)
+            planning_all[:, :n_valid_timestep, :] = planning
+            planning_mask_all[:, :n_valid_timestep, :] = 1
+
+        mask = planning_mask_all[0].any(axis=1)
+        if mask.sum() == 0:
+            command = 2  #'FORWARD'
+        elif planning_all[0, mask][-1][0] >= 2:
+            command = 0  #'RIGHT'
+        elif planning_all[0, mask][-1][0] <= -2:
+            command = 1  #'LEFT'
+        else:
+            command = 2  #'FORWARD'
+
+        return planning_all, planning_mask_all, command
+
+
 class NuScenesDataset(Dataset):
     NameMapping = {
         "movable_object.barrier": "barrier",
@@ -153,11 +334,24 @@ class NuScenesDataset(Dataset):
         "vehicle.truck": "truck",
     }
 
+    CLASSES = (
+        "car",
+        "truck",
+        "construction_vehicle",
+        "bus",
+        "trailer",
+        "barrier",
+        "motorcycle",
+        "bicycle",
+        "pedestrian",
+        "traffic_cone",
+    )
+
     def __init__(
         self,
-        ann_file=None,
         data_root=None,
-        classes=None,
+        version=None,
+        ann_file=None,
     ):
         if data_root is None:
             self.data_root = "./"
@@ -165,26 +359,29 @@ class NuScenesDataset(Dataset):
             self.data_root = data_root
         else:
             self.data_root = data_root + "/"
-        self.CLASSES = classes
 
         if ann_file is None:
-            self.data_infos = self.create_nuscenes_infos(self.data_root)
+            self.version = version or "v1.0-trainval"
+            self.data_infos = self.nuscenes_data_prep(self.version, self.data_root)
         else:
-            ann_file = os.path.join(self.data_root, "nuscenes_infos_val.pkl")
             self.data_infos = self.load_annotations(ann_file)
+            self.nusc = NuScenes(
+                version=self.version, dataroot=self.data_root, verbose=True
+            )
+
+        self.traj_api = NuScenesTraj(self.nusc)
 
     def __len__(self):
         return len(self.data_infos)
 
-    def create_nuscenes_infos(self, data_root, max_sweeps=10):
-        version = "v1.0-trainval"
-        # val_scenes = ["scene-0103", "scene-0916"]
+    def nuscenes_data_prep(self, version, data_root, max_sweeps=10):
+        val_scenes = ["scene-0103", "scene-0916"]
         val_scenes = splits.val
 
-        nusc = NuScenes(version=version, dataroot=data_root, verbose=True)
+        self.nusc = NuScenes(version=version, dataroot=data_root, verbose=True)
         nusc_can_bus = NuScenesCanBus(dataroot=data_root)
 
-        available_scenes = nusc.scene
+        available_scenes = self.nusc.scene
         available_scene_names = [s["name"] for s in available_scenes]
         val_scenes = list(filter(lambda x: x in available_scene_names, val_scenes))
         val_scenes = set(
@@ -193,7 +390,7 @@ class NuScenesDataset(Dataset):
                 for s in val_scenes
             ]
         )
-        samples = [x for x in nusc.sample if x["scene_token"] in val_scenes]
+        samples = [x for x in self.nusc.sample if x["scene_token"] in val_scenes]
 
         val_nusc_infos = []
         frame_idx = 0
@@ -342,8 +539,7 @@ class NuScenesDataset(Dataset):
             value_buf = f.read()
             data = pickle.loads(value_buf)
         data_infos = list(sorted(data["infos"], key=lambda e: e["timestamp"]))
-        self.metadata = data["metadata"]
-        self.version = self.metadata["version"]
+        self.version = data["metadata"]["version"]
 
         return data_infos
 
@@ -437,6 +633,13 @@ class NuScenesDataset(Dataset):
             lidar2img_rts.append(lidar2img_rt)
         input_dict["img_filename"] = image_paths
         input_dict["lidar2img"] = lidar2img_rts
+
+        sdc_planning, sdc_planning_mask, command = self.traj_api.get_sdc_planning_label(
+            info["token"]
+        )
+        input_dict["sdc_planning"] = sdc_planning
+        input_dict["sdc_planning_mask"] = sdc_planning_mask
+        input_dict["command"] = command
 
         rotation = Quaternion(input_dict["ego2global_rotation"])
         translation = input_dict["ego2global_translation"]
