@@ -407,7 +407,7 @@ def get_image_size(fname):
     try:
         with Image.open(fname) as img:
             return img.width, img.height
-    except:
+    except Exception:
         return
 
 def logging(message):
