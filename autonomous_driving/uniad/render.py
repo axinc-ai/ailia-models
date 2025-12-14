@@ -197,6 +197,13 @@ class BEVRender(BaseRender):
                     dot_size=dot_size,
                 )
 
+    def render_planning_data(self, predicted_planning, show_command=False):
+        planning_traj = predicted_planning.pred_traj
+        planning_traj = np.concatenate([np.zeros((1, 2)), planning_traj], axis=0)
+        self._render_traj(planning_traj, colormap="autumn", dot_size=50)
+        if show_command:
+            self._render_command(predicted_planning.command)
+
     def _render_traj(
         self,
         future_traj,
@@ -523,6 +530,7 @@ class Visualizer:
     ):
         self.nusc = NuScenes(version=version, dataroot=dataroot, verbose=True)
 
+        self.show_command = False
         self.with_planning = True
 
         self.token_set = set()
@@ -600,8 +608,7 @@ class Visualizer:
                 track_yaw = bboxes.yaw
                 track_velocity = bboxes.tensor[:, -2:]
 
-                # command = outputs[k]["command"][0]
-                command = None
+                command = outputs[k]["command"]
                 planning_agent = AgentPredictionData(
                     track_scores[0],
                     track_labels,
@@ -635,16 +642,17 @@ class Visualizer:
         self.bev_render.render_pred_box_data(
             self.predictions[sample_token]["predicted_agent_list"]
         )
-        # self.bev_render.render_pred_traj(
-        #     self.predictions[sample_token]["predicted_agent_list"]
-        # )
-        # self.bev_render.render_pred_box_data(
-        #     [self.predictions[sample_token]["predicted_planning"]]
-        # )
-        # self.bev_render.render_planning_data(
-        #     self.predictions[sample_token]["predicted_planning"],
-        #     show_command=self.show_command,
-        # )
+        self.bev_render.render_pred_traj(
+            self.predictions[sample_token]["predicted_agent_list"]
+        )
+        if self.with_planning:
+            self.bev_render.render_pred_box_data(
+                [self.predictions[sample_token]["predicted_planning"]]
+            )
+            self.bev_render.render_planning_data(
+                self.predictions[sample_token]["predicted_planning"],
+                show_command=self.show_command,
+            )
         # self.bev_render.render_sdc_car()
         # self.bev_render.render_legend()
 

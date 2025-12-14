@@ -20,6 +20,7 @@ from model_utils import check_and_download_models
 # isort: on
 
 # import local modules
+from collision_optimization import CollisionNonlinearOptimizer
 from lidar_box3d import LiDARInstance3DBoxes
 from nuscenes_dataset import NuScenesDataset
 from render import Visualizer
@@ -49,6 +50,10 @@ WEIGHT_SEG_HEAD_PATH = "seg_head.onnx"
 MODEL_SEG_HEAD_PATH = "seg_head.onnx.prototxt"
 WEIGHT_MOTION_HEAD_PATH = "motion_head.onnx"
 MODEL_MOTION_HEAD_PATH = "motion_head.onnx.prototxt"
+WEIGHT_OCC_HEAD_PATH = "occ_head.onnx"
+MODEL_OCC_HEAD_PATH = "occ_head.onnx.prototxt"
+WEIGHT_PLANNING_HEAD_PATH = "planning_head.onnx"
+MODEL_PLANNING_HEAD_PATH = "planning_head.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/uniad/"
 
 IMAGE_PATH = "nuscenes"
@@ -679,38 +684,167 @@ def motion_head_forward(models, bev_embed, outs_track: dict, outs_seg: dict):
     return traj_results, outs_motion
 
 
-def occ_head_forward(bev_embed, outs_motion, no_query=False):
-    """Occupancy head forward pass.
+def occ_head_forward(models, bev_feat, outs_dict, no_query=False):
+    traj_query = outs_dict["traj_query"]
+    track_query = outs_dict["track_query"]
+    track_query_pos = outs_dict["track_query_pos"]
 
-    Args:
-        bev_embed: BEV feature embedding
-        outs_motion: Motion head outputs dictionary
-        no_query: Whether there are no track queries
+    net = models["occ_head"]
+    if not args.onnx:
+        output = net.predict([bev_feat, traj_query, track_query, track_query_pos])
+    else:
+        output = net.run(
+            None,
+            {
+                "bev_feat": bev_feat,
+                "traj_query": traj_query,
+                "track_query": track_query,
+                "track_query_pos": track_query_pos,
+            },
+        )
+    _, pred_ins_logits = output
 
-    Returns:
-        dict: Occupancy prediction results
-    """
-    # TODO: Implement occupancy head forward
-    outs_occ = {}
-    return outs_occ
+    out_dict = dict()
+    out_dict["pred_ins_logits"] = pred_ins_logits
+
+    n_future = 4
+    pred_ins_logits = pred_ins_logits[:, :, : 1 + n_future]  # [b, q, t, h, w]
+    pred_ins_sigmoid = sigmoid(pred_ins_logits)  # [b, q, t, h, w]
+
+    # with_track_score
+    track_scores = outs_dict["track_scores"]  # [b, q]
+    track_scores = track_scores[:, :, None, None, None]
+    pred_ins_sigmoid = pred_ins_sigmoid * track_scores  # [b, q, t, h, w]
+
+    out_dict["pred_ins_sigmoid"] = pred_ins_sigmoid
+    pred_seg_scores = np.max(pred_ins_sigmoid, axis=1)
+    test_seg_thresh = 0.1
+    seg_out = (pred_seg_scores > test_seg_thresh).astype(np.int64)
+    seg_out = np.expand_dims(seg_out, axis=2)  # [b, t, 1, h, w]
+    out_dict["seg_out"] = seg_out
+
+    def update_instance_ids(instance_seg, old_ids, new_ids):
+        indices = np.arange(int(old_ids.max()) + 1)
+        for old_id, new_id in zip(old_ids, new_ids):
+            indices[int(old_id)] = int(new_id)
+
+        return indices[instance_seg].astype(np.int64)
+
+    def make_instance_seg_consecutive(instance_seg):
+        # Make the indices of instance_seg consecutive
+        unique_ids = np.unique(instance_seg)  # include background
+        new_ids = np.arange(len(unique_ids))
+        instance_seg = update_instance_ids(instance_seg, unique_ids, new_ids)
+        return instance_seg
+
+    def predict_instance_segmentation_and_trajectories(
+        foreground_masks,
+        ins_sigmoid,
+        vehicles_id=1,
+    ):
+        if foreground_masks.ndim == 5 and foreground_masks.shape[2] == 1:
+            foreground_masks = np.squeeze(foreground_masks, axis=2)  # [b, t, h, w]
+        foreground_masks = (
+            foreground_masks == vehicles_id
+        )  # [b, t, h, w]  Only these places have foreground id
+
+        argmax_ins = np.argmax(
+            ins_sigmoid, axis=1
+        )  # long, [b, t, h, w], ins_id starts from 0
+        argmax_ins = argmax_ins + 1  # [b, t, h, w], ins_id starts from 1
+        instance_seg = (argmax_ins * foreground_masks.astype(np.float32)).astype(
+            np.int64
+        )  # bg is 0, fg starts with 1
+
+        # Make the indices of instance_seg consecutive
+        instance_seg = make_instance_seg_consecutive(instance_seg).astype(np.int64)
+
+        return instance_seg
+
+    # ins_pred
+    pred_consistent_instance_seg = predict_instance_segmentation_and_trajectories(
+        seg_out, pred_ins_sigmoid
+    )  # bg is 0, fg starts with 1, consecutive
+    out_dict["ins_seg_out"] = pred_consistent_instance_seg  # [1, 5, 200, 200]
+
+    return out_dict
 
 
-def planning_head_forward(bev_embed, outs_motion, outs_occ, command):
-    """Planning head forward pass.
+def planning_head_forward(models, bev_embed, outs_motion, outs_occflow, command):
+    sdc_traj_query = outs_motion["sdc_traj_query"]
+    sdc_track_query = outs_motion["sdc_track_query"]
+    bev_pos = outs_motion["bev_pos"]
+    occ_mask = outs_occflow["seg_out"]
+    command = np.array([command], dtype=np.int64)
 
-    Args:
-        bev_embed: BEV feature embedding
-        outs_motion: Motion head outputs dictionary
-        outs_occ: Occupancy head outputs dictionary
-        command: Navigation command (e.g., 0=right, 1=left, 2=straight)
+    net = models["planning_head"]
+    if not args.onnx:
+        output = net.predict(
+            [bev_embed, bev_pos, sdc_traj_query, sdc_track_query, command]
+        )
+    else:
+        output = net.run(
+            None,
+            {
+                "bev_embed": bev_embed,
+                "bev_pos": bev_pos,
+                "sdc_traj_query": sdc_traj_query,
+                "sdc_track_query": sdc_track_query,
+                "command": command,
+            },
+        )
+    sdc_traj, sdc_traj_all = output
 
-    Returns:
-        dict: Planning results containing sdc_traj and sdc_traj_all
-    """
-    # TODO: Implement planning head forward
+    def collision_optimization(sdc_traj_all, occ_mask):
+        """
+        Optimize SDC trajectory with occupancy instance mask.
+        """
+        pos_xy_t = []
+        valid_occupancy_num = 0
+
+        if occ_mask.shape[2] == 1:
+            occ_mask = np.squeeze(occ_mask, axis=2)
+        occ_horizon = occ_mask.shape[1]
+        assert occ_horizon == 5
+
+        bev_h = bev_w = 200
+        occ_filter_range = 5.0
+        planning_steps = 6
+        sigma = 1.0
+        alpha_collision = 5.0
+        for t in range(planning_steps):
+            cur_t = min(t + 1, occ_horizon - 1)
+            pos_xy = np.argwhere(occ_mask[0][cur_t])
+            pos_xy = pos_xy[:, [1, 0]]
+            pos_xy[:, 0] = (pos_xy[:, 0] - bev_h // 2) * 0.5 + 0.25
+            pos_xy[:, 1] = (pos_xy[:, 1] - bev_w // 2) * 0.5 + 0.25
+
+            # filter the occupancy in range
+            keep_index = (
+                np.sum((sdc_traj_all[0, t, :2][None, :] - pos_xy[:, :2]) ** 2, axis=-1)
+                < occ_filter_range**2
+            )
+            pos_xy_t.append(pos_xy[keep_index])
+            valid_occupancy_num += np.sum(keep_index > 0)
+        if valid_occupancy_num == 0:
+            return sdc_traj_all
+
+        col_optimizer = CollisionNonlinearOptimizer(
+            planning_steps, 0.5, sigma, alpha_collision, pos_xy_t
+        )
+        col_optimizer.set_reference_trajectory(sdc_traj_all[0])
+        sol = col_optimizer.solve()
+        sdc_traj_optim = np.stack(
+            [sol.value(col_optimizer.position_x), sol.value(col_optimizer.position_y)],
+            axis=-1,
+        )
+        return sdc_traj_optim[None].astype(sdc_traj_all.dtype)
+
+    sdc_traj_all = collision_optimization(sdc_traj_all, occ_mask)
+
     result_planning = {
-        "sdc_traj": None,
-        "sdc_traj_all": None,
+        "sdc_traj": sdc_traj_all,
+        "sdc_traj_all": sdc_traj_all,
     }
     return result_planning
 
@@ -880,11 +1014,12 @@ def recognize_from_image(models):
     }
     bbox_results = []
     for i, data in enumerate(data_loader):
-        img = data[0]["img"]
-        img_metas = data[0]["img_metas"]
-        l2g_t = data[0]["l2g_t"]
-        l2g_r_mat = data[0]["l2g_r_mat"]
-        _timestamp = data[0]["timestamp"]
+        data = data[0]
+        img = data["img"]
+        img_metas = data["img_metas"]
+        l2g_t = data["l2g_t"]
+        l2g_r_mat = data["l2g_r_mat"]
+        _timestamp = data["timestamp"]
 
         img = np.stack(img).transpose(0, 3, 1, 2)  # N, C, H, W
         img = np.expand_dims(img, axis=0)  # B, N, C, H, W
@@ -974,13 +1109,14 @@ def recognize_from_image(models):
         result_motion, outs_motion = motion_head_forward(
             models, bev_embed, outs_track=result_track, outs_seg=result_seg
         )
-        # outs_motion["bev_pos"] = result_track["bev_pos"]
+        outs_motion["bev_pos"] = result_track["bev_pos"]
 
         result = dict()
         result["token"] = img_metas["sample_idx"]
 
         occ_no_query = outs_motion["track_query"].shape[1] == 0
         outs_occ = occ_head_forward(
+            models,
             bev_embed,
             outs_motion,
             no_query=occ_no_query,
@@ -990,19 +1126,13 @@ def recognize_from_image(models):
         )
         result["occ"] = outs_occ
 
-        command = 2
-        planning_gt = dict(
-            # segmentation=gt_segmentation,
-            # sdc_planning=sdc_planning,
-            # sdc_planning_mask=sdc_planning_mask,
-            # command=command
-        )
-        # result_planning = dict(sdc_traj=None, sdc_traj_all=None)
+        command = data["command"]
+        planning_gt = dict(command=command)
         result_planning = planning_head_forward(
-            bev_embed, outs_motion, outs_occ, command
+            models, bev_embed, outs_motion, outs_occ, command
         )
         result["planning"] = dict(
-            # planning_gt=planning_gt,
+            planning_gt=planning_gt,
             result_planning=result_planning,
         )
         result.update(result_track)
@@ -1014,6 +1144,7 @@ def recognize_from_image(models):
         ### End of forward_test ###
 
         result["planning_traj"] = result["planning"]["result_planning"]["sdc_traj"]
+        result["command"] = result["planning"]["planning_gt"]["command"]
 
         bbox_results.append(result)
         # occ_results_computed = occ_results
@@ -1082,6 +1213,10 @@ def main():
         motion_head = ailia.Net(
             MODEL_MOTION_HEAD_PATH, WEIGHT_MOTION_HEAD_PATH, env_id=env_id
         )
+        occ_head = ailia.Net(MODEL_OCC_HEAD_PATH, WEIGHT_OCC_HEAD_PATH, env_id=env_id)
+        planning_head = ailia.Net(
+            MODEL_PLANNING_HEAD_PATH, WEIGHT_PLANNING_HEAD_PATH, env_id=env_id
+        )
     else:
         import onnxruntime
 
@@ -1105,6 +1240,12 @@ def main():
         motion_head = onnxruntime.InferenceSession(
             WEIGHT_MOTION_HEAD_PATH, providers=providers
         )
+        occ_head = onnxruntime.InferenceSession(
+            WEIGHT_OCC_HEAD_PATH, providers=providers
+        )
+        planning_head = onnxruntime.InferenceSession(
+            WEIGHT_PLANNING_HEAD_PATH, providers=providers
+        )
 
     models = dict(
         bev_encoder=bev_encoder,
@@ -1114,6 +1255,8 @@ def main():
         query_interact=query_interact,
         seg_head=seg_head,
         motion_head=motion_head,
+        occ_head=occ_head,
+        planning_head=planning_head,
     )
     recognize_from_image(models)
 

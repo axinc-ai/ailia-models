@@ -353,6 +353,8 @@ class NuScenesDataset(Dataset):
         version=None,
         ann_file=None,
     ):
+        ### Custom3DDataset
+
         if data_root is None:
             self.data_root = "./"
         elif data_root.endswith("/"):
@@ -369,6 +371,9 @@ class NuScenesDataset(Dataset):
                 version=self.version, dataroot=self.data_root, verbose=True
             )
 
+        self.use_camera = True
+
+        ### NuScenesE2EDataset
         self.traj_api = NuScenesTraj(self.nusc)
 
     def __len__(self):
@@ -396,19 +401,21 @@ class NuScenesDataset(Dataset):
         frame_idx = 0
         for sample in tqdm.tqdm(samples):
             lidar_token = sample["data"]["LIDAR_TOP"]
-            sd_rec = nusc.get("sample_data", sample["data"]["LIDAR_TOP"])
-            cs_record = nusc.get("calibrated_sensor", sd_rec["calibrated_sensor_token"])
-            pose_record = nusc.get("ego_pose", sd_rec["ego_pose_token"])
-            lidar_path, boxes, _ = nusc.get_sample_data(lidar_token)
+            sd_rec = self.nusc.get("sample_data", sample["data"]["LIDAR_TOP"])
+            cs_record = self.nusc.get(
+                "calibrated_sensor", sd_rec["calibrated_sensor_token"]
+            )
+            pose_record = self.nusc.get("ego_pose", sd_rec["ego_pose_token"])
+            lidar_path, boxes, _ = self.nusc.get_sample_data(lidar_token)
 
-            can_bus = get_can_bus_info(nusc, nusc_can_bus, sample)
+            can_bus = get_can_bus_info(self.nusc, nusc_can_bus, sample)
             info = {
-                "lidar_path": lidar_path,
+                # "lidar_path": lidar_path,
                 "token": sample["token"],
-                "prev": sample["prev"],
-                "next": sample["next"],
+                # "prev": sample["prev"],
+                # "next": sample["next"],
                 "can_bus": can_bus,
-                "frame_idx": frame_idx,  # temporal related info
+                # "frame_idx": frame_idx,  # temporal related info
                 "sweeps": [],
                 "cams": dict(),
                 "scene_token": sample["scene_token"],  # temporal related info
@@ -442,20 +449,20 @@ class NuScenesDataset(Dataset):
             ]
             for cam in camera_types:
                 cam_token = sample["data"][cam]
-                cam_path, _, cam_intrinsic = nusc.get_sample_data(cam_token)
+                cam_path, _, cam_intrinsic = self.nusc.get_sample_data(cam_token)
                 cam_info = obtain_sensor2top(
-                    nusc, cam_token, l2e_t, l2e_r_mat, e2g_t, e2g_r_mat, cam
+                    self.nusc, cam_token, l2e_t, l2e_r_mat, e2g_t, e2g_r_mat, cam
                 )
                 cam_info.update(cam_intrinsic=cam_intrinsic)
                 info["cams"].update({cam: cam_info})
 
             # obtain sweeps for a single key-frame
-            sd_rec = nusc.get("sample_data", sample["data"]["LIDAR_TOP"])
+            sd_rec = self.nusc.get("sample_data", sample["data"]["LIDAR_TOP"])
             sweeps = []
             while len(sweeps) < max_sweeps:
                 if not sd_rec["prev"] == "":
                     sweep = obtain_sensor2top(
-                        nusc,
+                        self.nusc,
                         sd_rec["prev"],
                         l2e_t,
                         l2e_r_mat,
@@ -464,13 +471,13 @@ class NuScenesDataset(Dataset):
                         "lidar",
                     )
                     sweeps.append(sweep)
-                    sd_rec = nusc.get("sample_data", sd_rec["prev"])
+                    sd_rec = self.nusc.get("sample_data", sd_rec["prev"])
                 else:
                     break
             info["sweeps"] = sweeps
             # obtain annotation
             annotations = [
-                nusc.get("sample_annotation", token) for token in sample["anns"]
+                self.nusc.get("sample_annotation", token) for token in sample["anns"]
             ]
             locs = np.array([b.center for b in boxes]).reshape(-1, 3)
             dims = np.array([b.wlh for b in boxes]).reshape(-1, 3)
@@ -478,7 +485,7 @@ class NuScenesDataset(Dataset):
                 -1, 1
             )
             velocity = np.array(
-                [nusc.box_velocity(token)[:2] for token in sample["anns"]]
+                [self.nusc.box_velocity(token)[:2] for token in sample["anns"]]
             )
             valid_flag = np.array(
                 [
@@ -488,10 +495,11 @@ class NuScenesDataset(Dataset):
                 dtype=bool,
             ).reshape(-1)
             instance_inds = [
-                nusc.getind("instance", ann["instance_token"]) for ann in annotations
+                self.nusc.getind("instance", ann["instance_token"])
+                for ann in annotations
             ]
             future_traj_all, future_traj_valid_mask_all = get_future_traj_info(
-                nusc, sample
+                self.nusc, sample
             )
             instance_tokens = [
                 ann["instance_token"] for ann in annotations
@@ -583,6 +591,20 @@ class NuScenesDataset(Dataset):
 
         return data_dict
 
+    def get_ann_info(self, index):
+        info = self.data_infos[index]
+
+        sdc_planning, sdc_planning_mask, command = self.traj_api.get_sdc_planning_label(
+            info["token"]
+        )
+        anns_results = dict(
+            sdc_planning=sdc_planning,
+            sdc_planning_mask=sdc_planning_mask,
+            command=command,
+        )
+
+        return anns_results
+
     def get_data_info(self, index):
         """Get data info according to the given index."""
         info = self.data_infos[index]
@@ -616,30 +638,29 @@ class NuScenesDataset(Dataset):
         )
 
         # use_camera
-        image_paths = []
-        lidar2img_rts = []
-        for cam_type, cam_info in info["cams"].items():
-            image_paths.append(cam_info["data_path"])
-            # obtain lidar to image transformation matrix
-            lidar2cam_r = np.linalg.inv(cam_info["sensor2lidar_rotation"])
-            lidar2cam_t = cam_info["sensor2lidar_translation"] @ lidar2cam_r.T
-            lidar2cam_rt = np.eye(4)
-            lidar2cam_rt[:3, :3] = lidar2cam_r.T
-            lidar2cam_rt[3, :3] = -lidar2cam_t
-            intrinsic = cam_info["cam_intrinsic"]
-            viewpad = np.eye(4)
-            viewpad[: intrinsic.shape[0], : intrinsic.shape[1]] = intrinsic
-            lidar2img_rt = viewpad @ lidar2cam_rt.T
-            lidar2img_rts.append(lidar2img_rt)
-        input_dict["img_filename"] = image_paths
-        input_dict["lidar2img"] = lidar2img_rts
+        if self.use_camera:
+            image_paths = []
+            lidar2img_rts = []
+            for cam_type, cam_info in info["cams"].items():
+                image_paths.append(cam_info["data_path"])
+                # obtain lidar to image transformation matrix
+                lidar2cam_r = np.linalg.inv(cam_info["sensor2lidar_rotation"])
+                lidar2cam_t = cam_info["sensor2lidar_translation"] @ lidar2cam_r.T
+                lidar2cam_rt = np.eye(4)
+                lidar2cam_rt[:3, :3] = lidar2cam_r.T
+                lidar2cam_rt[3, :3] = -lidar2cam_t
+                intrinsic = cam_info["cam_intrinsic"]
+                viewpad = np.eye(4)
+                viewpad[: intrinsic.shape[0], : intrinsic.shape[1]] = intrinsic
+                lidar2img_rt = viewpad @ lidar2cam_rt.T
+                lidar2img_rts.append(lidar2img_rt)
+            input_dict["img_filename"] = image_paths
+            input_dict["lidar2img"] = lidar2img_rts
 
-        sdc_planning, sdc_planning_mask, command = self.traj_api.get_sdc_planning_label(
-            info["token"]
-        )
-        input_dict["sdc_planning"] = sdc_planning
-        input_dict["sdc_planning_mask"] = sdc_planning_mask
-        input_dict["command"] = command
+        ann_info = self.get_ann_info(index)
+        input_dict["sdc_planning"] = ann_info["sdc_planning"]
+        input_dict["sdc_planning_mask"] = ann_info["sdc_planning_mask"]
+        input_dict["command"] = ann_info["command"]
 
         rotation = Quaternion(input_dict["ego2global_rotation"])
         translation = input_dict["ego2global_translation"]
