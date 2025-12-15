@@ -8,6 +8,7 @@ from logging import getLogger
 import ailia
 import cv2
 import numpy as np
+import tqdm
 from nuscenes.utils import splits
 
 # import original modules
@@ -66,12 +67,59 @@ SAVE_IMAGE_PATH = "output.png"
 
 parser = get_base_parser("UniAD", IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
+parser.add_argument(
+    "--scenes",
+    type=str,
+    nargs="+",
+    action="append",
+    default=None,
+    help="Test scenes to process. Can be specified as: --scenes scene-0102 scene-0103 OR --scenes scene-0102 --scenes scene-0103. If not specified, all scenes will be processed.",
+)
+parser.add_argument(
+    "--vis_scenes",
+    type=str,
+    nargs="+",
+    action="append",
+    default=None,
+    help="Scenes to visualize. Can be specified as: --vis_scenes scene-0102 scene-0103 OR --vis_scenes scene-0102 --vis_scenes scene-0103. If not specified, all processed scenes will be visualized.",
+)
+parser.add_argument(
+    "--ann_file",
+    type=str,
+    default=None,
+    help="Path to annotation file. If not specified, data will be prepared from scratch.",
+)
+parser.add_argument(
+    "--data_root",
+    type=str,
+    default="data/nuscenes/",
+    help="Path to NuScenes dataset root directory.",
+)
+parser.add_argument(
+    "--version",
+    type=str,
+    default="v1.0-trainval",
+    help="NuScenes dataset version (e.g., v1.0-trainval, v1.0-mini).",
+)
 args = update_parser(parser)
 
 
 # ======================
 # Secondary Functions
 # ======================
+
+
+def flatten_args(arg_list):
+    """Flatten nested lists from nargs='*' with action='append'."""
+    if arg_list is None:
+        return None
+    flattened = []
+    for item in arg_list:
+        if isinstance(item, list):
+            flattened.extend(item)
+        else:
+            flattened.append(item)
+    return flattened if flattened else None
 
 
 def inverse_sigmoid(x, eps=1e-5):
@@ -973,14 +1021,30 @@ def forward(
 
 
 def recognize_from_image(models):
-    ann_file = "data/infos/nuscenes_infos_temporal_val.pkl"
+    test_scenes = flatten_args(args.scenes)
+    ann_file = args.ann_file
+    data_root = args.data_root
+    version = args.version
+
+    logger.info(f"Processing test scenes: {test_scenes}")
+    if ann_file:
+        logger.info(f"Using annotation file: {ann_file}")
+    else:
+        logger.info(f"Data root: {data_root}")
+        logger.info(f"Dataset version: {version}")
 
     dataset = NuScenesDataset(
-        **{
-            "data_root": "data/nuscenes/",
-            "ann_file": ann_file,
-        }
+        data_root=data_root,
+        version=version,
+        ann_file=ann_file,
+        test_scenes=test_scenes or ["scene-0102", "scene-0103"],
     )
+
+    if test_scenes is not None and len(dataset) == 0:
+        logger.info(
+            "No data found in the dataset. Please check if the scene name is correct."
+        )
+        sys.exit(1)
 
     # Simple DataLoader replacement
     class SimpleDataLoader:
@@ -990,6 +1054,9 @@ def recognize_from_image(models):
         def __iter__(self):
             for i in range(len(self.dataset)):
                 yield [self.dataset[i]]
+
+        def __len__(self):
+            return len(self.dataset)
 
     data_loader = SimpleDataLoader(dataset)
 
@@ -1013,7 +1080,9 @@ def recognize_from_image(models):
         "prev_angle": 0,
     }
     bbox_results = []
-    for i, data in enumerate(data_loader):
+    for i, data in tqdm.tqdm(
+        enumerate(data_loader), total=len(data_loader), desc="Processing frames"
+    ):
         data = data[0]
         img = data["img"]
         img_metas = data["img_metas"]
@@ -1113,6 +1182,7 @@ def recognize_from_image(models):
 
         result = dict()
         result["token"] = img_metas["sample_idx"]
+        result["scene_token"] = img_metas["scene_token"]
 
         occ_no_query = outs_motion["track_query"].shape[1] == 0
         outs_occ = occ_head_forward(
@@ -1139,7 +1209,6 @@ def recognize_from_image(models):
         result.update(
             result_motion[0]
         )  # 'traj_0', 'traj_scores_0', 'traj_1', 'traj_scores_1', 'traj', 'traj_scores'
-        # result.update(result_seg)  # ret_iou
 
         ### End of forward_test ###
 
@@ -1147,30 +1216,33 @@ def recognize_from_image(models):
         result["command"] = result["planning"]["planning_gt"]["command"]
 
         bbox_results.append(result)
-        # occ_results_computed = occ_results
-        # planning_results_computed = occ_results
-        # mask_results = mask_results
 
     vis = Visualizer(
-        version="v1.0-mini",
         bbox_results=bbox_results,
-        dataroot="data/nuscenes",
+        nuscenes=dataset.nusc,
+        # dataroot="data/nuscenes",
+        # version="v1.0-mini",
     )
-    val_splits = splits.val
+
+    # Filter scenes for visualization
+    vis_scenes = flatten_args(args.vis_scenes)
+    if vis_scenes:
+        logger.info(f"Visualizing scenes: {vis_scenes}")
+    else:
+        logger.info("Visualizing all processed scenes")
 
     scene_token_to_name = dict()
     for i in range(len(vis.nusc.scene)):
         scene_token_to_name[vis.nusc.scene[i]["token"]] = vis.nusc.scene[i]["name"]
 
-    for i in range(len(vis.nusc.sample)):
-        sample_token = vis.nusc.sample[i]["token"]
-        scene_token = vis.nusc.sample[i]["scene_token"]
+    for i, sample in enumerate(bbox_results):
+        sample_token = sample["token"]
+        scene_token = sample["scene_token"]
 
-        if scene_token_to_name[scene_token] not in val_splits:
-            continue
-
-        if sample_token not in vis.token_set:
-            print(i, sample_token, "not in prediction pkl!")
+        # Get scene name for filtering
+        scene_name = scene_token_to_name[scene_token]
+        # Skip if not in vis_scenes list
+        if vis_scenes and scene_name not in vis_scenes:
             continue
 
         bev_img = vis.visualize_bev(sample_token)

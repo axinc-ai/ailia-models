@@ -352,6 +352,7 @@ class NuScenesDataset(Dataset):
         data_root=None,
         version=None,
         ann_file=None,
+        test_scenes=None,
     ):
         ### Custom3DDataset
 
@@ -364,12 +365,26 @@ class NuScenesDataset(Dataset):
 
         if ann_file is None:
             self.version = version or "v1.0-trainval"
-            self.data_infos = self.nuscenes_data_prep(self.version, self.data_root)
+            self.data_infos = self.nuscenes_data_prep(
+                self.version, self.data_root, test_scenes=test_scenes
+            )
         else:
             self.data_infos = self.load_annotations(ann_file)
             self.nusc = NuScenes(
                 version=self.version, dataroot=self.data_root, verbose=True
             )
+
+            # filter scenes if test_scenes is provided
+            if test_scenes is not None:
+                val_scenes = set()
+                for s in self.nusc.scene:
+                    if s["name"] not in test_scenes:
+                        continue
+                    val_scenes.add(s["token"])
+
+                self.data_infos = [
+                    s for s in self.data_infos if s["scene_token"] in val_scenes
+                ]
 
         self.use_camera = True
 
@@ -379,27 +394,23 @@ class NuScenesDataset(Dataset):
     def __len__(self):
         return len(self.data_infos)
 
-    def nuscenes_data_prep(self, version, data_root, max_sweeps=10):
-        val_scenes = ["scene-0103", "scene-0916"]
-        val_scenes = splits.val
+    def nuscenes_data_prep(self, version, data_root, test_scenes=None, max_sweeps=10):
+        test_scenes = test_scenes or splits.val
 
         self.nusc = NuScenes(version=version, dataroot=data_root, verbose=True)
         nusc_can_bus = NuScenesCanBus(dataroot=data_root)
 
-        available_scenes = self.nusc.scene
-        available_scene_names = [s["name"] for s in available_scenes]
-        val_scenes = list(filter(lambda x: x in available_scene_names, val_scenes))
-        val_scenes = set(
-            [
-                available_scenes[available_scene_names.index(s)]["token"]
-                for s in val_scenes
-            ]
-        )
+        val_scenes = set()
+        for s in self.nusc.scene:
+            if s["name"] not in test_scenes:
+                continue
+            val_scenes.add(s["token"])
+
         samples = [x for x in self.nusc.sample if x["scene_token"] in val_scenes]
 
         val_nusc_infos = []
         frame_idx = 0
-        for sample in tqdm.tqdm(samples):
+        for sample in tqdm.tqdm(samples, desc="Preparing data"):
             lidar_token = sample["data"]["LIDAR_TOP"]
             sd_rec = self.nusc.get("sample_data", sample["data"]["LIDAR_TOP"])
             cs_record = self.nusc.get(
@@ -410,12 +421,8 @@ class NuScenesDataset(Dataset):
 
             can_bus = get_can_bus_info(self.nusc, nusc_can_bus, sample)
             info = {
-                # "lidar_path": lidar_path,
                 "token": sample["token"],
-                # "prev": sample["prev"],
-                # "next": sample["next"],
                 "can_bus": can_bus,
-                # "frame_idx": frame_idx,  # temporal related info
                 "sweeps": [],
                 "cams": dict(),
                 "scene_token": sample["scene_token"],  # temporal related info

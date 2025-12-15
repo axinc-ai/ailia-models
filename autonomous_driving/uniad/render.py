@@ -233,6 +233,20 @@ class BEVRender(BaseRender):
         total_xy[-1] = future_traj[-1]
         self.axes.scatter(total_xy[:, 0], total_xy[:, 1], c=dot_colors, s=dot_size)
 
+    def _render_command(self, command):
+        command_dict = ["TURN RIGHT", "TURN LEFT", "KEEP FORWARD"]
+        self.axes.text(-48, -45, command_dict[int(command)], fontsize=45)
+
+    def render_sdc_car(self):
+        sdc_car_png = cv2.imread("resources/sdc_car.png")
+        sdc_car_png = cv2.cvtColor(sdc_car_png, cv2.COLOR_BGR2RGB)
+        self.axes.imshow(sdc_car_png, extent=(-1, 1, -2, 2))
+
+    def render_legend(self):
+        legend = cv2.imread("resources/legend.png")
+        legend = cv2.cvtColor(legend, cv2.COLOR_BGR2RGB)
+        self.axes.imshow(legend, extent=(23, 51.2, -50, -40))
+
 
 class CameraRender(BaseRender):
     def __init__(self, figsize=(53.3333, 20), show_gt_boxes=False):
@@ -522,16 +536,20 @@ class AgentPredictionData:
 
 class Visualizer:
     def __init__(
-        self,
-        bbox_results,
-        dataroot="data/nuscenes",
-        version="v1.0-mini",
-        show_gt_boxes=False,
+        self, bbox_results, nuscenes=None, dataroot="data/nuscenes", version="v1.0-mini"
     ):
-        self.nusc = NuScenes(version=version, dataroot=dataroot, verbose=True)
+        if nuscenes is None:
+            self.nusc = NuScenes(version=version, dataroot=dataroot, verbose=True)
+        else:
+            self.nusc = nuscenes
 
-        self.show_command = False
         self.with_planning = True
+        self.show_command = True
+        self.show_sdc_car = True
+        self.show_legend = True
+        self.with_pred_traj = True
+        self.with_pred_box = True
+        show_gt_boxes = False
 
         self.token_set = set()
         self.predictions = self._parse_predictions(bbox_results)
@@ -639,12 +657,14 @@ class Visualizer:
         self.bev_render.reset_canvas(dx=1, dy=1)
         self.bev_render.set_plot_cfg()
 
-        self.bev_render.render_pred_box_data(
-            self.predictions[sample_token]["predicted_agent_list"]
-        )
-        self.bev_render.render_pred_traj(
-            self.predictions[sample_token]["predicted_agent_list"]
-        )
+        if self.with_pred_box:
+            self.bev_render.render_pred_box_data(
+                self.predictions[sample_token]["predicted_agent_list"]
+            )
+        if self.with_pred_traj:
+            self.bev_render.render_pred_traj(
+                self.predictions[sample_token]["predicted_agent_list"]
+            )
         if self.with_planning:
             self.bev_render.render_pred_box_data(
                 [self.predictions[sample_token]["predicted_planning"]]
@@ -653,8 +673,10 @@ class Visualizer:
                 self.predictions[sample_token]["predicted_planning"],
                 show_command=self.show_command,
             )
-        # self.bev_render.render_sdc_car()
-        # self.bev_render.render_legend()
+        if self.show_sdc_car:
+            self.bev_render.render_sdc_car()
+        if self.show_legend:
+            self.bev_render.render_legend()
 
         img = self.bev_render.save_fig()
         return img
