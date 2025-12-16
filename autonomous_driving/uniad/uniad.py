@@ -2,21 +2,21 @@ import copy
 import glob
 import os
 import sys
-import time
+import warnings
 from logging import getLogger
 
 import ailia
 import cv2
+import h5py
 import numpy as np
 import tqdm
-from nuscenes.utils import splits
 
 # import original modules
 sys.path.append("../../util")
 # isort: off
 from arg_utils import get_base_parser, get_savepath, update_parser
 from math_utils import sigmoid
-from model_utils import check_and_download_models
+from model_utils import check_and_download_file, check_and_download_models
 
 # isort: on
 
@@ -104,6 +104,18 @@ parser.add_argument(
     default=None,
     help="NuScenes dataset version (e.g., v1.0-trainval, v1.0-mini).",
 )
+parser.add_argument(
+    "--results_file",
+    type=str,
+    default="all_frames.h5",
+    help="Path to HDF5 file used to stream per-frame results.",
+)
+parser.add_argument(
+    "--visualize",
+    type=str,
+    default=None,
+    help="Path to HDF5 file to visualize (skip inference).",
+)
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
 
@@ -124,6 +136,66 @@ def flatten_args(arg_list):
         else:
             flattened.append(item)
     return flattened if flattened else None
+
+
+def save_frame_to_hdf5(h5_group, result, frame_count):
+    """Save a single frame result to HDF5 group.
+
+    Args:
+        h5_group: HDF5 file handle
+        result: Result dictionary containing frame data
+        frame_count: Frame index number
+    """
+    group = h5_group.create_group(f"frame_{frame_count:06d}")
+    group.attrs["token"] = result["token"]
+    group.attrs["scene_token"] = result["scene_token"]
+    group.attrs["command"] = result["command"]
+    group.create_dataset("boxes_3d", data=result["boxes_3d"].tensor)
+    group.create_dataset("scores_3d", data=result["scores_3d"])
+    group.create_dataset("labels_3d", data=result["labels_3d"])
+    group.create_dataset("track_ids", data=result["track_ids"])
+    group.create_dataset("traj", data=result["traj"])
+    group.create_dataset("traj_scores", data=result["traj_scores"])
+    group.create_dataset("sdc_boxes_3d", data=result["sdc_boxes_3d"].tensor)
+    group.create_dataset("sdc_scores_3d", data=result["sdc_scores_3d"])
+    group.create_dataset("planning_traj", data=result["planning_traj"])
+    # Flush to disk immediately
+    h5_group.flush()
+
+
+def load_frames_from_hdf5(hdf5_file):
+    """Load all frame results from HDF5 file.
+
+    Args:
+        hdf5_file: Path to HDF5 file
+
+    Returns:
+        List of result dictionaries
+    """
+    bbox_results = []
+    with h5py.File(hdf5_file, "r") as h5f:
+        for frame_key in sorted(h5f.keys()):
+            group = h5f[frame_key]
+            bbox_results.append(
+                {
+                    "token": group.attrs["token"],
+                    "scene_token": group.attrs["scene_token"],
+                    "command": group.attrs["command"],
+                    "boxes_3d": LiDARInstance3DBoxes(group["boxes_3d"][:], box_dim=9),
+                    "scores_3d": group["scores_3d"][:],
+                    "labels_3d": group["labels_3d"][:],
+                    "track_ids": group["track_ids"][:],
+                    "traj": group["traj"][:],
+                    "traj_scores": group["traj_scores"][:],
+                    "sdc_boxes_3d": LiDARInstance3DBoxes(
+                        group["sdc_boxes_3d"][:], box_dim=9
+                    ),
+                    "sdc_scores_3d": group["sdc_scores_3d"][:],
+                    "planning_traj": group["planning_traj"][:],
+                }
+            )
+
+    return bbox_results
 
 
 def inverse_sigmoid(x, eps=1e-5):
@@ -445,6 +517,89 @@ def to_video(folder_path, out_path, fps=4, downsample=1):
     for i in range(len(img_array)):
         out.write(img_array[i])
     out.release()
+
+
+def visualize_results(
+    results_file, nusc=None, output_dir="vis_output", fps=4, downsample=2
+):
+    """Visualize detection and planning results.
+
+    Args:
+        results_file: Path to HDF5 file containing frame results
+        nusc: NuScenes dataset instance (optional, will be loaded if None)
+        output_dir: Directory to save output images
+        fps: Frames per second for video
+        downsample: Downsample factor for video resolution
+    """
+    # Determine visualization scenes internally
+    defaults_on_none = args.ann_file is None and args.version is None
+    vis_scenes = flatten_args(args.vis_scenes) or (
+        DEFAULT_VIS_SCENES if defaults_on_none else None
+    )
+
+    # Load frame results from HDF5 for visualization
+    logger.info("Loading frame results for visualization...")
+    bbox_results = load_frames_from_hdf5(results_file)
+
+    if len(bbox_results) == 0:
+        logger.info("No results to visualize.")
+        sys.exit(1)
+
+    # Load NuScenes dataset if not provided
+    if nusc is None:
+        from nuscenes import NuScenes
+
+        logger.info("Loading NuScenes dataset...")
+        data_root = args.data_root
+        version = args.version or "v1.0-trainval"
+        nusc = NuScenes(version=version, dataroot=data_root, verbose=True)
+
+    vis = Visualizer(bbox_results=bbox_results, nuscenes=nusc)
+
+    if vis_scenes:
+        logger.info(f"Visualizing scenes: {vis_scenes}")
+    else:
+        logger.info("Visualizing all processed scenes")
+
+    scene_token_to_name = dict()
+    for i in range(len(vis.nusc.scene)):
+        scene_token_to_name[vis.nusc.scene[i]["token"]] = vis.nusc.scene[i]["name"]
+
+    # Clear and create output directory
+    for f in glob.glob(os.path.join(output_dir, "*")):
+        if os.path.isfile(f):
+            os.remove(f)
+    os.makedirs(output_dir, exist_ok=True)
+
+    for i, sample in enumerate(bbox_results):
+        sample_token = sample["token"]
+        scene_token = sample["scene_token"]
+
+        # Get scene name for filtering
+        scene_name = scene_token_to_name[scene_token]
+        # Skip if not in vis_scenes list
+        if vis_scenes and scene_name not in vis_scenes:
+            continue
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=RuntimeWarning)
+            bev_img = vis.visualize_bev(sample_token)
+            cam_img = vis.visualize_cam(sample_token)
+        out_img = cv2.hconcat([cam_img, bev_img])
+        out_img = out_img[:, :, ::-1]  # RGB to BGR
+
+        savepath = f"{output_dir}/{str(i).zfill(3)}.jpg"
+        cv2.imwrite(savepath, out_img)
+        logger.info(f"saved at : {savepath}")
+
+    savepath = get_savepath(args.savepath, output_dir, ext=".avi")
+    jpg_paths = glob.glob(os.path.join(output_dir, "*.jpg"))
+    if not jpg_paths:
+        logger.info("No frames written; skipping video output.")
+        return
+
+    to_video(output_dir, savepath, fps=fps, downsample=downsample)
+    logger.info(f"saved at : {savepath}")
 
 
 # ======================
@@ -1023,54 +1178,15 @@ def forward(
     return item
 
 
-def recognize_from_image(models):
-    ann_file = args.ann_file
-    data_root = args.data_root
-    version = args.version
-    test_scenes = flatten_args(args.scenes)
+def process_all_frames(models, data_loader, track_base, h5f):
+    """Process all frames from data_loader and stream results to HDF5.
 
-    logger.info(f"Processing test scenes: {test_scenes}")
-    if ann_file:
-        logger.info(f"Using annotation file: {ann_file}")
-    else:
-        logger.info(f"Data root: {data_root}")
-        logger.info(f"Dataset version: {version}")
-
-    dataset = NuScenesDataset(
-        data_root=data_root,
-        version=version,
-        ann_file=ann_file,
-        test_scenes=test_scenes or ["scene-0102", "scene-0103"],
-    )
-
-    if test_scenes is not None and len(dataset) == 0:
-        logger.info(
-            "No data found in the dataset. Please check if the scene name is correct."
-        )
-        sys.exit(1)
-
-    # Simple DataLoader replacement
-    class SimpleDataLoader:
-        def __init__(self, dataset):
-            self.dataset = dataset
-
-        def __iter__(self):
-            for i in range(len(self.dataset)):
-                yield [self.dataset[i]]
-
-        def __len__(self):
-            return len(self.dataset)
-
-    data_loader = SimpleDataLoader(dataset)
-
-    score_thresh = 0.4
-    filter_score_thresh = 0.35
-    miss_tolerance = 5
-    track_base = RuntimeTrackerBase(
-        score_thresh=score_thresh,
-        filter_score_thresh=filter_score_thresh,
-        miss_tolerance=miss_tolerance,
-    )
+    Args:
+        models: Dict of initialized model sessions
+        data_loader: Iterable yielding dataset items
+        track_base: Tracker base managing IDs and states
+        h5f: Open HDF5 file handle to write per-frame results
+    """
 
     track_instances = None
     tiemestamp = None
@@ -1082,7 +1198,7 @@ def recognize_from_image(models):
         "prev_pos": 0,
         "prev_angle": 0,
     }
-    bbox_results = []
+
     for i, data in tqdm.tqdm(
         enumerate(data_loader), total=len(data_loader), desc="Processing frames"
     ):
@@ -1215,46 +1331,81 @@ def recognize_from_image(models):
         result["planning_traj"] = result["planning"]["result_planning"]["sdc_traj"]
         result["command"] = result["planning"]["planning_gt"]["command"]
 
-        bbox_results.append(result)
+        # Stream frame results to HDF5 file
+        save_frame_to_hdf5(h5f, result, i)
 
-    vis = Visualizer(
-        bbox_results=bbox_results,
-        nuscenes=dataset.nusc,
-        # dataroot="data/nuscenes",
-        # version="v1.0-mini",
+        # Clear result from memory
+        del result
+
+
+def recognize_from_image(models):
+    defaults_on_none = args.ann_file is None and args.version is None
+
+    ann_file = args.ann_file
+    data_root = args.data_root
+    version = args.version or "v1.0-trainval"
+    test_scenes = flatten_args(args.scenes) or (
+        DEFAULT_SCENES if defaults_on_none else None
     )
 
-    # Filter scenes for visualization
-    vis_scenes = flatten_args(args.vis_scenes)
-    if vis_scenes:
-        logger.info(f"Visualizing scenes: {vis_scenes}")
+    if ann_file:
+        logger.info(f"Using annotation file: {ann_file}")
     else:
-        logger.info("Visualizing all processed scenes")
+        logger.info(f"Data root: {data_root}")
+        logger.info(f"Dataset version: {version}")
+    logger.info(f"Processing test scenes: {test_scenes or 'ALL'}")
 
-    scene_token_to_name = dict()
-    for i in range(len(vis.nusc.scene)):
-        scene_token_to_name[vis.nusc.scene[i]["token"]] = vis.nusc.scene[i]["name"]
+    dataset = NuScenesDataset(
+        data_root=data_root,
+        version=version,
+        ann_file=ann_file,
+        test_scenes=test_scenes,
+    )
 
-    for i, sample in enumerate(bbox_results):
-        sample_token = sample["token"]
-        scene_token = sample["scene_token"]
+    if len(dataset) == 0 and not defaults_on_none:
+        logger.info(
+            "No data found in the dataset. Please check if the scene name is correct."
+        )
+        sys.exit(1)
 
-        # Get scene name for filtering
-        scene_name = scene_token_to_name[scene_token]
-        # Skip if not in vis_scenes list
-        if vis_scenes and scene_name not in vis_scenes:
-            continue
+    # Simple DataLoader replacement
+    class SimpleDataLoader:
+        def __init__(self, dataset):
+            self.dataset = dataset
 
-        bev_img = vis.visualize_bev(sample_token)
-        cam_img = vis.visualize_cam(sample_token)
-        out_img = cv2.hconcat([cam_img, bev_img])
-        out_img = out_img[:, :, ::-1]  # RGB to BGR
+        def __iter__(self):
+            for i in range(len(self.dataset)):
+                yield [self.dataset[i]]
 
-        savepath = f"vis_output/{str(i).zfill(3)}.jpg"
-        cv2.imwrite(savepath, out_img)
-        logger.info(f"saved at : {savepath}")
+        def __len__(self):
+            return len(self.dataset)
 
-    to_video("vis_output", "output_video.avi", fps=4, downsample=2)
+    data_loader = SimpleDataLoader(dataset)
+
+    # Determine results file path
+    if args.visualize:
+        # Visualize mode: skip inference, use provided HDF5 file
+        results_file = args.visualize
+    else:
+        # Inference mode: run process_all_frames and save to results_file
+        results_file = args.results_file
+        with h5py.File(results_file, "w") as h5f:
+            logger.info(f"All frames streamed to: {results_file}")
+
+            score_thresh = 0.4
+            filter_score_thresh = 0.35
+            miss_tolerance = 5
+            track_base = RuntimeTrackerBase(
+                score_thresh=score_thresh,
+                filter_score_thresh=filter_score_thresh,
+                miss_tolerance=miss_tolerance,
+            )
+            process_all_frames(models, data_loader, track_base, h5f)
+
+    # Visualize results
+    visualize_results(
+        results_file=results_file, nusc=dataset.nusc, output_dir="vis_output"
+    )
 
     logger.info("Script finished successfully.")
 
