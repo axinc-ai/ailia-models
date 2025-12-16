@@ -395,14 +395,12 @@ class NuScenesDataset(Dataset):
         return len(self.data_infos)
 
     def nuscenes_data_prep(self, version, data_root, test_scenes=None, max_sweeps=10):
-        test_scenes = test_scenes or splits.val
-
         self.nusc = NuScenes(version=version, dataroot=data_root, verbose=True)
         nusc_can_bus = NuScenesCanBus(dataroot=data_root)
 
         val_scenes = set()
         for s in self.nusc.scene:
-            if s["name"] not in test_scenes:
+            if test_scenes and s["name"] not in test_scenes:
                 continue
             val_scenes.add(s["token"])
 
@@ -563,28 +561,9 @@ class NuScenesDataset(Dataset):
         data_dict = self.pipeline(input_dict)
 
         meta_keys = [
-            # "filename",
-            # "ori_shape",
             "sample_idx",
             "img_shape",
             "lidar2img",
-            # "depth2img",
-            # "cam2img",
-            # "pad_shape",
-            # "scale_factor",
-            # "flip",
-            # "pcd_horizontal_flip",
-            # "pcd_vertical_flip",
-            # "box_mode_3d",
-            # "box_type_3d",
-            # "img_norm_cfg",
-            # "pcd_trans",
-            # "prev_idx",
-            # "next_idx",
-            # "pcd_scale_factor",
-            # "pcd_rotation",
-            # "pts_filename",
-            # "transformation_3d_flow",
             "scene_token",
             "can_bus",
         ]
@@ -618,15 +597,10 @@ class NuScenesDataset(Dataset):
 
         input_dict = dict(
             sample_idx=info["token"],
-            # pts_filename=info["lidar_path"],
-            # sweeps=info["sweeps"],
             ego2global_translation=info["ego2global_translation"],
             ego2global_rotation=info["ego2global_rotation"],
-            # prev_idx=info["prev"],
-            # next_idx=info["next"],
             scene_token=info["scene_token"],
             can_bus=info["can_bus"],
-            # frame_idx=info["frame_idx"],
             timestamp=info["timestamp"] / 1e6,
         )
 

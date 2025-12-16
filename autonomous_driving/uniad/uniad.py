@@ -55,18 +55,21 @@ WEIGHT_OCC_HEAD_PATH = "occ_head.onnx"
 MODEL_OCC_HEAD_PATH = "occ_head.onnx.prototxt"
 WEIGHT_PLANNING_HEAD_PATH = "planning_head.onnx"
 MODEL_PLANNING_HEAD_PATH = "planning_head.onnx.prototxt"
+QUERY_EMBEDDING_FILE = "resources/query_embedding.npy"
+REFERENCE_POINTS_WEIGHT_FILE = "resources/reference_points_weight.npy"
+REFERENCE_POINTS_BIAS_FILE = "resources/reference_points_bias.npy"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/uniad/"
 
-IMAGE_PATH = "nuscenes"
-SAVE_IMAGE_PATH = "output.png"
+DEFAULT_SCENES = ["scene-0102", "scene-0103"]
+DEFAULT_VIS_SCENES = ["scene-0103"]
+SAVE_IMAGE_PATH = "output_video.avi"
 
 
 # ======================
 # Arguemnt Parser Config
 # ======================
 
-parser = get_base_parser("UniAD", IMAGE_PATH, SAVE_IMAGE_PATH)
-parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
+parser = get_base_parser("UniAD", None, SAVE_IMAGE_PATH)
 parser.add_argument(
     "--scenes",
     type=str,
@@ -98,9 +101,10 @@ parser.add_argument(
 parser.add_argument(
     "--version",
     type=str,
-    default="v1.0-trainval",
+    default=None,
     help="NuScenes dataset version (e.g., v1.0-trainval, v1.0-mini).",
 )
+parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
 
 
@@ -138,7 +142,7 @@ def empty_tracks():
     track_instances = Instances((1, 1))
 
     if _query_embedding is None:
-        _query_embedding = np.load("query_embedding.npy")
+        _query_embedding = np.load(QUERY_EMBEDDING_FILE)
 
     query = _query_embedding.copy()
     num_queries, dim = query.shape
@@ -732,7 +736,7 @@ def motion_head_forward(models, bev_embed, outs_track: dict, outs_seg: dict):
     return traj_results, outs_motion
 
 
-def occ_head_forward(models, bev_feat, outs_dict, no_query=False):
+def occ_head_forward(models, bev_feat, outs_dict):
     traj_query = outs_dict["traj_query"]
     track_query = outs_dict["track_query"]
     track_query_pos = outs_dict["track_query_pos"]
@@ -906,8 +910,8 @@ def reference_points(query):
     global _reference_points_weight, _reference_points_bias
 
     if _reference_points_weight is None:
-        _reference_points_weight = np.load("reference_points_weight.npy")
-        _reference_points_bias = np.load("reference_points_bias.npy")
+        _reference_points_weight = np.load(REFERENCE_POINTS_WEIGHT_FILE)
+        _reference_points_bias = np.load(REFERENCE_POINTS_BIAS_FILE)
 
     num_queries, dim = query.shape
     ref_pts = (
@@ -1015,16 +1019,15 @@ def forward(
     """  Update track instances using matcher """
     item["track_instances_fordet"] = track_instances
     item["track_instances"] = track_instances = query_interact(models, track_instances)
-    # item["track_obj_idxes"] = track_instances.obj_idxes
 
     return item
 
 
 def recognize_from_image(models):
-    test_scenes = flatten_args(args.scenes)
     ann_file = args.ann_file
     data_root = args.data_root
     version = args.version
+    test_scenes = flatten_args(args.scenes)
 
     logger.info(f"Processing test scenes: {test_scenes}")
     if ann_file:
@@ -1190,9 +1193,6 @@ def recognize_from_image(models):
             bev_embed,
             outs_motion,
             no_query=occ_no_query,
-            # gt_segmentation=gt_segmentation,
-            # gt_instance=gt_instance,
-            # gt_img_is_valid=gt_occ_img_is_valid,
         )
         result["occ"] = outs_occ
 
@@ -1261,8 +1261,30 @@ def recognize_from_image(models):
 
 def main():
     # model files check and download
-    # check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-    # check_and_download_models(WEIGHT_XXX_PATH, MODEL_XXX_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(
+        WEIGHT_TRACK_HEAD_PATH, MODEL_TRACK_HEAD_PATH, REMOTE_PATH
+    )
+    check_and_download_models(
+        WEIGHT_MEMORY_BANK_PATH, MODEL_MEMORY_BANK_PATH, REMOTE_PATH
+    )
+    check_and_download_models(
+        WEIGHT_MEMORY_BANK_UPD_PATH, MODEL_MEMORY_BANK_UPD_PATH, REMOTE_PATH
+    )
+    check_and_download_models(
+        WEIGHT_QUERY_INTERACTION_PATH, MODEL_QUERY_INTERACTION_PATH, REMOTE_PATH
+    )
+    check_and_download_models(WEIGHT_SEG_HEAD_PATH, MODEL_SEG_HEAD_PATH, REMOTE_PATH)
+    check_and_download_models(
+        WEIGHT_MOTION_HEAD_PATH, MODEL_MOTION_HEAD_PATH, REMOTE_PATH
+    )
+    check_and_download_models(WEIGHT_OCC_HEAD_PATH, MODEL_OCC_HEAD_PATH, REMOTE_PATH)
+    check_and_download_models(
+        WEIGHT_PLANNING_HEAD_PATH, MODEL_PLANNING_HEAD_PATH, REMOTE_PATH
+    )
+    check_and_download_file(QUERY_EMBEDDING_FILE, REMOTE_PATH)
+    check_and_download_file(REFERENCE_POINTS_WEIGHT_FILE, REMOTE_PATH)
+    check_and_download_file(REFERENCE_POINTS_BIAS_FILE, REMOTE_PATH)
 
     env_id = args.env_id
 

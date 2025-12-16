@@ -4,7 +4,7 @@
 # Copyright (c) OpenDriveLab. All rights reserved.                                #
 # ---------------------------------------------------------------------------------#
 
-from typing import Any, Dict, Sequence, Tuple
+from typing import Sequence, Tuple
 
 import numpy as np
 import numpy.typing as npt
@@ -63,13 +63,6 @@ class CollisionNonlinearOptimizer:
         """
         self._optimizer.set_value(self.ref_traj, DM(reference_trajectory).T)
         self._set_initial_guess(reference_trajectory)
-
-    def set_solver_optimizerons(self, options: Dict[str, Any]) -> None:
-        """
-        Control solver options including verbosity.
-        :param options: Dictionary containing optimization criterias
-        """
-        self._optimizer.solver("ipopt", options)
 
     def solve(self) -> OptiSol:
         """
