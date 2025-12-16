@@ -41,6 +41,7 @@ class SenseVoiceSmall:
         quantize: bool = False,
         intra_op_num_threads: int = 4,
         cache_dir: str = None,
+        env_id: int = -1,
         **kwargs,
     ):
 
@@ -86,7 +87,7 @@ class SenseVoiceSmall:
         #    model_file, device_id, intra_op_num_threads=intra_op_num_threads
         #)
         self.ort_infer = AiliaInferSession(
-            model_file, device_id, intra_op_num_threads=intra_op_num_threads
+            model_file, device_id, intra_op_num_threads=intra_op_num_threads, env_id=env_id
         )
         self.batch_size = batch_size
         self.blank_id = 0

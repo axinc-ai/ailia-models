@@ -258,9 +258,9 @@ class OrtInferSession:
 
 
 class AiliaInferSession:
-    def __init__(self, model_file, device_id=-1, intra_op_num_threads=4):
+    def __init__(self, model_file, device_id=-1, intra_op_num_threads=4, env_id = -1):
         import ailia
-        self.session = ailia.Net(weight=model_file)
+        self.session = ailia.Net(weight=model_file, env_id=env_id, memory_mode=11)
 
     def __call__(self, input_content: List[Union[np.ndarray, np.ndarray]], run_options = None) -> np.ndarray:
         print("ailia run")
