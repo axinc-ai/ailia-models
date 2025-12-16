@@ -13,7 +13,8 @@ model_dir = "iic/SenseVoiceSmall"
 model = SenseVoiceSmall(model_dir, batch_size=10, quantize=False, cache_dir="./")
 
 # inference
-wav_or_scp = ["./example/en.mp3", "./example/ja.mp3", "./example/ax.wav"]
+wav_or_scp = ["./example/en.mp3"]
+#wav_or_scp = ["./example/en.mp3", "./example/ja.mp3", "./example/ax.wav"]
 
 res = model(wav_or_scp, language="auto", use_itn=True)
 print([rich_transcription_postprocess(i) for i in res])

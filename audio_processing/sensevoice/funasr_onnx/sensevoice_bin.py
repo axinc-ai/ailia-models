@@ -14,6 +14,7 @@ from .utils.utils import (
     Hypothesis,
     ONNXRuntimeError,
     OrtInferSession,
+    AiliaInferSession,
     TokenIDConverter,
     get_logger,
     read_yaml,
@@ -55,18 +56,18 @@ class SenseVoiceSmall:
                     model_dir
                 )
 
-        model_file = os.path.join(model_dir, "model.onnx")
-        if quantize:
-            model_file = os.path.join(model_dir, "model_quant.onnx")
-        if not os.path.exists(model_file):
-            print(".onnx does not exist, begin to export onnx")
-            try:
-                from funasr import AutoModel
-            except:
-                raise "You are exporting onnx, please install funasr and try it again. To install funasr, you could:\n" "\npip3 install -U funasr\n" "For the users in China, you could install with the command:\n" "\npip3 install -U funasr -i https://mirror.sjtu.edu.cn/pypi/web/simple"
+        model_file = "./sensevoice_small.onnx"#os.path.join(model_dir, "model.onnx")
+        #if quantize:
+        #    model_file = os.path.join(model_dir, "model_quant.onnx")
+        #if not os.path.exists(model_file):
+        #    print(".onnx does not exist, begin to export onnx")
+        #    try:
+        #        from funasr import AutoModel
+        #    except:
+        #        raise "You are exporting onnx, please install funasr and try it again. To install funasr, you could:\n" "\npip3 install -U funasr\n" "For the users in China, you could install with the command:\n" "\npip3 install -U funasr -i https://mirror.sjtu.edu.cn/pypi/web/simple"
 
-            model = AutoModel(model=model_dir)
-            model_dir = model.export(type="onnx", quantize=quantize, **kwargs)
+        #    model = AutoModel(model=model_dir)
+        #    model_dir = model.export(type="onnx", quantize=quantize, **kwargs)
 
         config_file = os.path.join(model_dir, "config.yaml")
         cmvn_file = os.path.join(model_dir, "am.mvn")
@@ -77,7 +78,10 @@ class SenseVoiceSmall:
         )
         config["frontend_conf"]["cmvn_file"] = cmvn_file
         self.frontend = WavFrontend(**config["frontend_conf"])
-        self.ort_infer = OrtInferSession(
+        #self.ort_infer = OrtInferSession(
+        #    model_file, device_id, intra_op_num_threads=intra_op_num_threads
+        #)
+        self.ort_infer = AiliaInferSession(
             model_file, device_id, intra_op_num_threads=intra_op_num_threads
         )
         self.batch_size = batch_size

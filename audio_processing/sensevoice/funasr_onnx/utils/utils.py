@@ -256,6 +256,41 @@ class OrtInferSession:
             raise FileExistsError(f"{model_path} is not a file.")
 
 
+
+class AiliaInferSession:
+    def __init__(self, model_file, device_id=-1, intra_op_num_threads=4):
+        import ailia
+        self.session = ailia.Net(weight=model_file)
+
+    def __call__(self, input_content: List[Union[np.ndarray, np.ndarray]], run_options = None) -> np.ndarray:
+        print("ailia run")
+        return self.session.run(input_content)
+        #input_dict = dict(zip(self.get_input_names(), input_content))
+        #try:
+        #    return self.session.run(self.get_output_names(), input_dict, run_options)
+        #except Exception as e:
+        #    raise ONNXRuntimeError("ONNXRuntime inferece failed.") from e
+
+    #def get_input_names(
+    #    self,
+    #):
+    #    return [v.name for v in self.session.get_inputs()]
+
+    #def get_output_names(
+    #    self,
+    #):
+    #    return [v.name for v in self.session.get_outputs()]
+
+    #def get_character_list(self, key: str = "character"):
+    #    return self.meta_dict[key].splitlines()
+
+    #def have_key(self, key: str = "character") -> bool:
+    #    self.meta_dict = self.session.get_modelmeta().custom_metadata_map
+    #    if key in self.meta_dict.keys():
+    #        return True
+    #    return False
+
+
 def split_to_mini_sentence(words: list, word_limit: int = 20):
     assert word_limit > 1
     if len(words) <= word_limit:
