@@ -20,7 +20,7 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WAV_PATH = "example/ja.mp3"
+WAV_PATH = "ja.wav"
 SAVE_TEXT_PATH = "output.txt"
 
 # ======================
