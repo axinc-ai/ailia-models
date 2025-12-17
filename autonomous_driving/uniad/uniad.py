@@ -35,10 +35,8 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-# WEIGHT_PATH = "bev_encoder.onnx"
-# MODEL_PATH = "bev_encoder.onnx.prototxt"
-WEIGHT_PATH = "bev_encoder.msfix.onnx"
-MODEL_PATH = "bev_encoder.msfix.onnx.prototxt"
+WEIGHT_BEV_ENC_PATH = "bev_encoder.msfix.onnx"
+MODEL_BEV_ENC_PATH = "bev_encoder.msfix.onnx.prototxt"
 WEIGHT_TRACK_HEAD_PATH = "track_head.onnx"
 MODEL_TRACK_HEAD_PATH = "track_head.onnx.prototxt"
 WEIGHT_MEMORY_BANK_PATH = "memory_bank.onnx"
@@ -733,21 +731,22 @@ def memory_bank(models, track_instances):
 def query_interact(models, track_instances):
     active_track_instances = track_instances[track_instances.obj_idxes >= 0]
 
-    net = models["query_interact"]
-    if not args.onnx:
-        output = net.predict(
-            [active_track_instances.query, active_track_instances.output_embedding]
-        )
-    else:
-        output = net.run(
-            None,
-            {
-                "query": active_track_instances.query,
-                "output_embedding": active_track_instances.output_embedding,
-            },
-        )
-    updated_query = output[0]
-    active_track_instances.query = updated_query
+    if 0 < len(active_track_instances):
+        net = models["query_interact"]
+        if not args.onnx:
+            output = net.predict(
+                [active_track_instances.query, active_track_instances.output_embedding]
+            )
+        else:
+            output = net.run(
+                None,
+                {
+                    "query": active_track_instances.query,
+                    "output_embedding": active_track_instances.output_embedding,
+                },
+            )
+        updated_query = output[0]
+        active_track_instances.query = updated_query
 
     merged_track_instances = Instances.cat([empty_tracks(), active_track_instances])
 
@@ -891,7 +890,18 @@ def motion_head_forward(models, bev_embed, outs_track: dict, outs_seg: dict):
     return traj_results, outs_motion
 
 
-def occ_head_forward(models, bev_feat, outs_dict):
+def occ_head_forward(models, bev_feat, outs_dict, no_query=False):
+    if no_query:
+        b, t, h, w = 1, 5, 200, 200
+        out_dict = dict()
+        out_dict["seg_out"] = np.zeros(
+            (b, t, 1, h, w), dtype=np.int64
+        )  # [1, 5, 1, 200, 200]
+        out_dict["ins_seg_out"] = np.zeros(
+            (b, t, h, w), dtype=np.int64
+        )  # [1, 5, 200, 200]
+        return out_dict
+
     traj_query = outs_dict["traj_query"]
     track_query = outs_dict["track_query"]
     track_query_pos = outs_dict["track_query_pos"]
@@ -1411,8 +1421,13 @@ def recognize_from_image(models):
 
 
 def main():
+    # Skip model initialization if only visualizing
+    if args.visualize:
+        visualize_results(args.visualize)
+        return
+
     # model files check and download
-    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_BEV_ENC_PATH, MODEL_BEV_ENC_PATH, REMOTE_PATH)
     check_and_download_models(
         WEIGHT_TRACK_HEAD_PATH, MODEL_TRACK_HEAD_PATH, REMOTE_PATH
     )
@@ -1441,7 +1456,7 @@ def main():
 
     # initialize
     if not args.onnx:
-        bev_encoder = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        bev_encoder = ailia.Net(MODEL_BEV_ENC_PATH, WEIGHT_BEV_ENC_PATH, env_id=env_id)
         track_head = ailia.Net(
             MODEL_TRACK_HEAD_PATH, WEIGHT_TRACK_HEAD_PATH, env_id=env_id
         )
@@ -1466,7 +1481,9 @@ def main():
         import onnxruntime
 
         providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
-        bev_encoder = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
+        bev_encoder = onnxruntime.InferenceSession(
+            WEIGHT_BEV_ENC_PATH, providers=providers
+        )
         track_head = onnxruntime.InferenceSession(
             WEIGHT_TRACK_HEAD_PATH, providers=providers
         )
