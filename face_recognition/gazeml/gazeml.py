@@ -5,6 +5,7 @@ import time
 import ailia
 import cv2
 import numpy as np
+import json
 
 # import original modules
 sys.path.append('../../util')
@@ -52,6 +53,11 @@ FACE_MARGIN = 1.2
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser('gaze estimation model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='save result to json'
+)
 args = update_parser(parser)
 
 
@@ -81,6 +87,15 @@ def plot_on_image(img, preds_ailia, eye_x, eye_y, eye_w, eye_h):
             )
         logger.debug(f'x: {int(x):3d}\ty: {int(y):3d}\tprob:{prob}')
 
+def save_json(json_path, preds_ailia):
+    output = []
+    for i in range(preds_ailia.shape[3]):
+        probMap = preds_ailia[0, :, :, i]
+        minVal, prob, minLoc, point = cv2.minMaxLoc(probMap)
+        output.append({"pos": point, "prob": prob})
+
+    with open(json_path, 'w') as f:
+        json.dump(output, f, indent=2)
 
 # ======================
 # Main functions
@@ -131,6 +146,10 @@ def recognize_from_image():
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, org_img)
+
+        if args.write_json:
+            save_json((savepath.rsplit('.', 1)[0]) + '.json', preds_ailia)
+
     logger.info('Script finished successfully.')
 
 

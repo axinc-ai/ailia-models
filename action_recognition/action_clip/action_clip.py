@@ -77,14 +77,17 @@ def get_model_params(model_type):
 
     for submodel in ['text_clip', 'image_clip', 'fusion']:
         stem = f'{model_type}-{submodel}'
+        opt = ''
+        if submodel == 'text_clip':
+            opt = '.opt'
 
         if submodel not in params:
             params[submodel] = {}
 
         if 'weight_path' not in params[submodel]:
-            params[submodel]['weight_path'] = f'{stem}.onnx'
+            params[submodel]['weight_path'] = f'{stem}{opt}.onnx'
         if 'model_path' not in params[submodel]:
-            params[submodel]['model_path'] = f'{stem}.onnx.prototxt'
+            params[submodel]['model_path'] = f'{stem}{opt}.onnx.prototxt'
         if 'remote_path' not in params[submodel]:
             params[submodel]['remote_path'] = f'https://storage.googleapis.com/ailia-models/action_clip/'
 
