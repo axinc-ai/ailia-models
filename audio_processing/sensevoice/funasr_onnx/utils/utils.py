@@ -42,7 +42,6 @@ class OrtInferSession:
             EP_list = [(cuda_ep, cuda_provider_options)]
         EP_list.append((cpu_ep, cpu_provider_options))
 
-        self._verify_model(model_file)
         self.session = InferenceSession(model_file, sess_options=sess_opt, providers=EP_list)
 
         if device_id != "-1" and cuda_ep not in self.session.get_providers():
@@ -71,25 +70,6 @@ class OrtInferSession:
     ):
         return [v.name for v in self.session.get_outputs()]
 
-    def get_character_list(self, key: str = "character"):
-        return self.meta_dict[key].splitlines()
-
-    def have_key(self, key: str = "character") -> bool:
-        self.meta_dict = self.session.get_modelmeta().custom_metadata_map
-        if key in self.meta_dict.keys():
-            return True
-        return False
-
-    @staticmethod
-    def _verify_model(model_path):
-        model_path = Path(model_path)
-        if not model_path.exists():
-            raise FileNotFoundError(f"{model_path} does not exists.")
-        if not model_path.is_file():
-            raise FileExistsError(f"{model_path} is not a file.")
-
-
-
 class AiliaInferSession:
     def __init__(self, model_file, env_id = -1):
         import ailia
@@ -97,20 +77,6 @@ class AiliaInferSession:
 
     def __call__(self, input_content: List[Union[np.ndarray, np.ndarray]], run_options = None) -> np.ndarray:
         return self.session.run(input_content)
-
-def split_to_mini_sentence(words: list, word_limit: int = 20):
-    assert word_limit > 1
-    if len(words) <= word_limit:
-        return [words]
-    sentences = []
-    length = len(words)
-    sentence_len = length // word_limit
-    for i in range(sentence_len):
-        sentences.append(words[i * word_limit : (i + 1) * word_limit])
-    if length % word_limit > 0:
-        sentences.append(words[sentence_len * word_limit :])
-    return sentences
-
 
 def read_yaml(yaml_path: Union[str, Path]) -> Dict:
     if not Path(yaml_path).exists():
