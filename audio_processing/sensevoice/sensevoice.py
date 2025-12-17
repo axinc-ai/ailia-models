@@ -81,8 +81,8 @@ def recognize_from_audio():
 	for audio_path in args.input:
 		logger.info(audio_path)
 
-		model = SenseVoiceSmall(env_id=args.env_id, onnx=args.onnx, ailia_audio=not args.disable_ailia_audio)
-		vad = Fsmn_vad_online(env_id=args.env_id, onnx=args.onnx, ailia_audio=not args.disable_ailia_audio)
+		model = SenseVoiceSmall(env_id=args.env_id, onnx=args.onnx, ailia_audio=not args.disable_ailia_audio, profile=args.profile, model_file=WEIGHT_PATH)
+		vad = Fsmn_vad_online(env_id=args.env_id, onnx=args.onnx, ailia_audio=not args.disable_ailia_audio, profile=args.profile, model_file=VAD_WEIGHT_PATH)
 
 		# vad
 		speech, sample_rate = soundfile.read(audio_path)
@@ -136,7 +136,8 @@ def recognize_from_audio():
 
 			end_profile = int(round(time.time() * 1000))
 			estimation_time = end_profile - start_profile
-			logger.info(f"\ts2t processing time {estimation_time} ms")
+			if args.benchmark:
+				logger.info(f"\ts2t processing time {estimation_time} ms")
 		else:
 			# s2t
 			wav_or_scp = speech
@@ -146,7 +147,8 @@ def recognize_from_audio():
 			estimation_time = end - start
 		
 			print([rich_transcription_postprocess(i) for i in res])
-			logger.info(f"\ts2t processing time {estimation_time} ms")
+			if args.benchmark:
+				logger.info(f"\ts2t processing time {estimation_time} ms")
 
 		# inference
 		logger.info("Start inference...")

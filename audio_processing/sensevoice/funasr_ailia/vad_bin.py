@@ -28,8 +28,9 @@ class Fsmn_vad_online:
         env_id: int = -1,
         onnx: bool = False,
         ailia_audio: bool = False,
+        profile: bool = False,
+        model_file: str = "./speech_fsmn_vad_zh-cn-16k-common.onnx",
     ):
-        model_file = "./speech_fsmn_vad_zh-cn-16k-common.onnx"
         config_file = "./vad_config/config.yaml"
         self.cmvn_file = "./vad_config/am.mvn"
 
@@ -41,7 +42,7 @@ class Fsmn_vad_online:
             )
         else:
             self.ort_infer = AiliaInferSession(
-                model_file, env_id = env_id
+                model_file, env_id = env_id, profile = profile
             )
 
         self.batch_size = batch_size
