@@ -27,16 +27,11 @@ class SenseVoiceSmall:
 
     def __init__(
         self,
-        model_dir: Union[str, Path] = None,
         batch_size: int = 1,
         device_id: Union[str, int] = "-1",
-        plot_timestamp_to: str = "",
-        quantize: bool = False,
         intra_op_num_threads: int = 4,
-        cache_dir: str = None,
         env_id: int = -1,
         onnx: bool = False,
-        **kwargs,
     ):
 
         model_file = "./sensevoice_small.onnx"

@@ -61,8 +61,8 @@ def recognize_from_audio():
 	for audio_path in args.input:
 		logger.info(audio_path)
 
-		model = SenseVoiceSmall(model_dir="./", batch_size=10, quantize=False, cache_dir="./", env_id=args.env_id, onnx=args.onnx)
-		vad = Fsmn_vad_online(model_dir="./", cache_dir="./")
+		model = SenseVoiceSmall(env_id=args.env_id, onnx=args.onnx)
+		vad = Fsmn_vad_online(env_id=args.env_id, onnx=args.onnx)
 
 		# vad
 		speech, sample_rate = soundfile.read(audio_path)

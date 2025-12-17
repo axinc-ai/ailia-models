@@ -21,15 +21,12 @@ class Fsmn_vad_online:
 
     def __init__(
         self,
-        model_dir: Union[str, Path] = None,
         batch_size: int = 1,
         device_id: Union[str, int] = "-1",
-        quantize: bool = False,
         intra_op_num_threads: int = 4,
         max_end_sil: int = None,
-        cache_dir: str = None,
+        env_id: int = -1,
         onnx: bool = False,
-        **kwargs,
     ):
         model_file = "./speech_fsmn_vad_zh-cn-16k-common.onnx"
         config_file = "./vad/config.yaml"
@@ -43,7 +40,7 @@ class Fsmn_vad_online:
             )
         else:
             self.ort_infer = AiliaInferSession(
-                model_file
+                model_file, env_id = env_id
             )
 
         self.batch_size = batch_size
@@ -85,9 +82,9 @@ class Fsmn_vad_online:
                     scores, waveforms, is_final=is_final, max_end_sil=self.max_end_sil, online=True
                 )
 
-            except ONNXRuntimeError:
+            except Exception:
                 # logging.warning(traceback.format_exc())
-                logging.warning("input wav is silence or noise")
+                #logging.warning("input wav is silence or noise")
                 segments = []
         param_dict.update({"frontend": frontend, "vad_scorer": vad_scorer})
         return segments
