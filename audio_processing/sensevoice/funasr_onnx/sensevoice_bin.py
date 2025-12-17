@@ -42,7 +42,6 @@ class SenseVoiceSmall:
 
         self.tokenizer = SentencepiecesTokenizer(
             bpemodel="./tokenizer/chn_jpn_yue_eng_ko_spectok.bpe.model"
-            #bpemodel=os.path.join(model_dir, "chn_jpn_yue_eng_ko_spectok.bpe.model")
         )
         config["frontend_conf"]["cmvn_file"] = cmvn_file
         self.frontend = WavFrontend(**config["frontend_conf"])
@@ -124,7 +123,6 @@ class SenseVoiceSmall:
         language_list, textnorm_list = self.read_tags(language_input, textnorm_input)
         
         waveform_list = [wav_content]
-        #waveform_list = self.load_data(wav_content, self.frontend.opts.frame_opts.samp_freq)
         waveform_nums = len(waveform_list)
         
         assert len(language_list) == 1 or len(language_list) == waveform_nums, \
@@ -169,39 +167,6 @@ class SenseVoiceSmall:
                 asr_res.append(self.tokenizer.decode(token_int))
 
         return asr_res
-
-    def load_data(self, wav_content: Union[str, np.ndarray, List[str]], fs: int = None) -> List:
-        
-        def convert_to_wav(input_path, output_path):
-            from pydub import AudioSegment
-            try:
-                audio = AudioSegment.from_mp3(input_path)
-                audio.export(output_path, format="wav")
-                print("音频文件为mp3格式，已转换为wav格式")
-                
-            except Exception as e:
-                print(f"转换失败:{e}")
-
-        def load_wav(path: str) -> np.ndarray:
-            if not path.lower().endswith('.wav'):
-                import os
-                input_path = path
-                path = os.path.splitext(path)[0]+'.wav'
-                convert_to_wav(input_path,path) #将mp3格式转换成wav格式
-
-            waveform, _ = librosa.load(path, sr=fs)
-            return waveform
-
-        if isinstance(wav_content, np.ndarray):
-            return [wav_content]
-
-        if isinstance(wav_content, str):
-            return [load_wav(wav_content)]
-
-        if isinstance(wav_content, list):
-            return [load_wav(path) for path in wav_content]
-
-        raise TypeError(f"The type of {wav_content} is not in [str, np.ndarray, list]")
 
     def extract_feat(self, waveform_list: List[np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:
         feats, feats_len = [], []

@@ -56,6 +56,23 @@ VAD_MODEL_PATH = "speech_fsmn_vad_zh-cn-16k-common.onnx.prototxt"
 
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/sensevoice/"
 
+def format_timestamp(seconds: float, always_include_hours: bool = False):
+    assert seconds >= 0, "non-negative timestamp expected"
+    milliseconds = round(seconds * 1000.0)
+
+    hours = milliseconds // 3_600_000
+    milliseconds -= hours * 3_600_000
+
+    minutes = milliseconds // 60_000
+    milliseconds -= minutes * 60_000
+
+    seconds = milliseconds // 1_000
+    milliseconds -= seconds * 1_000
+
+    hours_marker = f"{hours}:" if always_include_hours or hours > 0 else ""
+
+    return f"{hours_marker}{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
+
 def recognize_from_audio():
 	# input audio loop
 	for audio_path in args.input:
@@ -109,7 +126,7 @@ def recognize_from_audio():
 							res = model(audio, language="auto", use_itn=True)
 							
 							for i in res:
-								print("[" + str(start / 1000) + " - " + str(end / 1000) + "] " + rich_transcription_postprocess(i))
+								print("[" + format_timestamp(start / 1000) + " --> " + format_timestamp(end / 1000) + "] " + rich_transcription_postprocess(i))
 
 							start = -1
 							end = -1

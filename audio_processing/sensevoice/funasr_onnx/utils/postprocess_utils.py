@@ -2,13 +2,6 @@
 # Copyright FunASR (https://github.com/alibaba-damo-academy/FunASR). All Rights Reserved.
 #  MIT License  (https://opensource.org/licenses/MIT)
 
-import string
-import logging
-from typing import Any, List, Union
-
-
-
-
 emo_dict = {
     "<|HAPPY|>": "😊",
     "<|SAD|>": "😔",

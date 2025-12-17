@@ -83,27 +83,10 @@ class Fsmn_vad_online:
                 )
 
             except Exception:
-                # logging.warning(traceback.format_exc())
                 #logging.warning("input wav is silence or noise")
                 segments = []
         param_dict.update({"frontend": frontend, "vad_scorer": vad_scorer})
         return segments
-
-    def load_data(self, wav_content: Union[str, np.ndarray, List[str]], fs: int = None) -> List:
-        def load_wav(path: str) -> np.ndarray:
-            waveform, _ = librosa.load(path, sr=fs)
-            return waveform
-
-        if isinstance(wav_content, np.ndarray):
-            return [wav_content]
-
-        if isinstance(wav_content, str):
-            return [load_wav(wav_content)]
-
-        if isinstance(wav_content, list):
-            return [load_wav(path) for path in wav_content]
-
-        raise TypeError(f"The type of {wav_content} is not in [str, np.ndarray, list]")
 
     def extract_feat(
         self, frontend: WavFrontendOnline, waveforms: np.ndarray, is_final: bool = False
@@ -113,11 +96,6 @@ class Fsmn_vad_online:
             waveforms_lens[idx] = waveform.shape[-1]
 
         feats, feats_len = frontend.extract_fbank(waveforms, waveforms_lens, is_final)
-        # feats.append(feat)
-        # feats_len.append(feat_len)
-
-        # feats = self.pad_feats(feats, np.max(feats_len))
-        # feats_len = np.array(feats_len).astype(np.int32)
         return feats.astype(np.float32), feats_len.astype(np.int32)
 
     @staticmethod
