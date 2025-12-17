@@ -1,83 +1,25 @@
 # -*- encoding: utf-8 -*-
 
-import functools
-import logging
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, NamedTuple, Set, Tuple, Union
+from typing import Dict, List,  Union
 
-import re
 import numpy as np
 import yaml
 
-try:
-    from onnxruntime import (
-        GraphOptimizationLevel,
-        InferenceSession,
-        SessionOptions,
-        get_available_providers,
-        get_device,
-    )
-except:
-    print("please pip3 install onnxruntime")
-import jieba
 import warnings
 
 root_dir = Path(__file__).resolve().parent
 
-logger_initialized = {}
-
-
-def pad_list(xs, pad_value, max_len=None):
-    n_batch = len(xs)
-    if max_len is None:
-        max_len = max(x.size(0) for x in xs)
-    # pad = xs[0].new(n_batch, max_len, *xs[0].size()[1:]).fill_(pad_value)
-    # numpy format
-    pad = (np.zeros((n_batch, max_len)) + pad_value).astype(np.int32)
-    for i in range(n_batch):
-        pad[i, : xs[i].shape[0]] = xs[i]
-
-    return pad
-
-
-"""
-def make_pad_mask(lengths, xs=None, length_dim=-1, maxlen=None):
-    if length_dim == 0:
-        raise ValueError("length_dim cannot be 0: {}".format(length_dim))
-
-    if not isinstance(lengths, list):
-        lengths = lengths.tolist()
-    bs = int(len(lengths))
-    if maxlen is None:
-        if xs is None:
-            maxlen = int(max(lengths))
-        else:
-            maxlen = xs.size(length_dim)
-    else:
-        assert xs is None
-        assert maxlen >= int(max(lengths))
-
-    seq_range = torch.arange(0, maxlen, dtype=torch.int64)
-    seq_range_expand = seq_range.unsqueeze(0).expand(bs, maxlen)
-    seq_length_expand = seq_range_expand.new(lengths).unsqueeze(-1)
-    mask = seq_range_expand >= seq_length_expand
-
-    if xs is not None:
-        assert xs.size(0) == bs, (xs.size(0), bs)
-
-        if length_dim < 0:
-            length_dim = xs.dim() + length_dim
-        # ind = (:, None, ..., None, :, , None, ..., None)
-        ind = tuple(
-            slice(None) if i in (0, length_dim) else None for i in range(xs.dim())
-        )
-        mask = mask[ind].expand_as(xs).to(xs.device)
-    return mask
-"""
-
-
 class OrtInferSession:
     def __init__(self, model_file, device_id=-1, intra_op_num_threads=4):
+        from onnxruntime import (
+            GraphOptimizationLevel,
+            InferenceSession,
+            SessionOptions,
+            get_available_providers,
+            get_device,
+        )
+
         device_id = str(device_id)
         sess_opt = SessionOptions()
         sess_opt.intra_op_num_threads = intra_op_num_threads
@@ -191,68 +133,6 @@ def code_mix_split_words(text: str):
         if len(current_word) > 0:
             words.append(current_word)
     return words
-
-
-def isEnglish(text: str):
-    if re.search("^[a-zA-Z']+$", text):
-        return True
-    else:
-        return False
-
-
-def join_chinese_and_english(input_list):
-    line = ""
-    for token in input_list:
-        if isEnglish(token):
-            line = line + " " + token
-        else:
-            line = line + token
-
-    line = line.strip()
-    return line
-
-
-def code_mix_split_words_jieba(seg_dict_file: str):
-    jieba.load_userdict(seg_dict_file)
-
-    def _fn(text: str):
-        input_list = text.split()
-        token_list_all = []
-        langauge_list = []
-        token_list_tmp = []
-        language_flag = None
-        for token in input_list:
-            if isEnglish(token) and language_flag == "Chinese":
-                token_list_all.append(token_list_tmp)
-                langauge_list.append("Chinese")
-                token_list_tmp = []
-            elif not isEnglish(token) and language_flag == "English":
-                token_list_all.append(token_list_tmp)
-                langauge_list.append("English")
-                token_list_tmp = []
-
-            token_list_tmp.append(token)
-
-            if isEnglish(token):
-                language_flag = "English"
-            else:
-                language_flag = "Chinese"
-
-        if token_list_tmp:
-            token_list_all.append(token_list_tmp)
-            langauge_list.append(language_flag)
-
-        result_list = []
-        for token_list_tmp, language_flag in zip(token_list_all, langauge_list):
-            if language_flag == "English":
-                result_list.extend(token_list_tmp)
-            else:
-                seg_list = jieba.cut(join_chinese_and_english(token_list_tmp), HMM=False)
-                result_list.extend(seg_list)
-
-        return result_list
-
-    return _fn
 
 
 def read_yaml(yaml_path: Union[str, Path]) -> Dict:

@@ -27,27 +27,6 @@ class SentencepiecesTokenizer:
             self.sp = spm.SentencePieceProcessor()
             self.sp.load(self.bpemodel)
 
-    def text2tokens(self, line: str) -> List[str]:
-        self._build_sentence_piece_processor()
-        return self.sp.EncodeAsPieces(line)
-
-    def tokens2text(self, tokens: Iterable[str]) -> str:
-        self._build_sentence_piece_processor()
-        return self.sp.DecodePieces(list(tokens))
-
-    def encode(self, line: str, **kwargs) -> List[int]:
-        self._build_sentence_piece_processor()
-        return self.sp.EncodeAsIds(line)
-
     def decode(self, line: List[int], **kwargs):
         self._build_sentence_piece_processor()
         return self.sp.DecodeIds(line)
-
-    def get_vocab_size(self):
-        return self.sp.GetPieceSize()
-
-    def ids2tokens(self, *args, **kwargs):
-        return self.decode(*args, **kwargs)
-
-    def tokens2ids(self, *args, **kwargs):
-        return self.encode(*args, **kwargs)
