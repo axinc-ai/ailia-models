@@ -10,19 +10,12 @@ from pathlib import Path
 from typing import List, Union, Tuple
 
 from .utils.utils import (
-    CharTokenizer,
-    Hypothesis,
-    ONNXRuntimeError,
     OrtInferSession,
     AiliaInferSession,
-    TokenIDConverter,
-    get_logger,
     read_yaml,
 )
 from .utils.sentencepiece_tokenizer import SentencepiecesTokenizer
 from .utils.frontend import WavFrontend
-
-logging = get_logger()
 
 
 class SenseVoiceSmall:
@@ -42,36 +35,11 @@ class SenseVoiceSmall:
         intra_op_num_threads: int = 4,
         cache_dir: str = None,
         env_id: int = -1,
+        onnx: bool = False,
         **kwargs,
     ):
 
-        #if not Path(model_dir).exists():
-        #    try:
-        #        from modelscope.hub.snapshot_download import snapshot_download
-        #    except:
-        #        raise "You are exporting model from modelscope, please install modelscope and try it again. To install modelscope, you could:\n" "\npip3 install -U modelscope\n" "For the users in China, you could install with the command:\n" "\npip3 install -U modelscope -i https://mirror.sjtu.edu.cn/pypi/web/simple"
-        #    try:
-        #        model_dir = snapshot_download(model_dir, cache_dir=cache_dir)
-        #    except:
-        #        raise "model_dir must be model_name in modelscope or local path downloaded from modelscope, but is {}".format(
-        #            model_dir
-        #        )
-
-        model_file = "./sensevoice_small.onnx"#os.path.join(model_dir, "model.onnx")
-        #if quantize:
-        #    model_file = os.path.join(model_dir, "model_quant.onnx")
-        #if not os.path.exists(model_file):
-        #    print(".onnx does not exist, begin to export onnx")
-        #    try:
-        #        from funasr import AutoModel
-        #    except:
-        #        raise "You are exporting onnx, please install funasr and try it again. To install funasr, you could:\n" "\npip3 install -U funasr\n" "For the users in China, you could install with the command:\n" "\npip3 install -U funasr -i https://mirror.sjtu.edu.cn/pypi/web/simple"
-
-        #    model = AutoModel(model=model_dir)
-        #    model_dir = model.export(type="onnx", quantize=quantize, **kwargs)
-
-        #config_file = os.path.join(model_dir, "config.yaml")
-        #cmvn_file = os.path.join(model_dir, "am.mvn")
+        model_file = "./sensevoice_small.onnx"
         config_file = "./tokenizer/config.yaml"
         cmvn_file ="./tokenizer/am.mvn"
 
@@ -83,12 +51,14 @@ class SenseVoiceSmall:
         )
         config["frontend_conf"]["cmvn_file"] = cmvn_file
         self.frontend = WavFrontend(**config["frontend_conf"])
-        #self.ort_infer = OrtInferSession(
-        #    model_file, device_id, intra_op_num_threads=intra_op_num_threads
-        #)
-        self.ort_infer = AiliaInferSession(
-            model_file, device_id, intra_op_num_threads=intra_op_num_threads, env_id=env_id
-        )
+        if onnx:
+            self.ort_infer = OrtInferSession(
+                model_file, device_id, intra_op_num_threads=intra_op_num_threads
+            )
+        else:
+            self.ort_infer = AiliaInferSession(
+                model_file, env_id=env_id
+            )
         self.batch_size = batch_size
         self.blank_id = 0
         self.lid_dict = {"auto": 0, "zh": 3, "en": 4, "yue": 7, "ja": 11, "ko": 12, "nospeech": 13}

@@ -27,13 +27,16 @@ SAVE_TEXT_PATH = "output.txt"
 # Arguemnt Parser Config
 # ======================
 
-parser = get_base_parser("Whisper", WAV_PATH, SAVE_TEXT_PATH, input_ftype="audio")
+parser = get_base_parser("SenseVoice", WAV_PATH, SAVE_TEXT_PATH, input_ftype="audio")
 #parser.add_argument(
 #    "--intermediate", action="store_true", help="display intermediate state."
 #)
 #parser.add_argument(
 #    "--fp16", action="store_true", help="use fp16 model (default : fp32 model)."
 #)
+parser.add_argument(
+    "--onnx", action="store_true", help="use onnx runtime."
+)
 args = update_parser(parser)
 
 
@@ -50,21 +53,17 @@ def recognize_from_audio():
 	for audio_path in args.input:
 		logger.info(audio_path)
 
-		model = SenseVoiceSmall(model_dir="./", batch_size=10, quantize=False, cache_dir="./", env_id=args.env_id)
+		model = SenseVoiceSmall(model_dir="./", batch_size=10, quantize=False, cache_dir="./", env_id=args.env_id, onnx=args.onnx)
 
 		# inference
 		wav_or_scp = [audio_path]
-		#wav_or_scp = ["./example/en.mp3", "./example/ja.mp3", "./example/ax.wav"]
-
-		import time
 
 		start = int(round(time.time() * 1000))
 		res = model(wav_or_scp, language="auto", use_itn=True)
 		end = int(round(time.time() * 1000))
 		estimation_time = end - start
-		#logger.info(f"\tencoder processing time {estimation_time} ms")
-		print(f"\tprocessing time {estimation_time} ms")
-
+		logger.info(f"\tencoder processing time {estimation_time} ms")
+		
 		print([rich_transcription_postprocess(i) for i in res])
 
 		# inference
