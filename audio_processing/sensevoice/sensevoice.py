@@ -72,7 +72,7 @@ def recognize_from_audio():
 		if sample_rate != target_sr:
 			speech = librosa.resample(speech, orig_sr=sample_rate, target_sr=target_sr)
 
-		vad_enable = False
+		vad_enable = True
 
 		if vad_enable:
 			speech_length = speech.shape[0]
@@ -81,6 +81,9 @@ def recognize_from_audio():
 			param_dict = {"in_cache": []}
 			start = -1
 			end = -1
+
+			start_profile = int(round(time.time() * 1000))
+
 			for sample_offset in range(0, speech_length, min(step, speech_length - sample_offset)):
 				if sample_offset + step >= speech_length - 1:
 					step = speech_length - sample_offset
@@ -91,30 +94,29 @@ def recognize_from_audio():
 				segments_result = vad(
 					audio_in=speech[sample_offset : sample_offset + step], param_dict=param_dict
 				)
-				if True:
-					if segments_result:
-						print(segments_result)
-				else:
-					for segment in segments_result:
-						for s in segment:
-							print(s)
-							if s[0] != -1:
-								start = s[0]
-							if s[1] != -1:
-								end = s[1]
-							if start != -1 and end != -1:
-								audio = speech[start:end]
-								start = -1
-								end = -1
-								print(audio.shape)
+				for segment in segments_result:
+					for s in segment:
+						#print(s)
+						if s[0] != -1:
+							start = s[0]
+						if s[1] != -1:
+							end = s[1]
+						if start != -1 and end != -1:
+							start_int = int(start / 1000 * target_sr)
+							end_int = int(end / 1000 * target_sr)
+							audio = speech[start_int:end_int]
 
-								start = int(round(time.time() * 1000))
-								res = model(audio, language="auto", use_itn=True)
-								end = int(round(time.time() * 1000))
-								estimation_time = end - start
-								logger.info(f"\tencoder processing time {estimation_time} ms")
-								
-								print([rich_transcription_postprocess(i) for i in res])
+							res = model(audio, language="auto", use_itn=True)
+							
+							for i in res:
+								print("[" + str(start / 1000) + " - " + str(end / 1000) + "] " + rich_transcription_postprocess(i))
+
+							start = -1
+							end = -1
+
+			end_profile = int(round(time.time() * 1000))
+			estimation_time = end_profile - start_profile
+			logger.info(f"\ts2t processing time {estimation_time} ms")
 		else:
 			# s2t
 			wav_or_scp = speech#[audio_path]
@@ -124,7 +126,7 @@ def recognize_from_audio():
 			res = model(wav_or_scp, language="auto", use_itn=True) # 16khz
 			end = int(round(time.time() * 1000))
 			estimation_time = end - start
-			logger.info(f"\tencoder processing time {estimation_time} ms")
+			logger.info(f"\ts2t processing time {estimation_time} ms")
 		
 			print([rich_transcription_postprocess(i) for i in res])
 
