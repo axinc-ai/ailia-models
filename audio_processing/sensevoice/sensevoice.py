@@ -3,9 +3,9 @@ import sys
 import time
 from logging import getLogger
 
-from funasr_onnx import SenseVoiceSmall
-from funasr_onnx.utils.postprocess_utils import rich_transcription_postprocess
-from funasr_onnx import Fsmn_vad_online
+from funasr_ailia import SenseVoiceSmall
+from funasr_ailia.utils.postprocess_utils import rich_transcription_postprocess
+from funasr_ailia import Fsmn_vad_online
 
 import soundfile
 import librosa

@@ -5,8 +5,8 @@ import copy
 
 import numpy as np
 
-USE_KALDI = False
-USE_AILIA_AUDIO = True
+USE_KALDI = True
+USE_AILIA_AUDIO = False
 if USE_KALDI:
     import kaldi_native_fbank as knf
 else:

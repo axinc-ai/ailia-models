@@ -29,8 +29,8 @@ class Fsmn_vad_online:
         onnx: bool = False,
     ):
         model_file = "./speech_fsmn_vad_zh-cn-16k-common.onnx"
-        config_file = "./vad/config.yaml"
-        self.cmvn_file = "./vad/am.mvn"
+        config_file = "./vad_config/config.yaml"
+        self.cmvn_file = "./vad_config/am.mvn"
 
         self.config = read_yaml(config_file)
 

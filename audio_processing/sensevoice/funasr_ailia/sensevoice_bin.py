@@ -35,13 +35,13 @@ class SenseVoiceSmall:
     ):
 
         model_file = "./sensevoice_small.onnx"
-        config_file = "./tokenizer/config.yaml"
-        cmvn_file ="./tokenizer/am.mvn"
+        config_file = "./s2t_config/config.yaml"
+        cmvn_file ="./s2t_config/am.mvn"
 
         config = read_yaml(config_file)
 
         self.tokenizer = SentencepiecesTokenizer(
-            bpemodel="./tokenizer/chn_jpn_yue_eng_ko_spectok.bpe.model"
+            bpemodel="./s2t_config/chn_jpn_yue_eng_ko_spectok.bpe.model"
         )
         config["frontend_conf"]["cmvn_file"] = cmvn_file
         self.frontend = WavFrontend(**config["frontend_conf"])
