@@ -214,7 +214,7 @@ def extract_speech_feat(speech):
 
 def llm_forward(llm, xs, cache):
     masks = np.expand_dims(np.tril(np.ones((xs.shape[1], xs.shape[1]))), axis=0)
-    masks = masks.astype(np.bool)
+    masks = masks.astype(np.bool_)
     if not args.onnx:
         output = llm.predict([xs, masks, *cache])
     else:
@@ -674,7 +674,15 @@ def main():
         }
         tokenizer.add_special_tokens(special_tokens)
     else:
-        raise NotImplementedError
+        from ailia_tokenizer import GPT2Tokenizer
+        tokenizer = GPT2Tokenizer.from_pretrained("./tokenizer")
+        tokenizer.add_special_tokens({"additional_special_tokens":['<|im_start|>', '<|im_end|>', '<|endofprompt|>',
+                '[breath]', '<strong>', '</strong>', '[noise]',
+                '[laughter]', '[cough]', '[clucking]', '[accent]',
+                '[quick_breath]',
+                "<laughter>", "</laughter>",
+                "[hissing]", "[sigh]", "[vocalized-noise]",
+                "[lipsmack]", "[mn]"]})
 
     speech_embedding = np.load(NPY_SPEECH_EMB_PATH)
     llm_embedding = np.load(NPY_LLM_EMB_PATH)

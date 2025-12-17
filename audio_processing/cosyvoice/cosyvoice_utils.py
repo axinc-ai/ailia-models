@@ -2,9 +2,9 @@ import re
 import regex
 
 import inflect
-from tn.chinese.normalizer import Normalizer as ZhNormalizer
-from tn.english.normalizer import Normalizer as EnNormalizer
 
+from logging import getLogger
+logger = getLogger(__name__)
 
 # whether contain chinese character
 def contains_chinese(text):
@@ -150,11 +150,15 @@ def text_normalize(tokenizer, text, split=True):
 
     if contains_chinese(text):
         if hasattr(text_normalize, "zh_tn_model") is False:
-            text_normalize.zh_tn_model = ZhNormalizer(
-                remove_erhua=False, full_to_half=False, overwrite_cache=True
-            )
-
-        text = text_normalize.zh_tn_model.normalize(text)
+            try:
+                from tn.chinese.normalizer import Normalizer as ZhNormalizer
+                text_normalize.zh_tn_model = ZhNormalizer(
+                    remove_erhua=False, full_to_half=False, overwrite_cache=True
+                )
+            except:
+                logger.warning("tn.chinese.normalizer load failed. normalize disabled.")
+        if hasattr(text_normalize, "zh_tn_model") is True:
+            text = text_normalize.zh_tn_model.normalize(text)
         text = text.replace("\n", "")
         text = replace_blank(text)
         text = replace_corner_mark(text)
@@ -174,12 +178,16 @@ def text_normalize(tokenizer, text, split=True):
             )
         )
     else:
-        if getattr(text_normalize, "en_tn_model") is None:
-            text_normalize.en_tn_model = EnNormalizer()
-            text_normalize.inflect_parser = inflect.engine()
-
-        text = text_normalize.en_tn_model.normalize(text)
-        text = spell_out_number(text, text_normalize.inflect_parser)
+        if hasattr(text_normalize, "en_tn_model") is None:
+            try:
+                from tn.english.normalizer import Normalizer as EnNormalizer
+                text_normalize.en_tn_model = EnNormalizer()
+                text_normalize.inflect_parser = inflect.engine()
+            except:
+                logger.warning("tn.english.normalizer load failed. normalize disabled.")
+        if hasattr(text_normalize, "en_tn_model") is True:
+            text = text_normalize.en_tn_model.normalize(text)
+            text = spell_out_number(text, text_normalize.inflect_parser)
         texts = list(
             split_paragraph(
                 text,
