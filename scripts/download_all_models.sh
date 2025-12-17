@@ -46,6 +46,7 @@ cd ../../audio_processing/dtln/; python3 dtln.py ${OPTION}
 cd ../../audio_processing/pytorch_wavenet/; python3 pytorch_wavenet.py ${OPTION}
 cd ../../audio_processing/audiosep/; python3 audiosep.py ${OPTION}
 cd ../../audio_processing/cosyvoice2/; python3 cosyvoice2.py ${OPTION}
+cd ../../audio_processing/sensevoice/; python3 sensevoice.py ${OPTION}
 cd ../../background_ramoval/deep-image-matting; python3 deep-image-matting.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py -a small ${OPTION}

@@ -128,6 +128,7 @@ If you would like to try on your computer:
 | [distil-whisper](/audio_processing/distil-whisper/) | [Hugging Face - Distil-Whisper](https://github.com/huggingface/distil-whisper) | Pytorch | 1.2.16 and later | Nov 2023 | |
 | [reazon_speech2](/audio_processing/reazon_speech2/) | [ReazonSpeech2](https://research.reazon.jp/projects/ReazonSpeech/) | Pytorch | 1.4.0 and later | Feb 2024 | |
 | [kotoba-whisper](/audio_processing/kotoba-whisper/) | [kotoba-whisper](https://huggingface.co/kotoba-tech/kotoba-whisper-v1.0) | Pytorch | 1.2.16 and later | Apr 2024 | |
+| [sensevoice](/audio_processing/sensevoice/) | [SenseVoice](https://github.com/FunAudioLLM/SenseVoice) | Pytorch | 1.2.13 and later | July 2024 | |
 
 ### Text to speech
 
