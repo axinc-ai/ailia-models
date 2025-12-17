@@ -32,6 +32,7 @@ class SenseVoiceSmall:
         intra_op_num_threads: int = 4,
         env_id: int = -1,
         onnx: bool = False,
+        ailia_audio: bool = False,
     ):
 
         model_file = "./sensevoice_small.onnx"
@@ -44,7 +45,7 @@ class SenseVoiceSmall:
             bpemodel="./s2t_config/chn_jpn_yue_eng_ko_spectok.bpe.model"
         )
         config["frontend_conf"]["cmvn_file"] = cmvn_file
-        self.frontend = WavFrontend(**config["frontend_conf"])
+        self.frontend = WavFrontend(ailia_audio = ailia_audio, **config["frontend_conf"])
         if onnx:
             self.ort_infer = OrtInferSession(
                 model_file, device_id, intra_op_num_threads=intra_op_num_threads

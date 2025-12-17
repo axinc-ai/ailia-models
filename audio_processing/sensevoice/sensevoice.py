@@ -32,9 +32,9 @@ SAVE_TEXT_PATH = "output.txt"
 # ======================
 
 parser = get_base_parser("SenseVoice", WAV_PATH, SAVE_TEXT_PATH, input_ftype="audio", fp16_support = False)
-#parser.add_argument(
-#    "--intermediate", action="store_true", help="display intermediate state."
-#)
+parser.add_argument(
+    "--ailia_audio", action="store_true", help="use ailia_audio."
+)
 #parser.add_argument(
 #    "--fp16", action="store_true", help="use fp16 model (default : fp32 model)."
 #)
@@ -42,7 +42,6 @@ parser.add_argument(
 	"--onnx", action="store_true", help="use onnx runtime."
 )
 args = update_parser(parser)
-
 
 # ======================
 # Models
@@ -78,8 +77,8 @@ def recognize_from_audio():
 	for audio_path in args.input:
 		logger.info(audio_path)
 
-		model = SenseVoiceSmall(env_id=args.env_id, onnx=args.onnx)
-		vad = Fsmn_vad_online(env_id=args.env_id, onnx=args.onnx)
+		model = SenseVoiceSmall(env_id=args.env_id, onnx=args.onnx, ailia_audio=args.ailia_audio)
+		vad = Fsmn_vad_online(env_id=args.env_id, onnx=args.onnx, ailia_audio=args.ailia_audio)
 
 		# vad
 		speech, sample_rate = soundfile.read(audio_path)
@@ -136,16 +135,14 @@ def recognize_from_audio():
 			logger.info(f"\ts2t processing time {estimation_time} ms")
 		else:
 			# s2t
-			wav_or_scp = speech#[audio_path]
-			#print(speech.shape)
-
+			wav_or_scp = speech
 			start = int(round(time.time() * 1000))
 			res = model(wav_or_scp, language="auto", use_itn=True) # 16khz
 			end = int(round(time.time() * 1000))
 			estimation_time = end - start
-			logger.info(f"\ts2t processing time {estimation_time} ms")
 		
 			print([rich_transcription_postprocess(i) for i in res])
+			logger.info(f"\ts2t processing time {estimation_time} ms")
 
 		# inference
 		logger.info("Start inference...")

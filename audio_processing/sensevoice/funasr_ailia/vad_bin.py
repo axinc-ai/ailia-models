@@ -27,6 +27,7 @@ class Fsmn_vad_online:
         max_end_sil: int = None,
         env_id: int = -1,
         onnx: bool = False,
+        ailia_audio: bool = False,
     ):
         model_file = "./speech_fsmn_vad_zh-cn-16k-common.onnx"
         config_file = "./vad_config/config.yaml"
@@ -48,6 +49,7 @@ class Fsmn_vad_online:
             max_end_sil if max_end_sil is not None else self.config["model_conf"]["max_end_silence_time"]
         )
         self.encoder_conf = self.config["encoder_conf"]
+        self.ailia_audio = ailia_audio
 
     def prepare_cache(self, in_cache: list = []):
         if len(in_cache) > 0:
@@ -65,7 +67,7 @@ class Fsmn_vad_online:
 
         param_dict: Dict = kwargs.get("param_dict", dict())
         is_final = param_dict.get("is_final", False)
-        frontend: WavFrontendOnline = param_dict.get("frontend", WavFrontendOnline(cmvn_file=self.cmvn_file, **self.config["frontend_conf"]))
+        frontend: WavFrontendOnline = param_dict.get("frontend", WavFrontendOnline(cmvn_file=self.cmvn_file, ailia_audio=self.ailia_audio, **self.config["frontend_conf"]))
         feats, feats_len = self.extract_feat(frontend=frontend, waveforms=waveforms, is_final=is_final)
         segments = []
         if feats.size != 0:

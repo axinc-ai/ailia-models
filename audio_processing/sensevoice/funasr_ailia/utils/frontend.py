@@ -5,13 +5,10 @@ import copy
 
 import numpy as np
 
-USE_KALDI = True
+import librosa
+import ailia.audio
+
 USE_AILIA_AUDIO = False
-if USE_KALDI:
-    import kaldi_native_fbank as knf
-else:
-    import librosa
-    import ailia.audio
 
 # -*- coding: utf-8 -*-
 
@@ -147,10 +144,13 @@ class WavFrontend:
         lfr_m: int = 1,
         lfr_n: int = 1,
         dither: float = 1.0,
+        ailia_audio: bool = False,
         **kwargs,
     ) -> None:
+        self.ailia_audio = ailia_audio
 
-        if USE_KALDI:
+        if not self.ailia_audio:
+            import kaldi_native_fbank as knf
             opts = knf.FbankOptions()
         else:
             opts = AiliaFbankOptions()
@@ -177,7 +177,8 @@ class WavFrontend:
 
     def fbank(self, waveform: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         waveform = waveform * (1 << 15)
-        if USE_KALDI:
+        if not self.ailia_audio:
+            import kaldi_native_fbank as knf
             fbank_fn = knf.OnlineFbank(self.opts)
         else:
             fbank_fn = AiliaOnlineFbank(self.opts)
@@ -202,7 +203,8 @@ class WavFrontend:
         return feat, feat_len
 
     def reset_status(self):
-        if USE_KALDI:
+        if not self.ailia_audio:
+            import kaldi_native_fbank as knf
             self.fbank_fn = knf.OnlineFbank(self.opts)
         else:
             self.fbank_fn = AiliaOnlineFbank(self.opts)
@@ -352,7 +354,8 @@ class WavFrontendOnline(WavFrontend):
     def fbank(
         self, input: np.ndarray, input_lengths: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        if USE_KALDI:
+        if not self.ailia_audio:
+            import kaldi_native_fbank as knf
             self.fbank_fn = knf.OnlineFbank(self.opts)
         else:
             self.fbank_fn = AiliaOnlineFbank(self.opts)
@@ -507,7 +510,8 @@ class WavFrontendOnline(WavFrontend):
         return self.waveforms
 
     def cache_reset(self):
-        if USE_KALDI:
+        if not self.ailia_audio:
+            import kaldi_native_fbank as knf
             self.fbank_fn = knf.OnlineFbank(self.opts)
         else:
             self.fbank_fn = AiliaOnlineFbank(self.opts)
