@@ -34,6 +34,15 @@ If you want to specify the audio, put the file path after the `--input` option.
 $ python3 sensevoice.py --input AUDIO_FILE
 ```
 
+By adding the disable_ailia_audio option, you can use the same kaldi as the reference implementation. In that case, installing kaldi is required.
+```bash
+$ python3 sensevoice.py --disable_ailia_audio
+```
+
+```
+pip3 install kaldi_native_fbank
+```
+
 ## Reference
 
 - [SenseVoice](https://github.com/FunAudioLLM/SenseVoice)
