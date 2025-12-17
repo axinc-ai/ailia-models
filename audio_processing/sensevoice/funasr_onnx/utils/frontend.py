@@ -4,8 +4,134 @@ from typing import List, Tuple, Union
 import copy
 
 import numpy as np
-import kaldi_native_fbank as knf
 
+USE_KALDI = False
+USE_AILIA_AUDIO = True
+if USE_KALDI:
+    import kaldi_native_fbank as knf
+else:
+    import librosa
+    import ailia.audio
+
+# -*- coding: utf-8 -*-
+
+class AiliaFrameOptions:
+    """Options related to frame extraction (frame_opts)."""
+    def __init__(
+        self,
+        samp_freq: float = 16000.0,
+        dither: float = 1.0,
+        window_type: str = "hamming",
+        frame_shift_ms: float = 10.0,
+        frame_length_ms: float = 25.0,
+        snip_edges: bool = True,
+    ):
+        self.samp_freq = samp_freq
+        self.dither = dither
+        self.window_type = window_type
+        self.frame_shift_ms = frame_shift_ms
+        self.frame_length_ms = frame_length_ms
+        self.snip_edges = snip_edges
+
+class AiliaMelOptions:
+    """Options for mel filterbank computation (mel_opts)."""
+    def __init__(self, num_bins: int = 80, debug_mel: bool = False):
+        self.num_bins = num_bins
+        self.debug_mel = debug_mel
+
+
+class AiliaFbankOptions:
+    """Wrapper to mimic kaldi_native_fbank.FbankOptions."""
+    def __init__(self):
+        self.frame_opts = AiliaFrameOptions()
+        self.mel_opts = AiliaMelOptions()
+        self.energy_floor = 0.0
+
+class AiliaOnlineFbank:
+    """Librosa-based replacement for kaldi_native_fbank.OnlineFbank."""
+
+    def __init__(self, opts):
+        self.opts = opts
+        self.reset()
+
+    def reset(self):
+        """Reset internal states."""
+        self.sr = int(self.opts.frame_opts.samp_freq)
+        self.dither = float(self.opts.frame_opts.dither)
+        self.window_type = self.opts.frame_opts.window_type
+        self.frame_length_ms = float(self.opts.frame_opts.frame_length_ms)
+        self.frame_shift_ms = float(self.opts.frame_opts.frame_shift_ms)
+        self.n_mels = int(self.opts.mel_opts.num_bins)
+        self.frame_length = int(self.sr * self.frame_length_ms / 1000)
+        self.frame_shift = int(self.sr * self.frame_shift_ms / 1000)
+        self.snip_edges = getattr(self.opts.frame_opts, "snip_edges", True)
+        self._waveform_buffer = np.array([], dtype=np.float32)
+        self._frames_cache = None
+
+    # ――― Kaldi オンライン互換インターフェース ―――
+    def accept_waveform(self, sampling_rate: float, waveform):
+        """Receive waveform and append it to buffer."""
+        waveform = np.asarray(waveform, dtype=np.float32)
+        if self.dither > 0:
+            waveform += np.random.normal(scale=self.dither, size=len(waveform)).astype(np.float32)
+        self._waveform_buffer = np.concatenate([self._waveform_buffer, waveform])
+        self._compute_fbanks()
+
+    def _compute_fbanks(self):
+        """Compute mel filterbank features for all frames available."""
+        if len(self._waveform_buffer) < self.frame_length:
+            self._frames_cache = np.empty((0, self.n_mels), dtype=np.float32)
+            return
+
+        hop_length = self.frame_shift
+        win_length = self.frame_length
+
+        # librosa uses float[-1, 1] range, assume waveform already scaled appropriately
+        if USE_AILIA_AUDIO:
+            mel_spec = ailia.audio.mel_spectrogram(
+                wav=self._waveform_buffer,
+                sample_rate=self.sr,
+                fft_n=2048 if win_length > 2048 else win_length,
+                hop_n=hop_length,
+                win_n=win_length,
+                win_type=self.window_type,
+                mel_n=self.n_mels,
+                center_mode=not self.snip_edges,
+                power=2.0,
+            )
+        else:
+            mel_spec = librosa.feature.melspectrogram(
+                y=self._waveform_buffer,
+                sr=self.sr,
+                n_fft=2048 if win_length > 2048 else win_length,
+                hop_length=hop_length,
+                win_length=win_length,
+                window=self.window_type,
+                n_mels=self.n_mels,
+                center=not self.snip_edges,
+                power=2.0,
+            )
+        mel_spec = np.log(np.maximum(mel_spec, 1e-10)).T.astype(np.float32)
+        self._frames_cache = mel_spec
+
+    @property
+    def num_frames_ready(self):
+        return 0 if self._frames_cache is None else self._frames_cache.shape[0]
+
+    def get_frame(self, i):
+        """Get i-th fbank frame as numpy array."""
+        if self._frames_cache is None or i >= self._frames_cache.shape[0]:
+            raise IndexError("Frame index out of range or cache empty.")
+        return self._frames_cache[i]
+
+    def get_all_frames(self):
+        """Return all computed frames."""
+        return self._frames_cache
+
+    # Optional: if you want to flush buffer or reset
+    def flush(self):
+        self._waveform_buffer = np.array([], dtype=np.float32)
+        self._frames_cache = None
 
 class WavFrontend:
     """Conventional frontend structure for ASR."""
@@ -24,7 +150,10 @@ class WavFrontend:
         **kwargs,
     ) -> None:
 
-        opts = knf.FbankOptions()
+        if USE_KALDI:
+            opts = knf.FbankOptions()
+        else:
+            opts = AiliaFbankOptions()
         opts.frame_opts.samp_freq = fs
         opts.frame_opts.dither = dither
         opts.frame_opts.window_type = window
@@ -48,7 +177,10 @@ class WavFrontend:
 
     def fbank(self, waveform: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         waveform = waveform * (1 << 15)
-        fbank_fn = knf.OnlineFbank(self.opts)
+        if USE_KALDI:
+            fbank_fn = knf.OnlineFbank(self.opts)
+        else:
+            fbank_fn = AiliaOnlineFbank(self.opts)
         fbank_fn.accept_waveform(self.opts.frame_opts.samp_freq, waveform.tolist())
         frames = fbank_fn.num_frames_ready
         mat = np.empty([frames, self.opts.mel_opts.num_bins])
@@ -60,19 +192,20 @@ class WavFrontend:
 
     def fbank_online(self, waveform: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         waveform = waveform * (1 << 15)
-        # self.fbank_fn = knf.OnlineFbank(self.opts)
         self.fbank_fn.accept_waveform(self.opts.frame_opts.samp_freq, waveform.tolist())
         frames = self.fbank_fn.num_frames_ready
         mat = np.empty([frames, self.opts.mel_opts.num_bins])
         for i in range(self.fbank_beg_idx, frames):
             mat[i, :] = self.fbank_fn.get_frame(i)
-        # self.fbank_beg_idx += (frames-self.fbank_beg_idx)
         feat = mat.astype(np.float32)
         feat_len = np.array(mat.shape[0]).astype(np.int32)
         return feat, feat_len
 
     def reset_status(self):
-        self.fbank_fn = knf.OnlineFbank(self.opts)
+        if USE_KALDI:
+            self.fbank_fn = knf.OnlineFbank(self.opts)
+        else:
+            self.fbank_fn = AiliaOnlineFbank(self.opts)
         self.fbank_beg_idx = 0
 
     def lfr_cmvn(self, feat: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -163,7 +296,6 @@ def load_cmvn(cmvn_file: Union[str, Path]) -> np.ndarray:
 class WavFrontendOnline(WavFrontend):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # self.fbank_fn = knf.OnlineFbank(self.opts)
         # add variables
         self.frame_sample_length = int(
             self.opts.frame_opts.frame_length_ms * self.opts.frame_opts.samp_freq / 1000
@@ -220,7 +352,10 @@ class WavFrontendOnline(WavFrontend):
     def fbank(
         self, input: np.ndarray, input_lengths: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        self.fbank_fn = knf.OnlineFbank(self.opts)
+        if USE_KALDI:
+            self.fbank_fn = knf.OnlineFbank(self.opts)
+        else:
+            self.fbank_fn = AiliaOnlineFbank(self.opts)
         batch_size = input.shape[0]
         if self.input_cache is None:
             self.input_cache = np.empty((batch_size, 0), dtype=np.float32)
@@ -372,7 +507,10 @@ class WavFrontendOnline(WavFrontend):
         return self.waveforms
 
     def cache_reset(self):
-        self.fbank_fn = knf.OnlineFbank(self.opts)
+        if USE_KALDI:
+            self.fbank_fn = knf.OnlineFbank(self.opts)
+        else:
+            self.fbank_fn = AiliaOnlineFbank(self.opts)
         self.reserve_waveforms = None
         self.input_cache = None
         self.lfr_splice_cache = []

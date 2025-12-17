@@ -17,7 +17,7 @@ Recognized speech text
 
 This model requires additional module.
 ```
-pip3 install kaldi_native_fbank, sentencepiece
+pip3 install sentencepiece
 ```
 
 ## Usage
