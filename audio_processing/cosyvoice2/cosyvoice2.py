@@ -49,7 +49,7 @@ NPY_SPEECH_EMB_PATH = "CosyVoice2-0.5B_speech_embedding.npy"
 NPY_LLM_EMB_PATH = "CosyVoice2-0.5B_llm_embedding.npy"
 NPY_LLM_DEC_WEIGHT_PATH = "CosyVoice2-0.5B_llm_decoder_weight.npy"
 NPY_LLM_DEC_BIAS_PATH = "CosyVoice2-0.5B_llm_decoder_bias.npy"
-REMOTE_PATH = "https://storage.googleapis.com/ailia-models/cosyvoice/"
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/cosyvoice2/"
 
 SAMPLE_RATE = 24000
 
@@ -60,7 +60,7 @@ SAVE_WAV_PATH = "output.wav"
 # Arguemnt Parser Config
 # ======================
 
-parser = get_base_parser("CosyVoice", WAV_PATH, SAVE_WAV_PATH)
+parser = get_base_parser("CosyVoice2", WAV_PATH, SAVE_WAV_PATH, fp16_support = False)
 parser.add_argument(
     "-t",
     "--tts_text",

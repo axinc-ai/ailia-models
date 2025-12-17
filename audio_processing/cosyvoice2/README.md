@@ -40,17 +40,17 @@ It is necessary to be connected to the Internet while downloading.
 
 For the sample wav,
 ```bash
-$ python3 cosyvoice.py
+$ python3 cosyvoice2.py
 ```
 
 If you want to specify audio and prompt_text, put the file path after the `--input` option and the prompt_text after the `--prompt_text` option.
 ```bash
-$ python3 cosyvoice.py --input zero_shot_prompt.wav --prompt_text "希望你以后能够做的比我还好呦。"
+$ python3 cosyvoice2.py --input zero_shot_prompt.wav --prompt_text "希望你以后能够做的比我还好呦。"
 ```
 
 You can specify tts_text by adding the `--tts_text` option.
 ```bash
-$ python3 cosyvoice.py --tts_text "收到好友从远方寄来的生日礼物，那份意外的惊喜与深深的祝福让我心中充满了甜蜜的快乐，笑容如花儿般绽放。"
+$ python3 cosyvoice2.py --tts_text "收到好友从远方寄来的生日礼物，那份意外的惊喜与深深的祝福让我心中充满了甜蜜的快乐，笑容如花儿般绽放。"
 ```
 
 ## Reference
