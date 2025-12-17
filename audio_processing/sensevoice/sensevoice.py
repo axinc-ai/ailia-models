@@ -35,9 +35,9 @@ parser = get_base_parser("SenseVoice", WAV_PATH, SAVE_TEXT_PATH, input_ftype="au
 parser.add_argument(
     "--disable_ailia_audio", action="store_true", help="disable ailia_audio."
 )
-#parser.add_argument(
-#    "--fp16", action="store_true", help="use fp16 model (default : fp32 model)."
-#)
+parser.add_argument(
+    "--fp16", action="store_true", help="use fp16 model (default : fp32 model)."
+)
 parser.add_argument(
 	"--onnx", action="store_true", help="use onnx runtime."
 )
@@ -47,11 +47,15 @@ args = update_parser(parser)
 # Models
 # ======================
 
-WEIGHT_PATH = "sensevoice_small.onnx"
-MODEL_PATH = "sensevoice_small.onnx.prototxt"
+if args.fp16:
+	WEIGHT_PATH = "sensevoice_small_fp16.onnx"
+	VAD_WEIGHT_PATH = "speech_fsmn_vad_zh-cn-16k-common_fp16.onnx"
+else:
+	WEIGHT_PATH = "sensevoice_small.onnx"
+	VAD_WEIGHT_PATH = "speech_fsmn_vad_zh-cn-16k-common.onnx"
 
-VAD_WEIGHT_PATH = "speech_fsmn_vad_zh-cn-16k-common.onnx"
-VAD_MODEL_PATH = "speech_fsmn_vad_zh-cn-16k-common.onnx.prototxt"
+MODEL_PATH = WEIGHT_PATH + ".prototxt"
+VAD_MODEL_PATH = VAD_WEIGHT_PATH + ".prototxt"
 
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/sensevoice/"
 
