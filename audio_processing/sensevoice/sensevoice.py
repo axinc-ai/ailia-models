@@ -33,7 +33,7 @@ SAVE_TEXT_PATH = "output.txt"
 
 parser = get_base_parser("SenseVoice", WAV_PATH, SAVE_TEXT_PATH, input_ftype="audio", fp16_support = False)
 parser.add_argument(
-    "--ailia_audio", action="store_true", help="use ailia_audio."
+    "--disable_ailia_audio", action="store_true", help="disable ailia_audio."
 )
 #parser.add_argument(
 #    "--fp16", action="store_true", help="use fp16 model (default : fp32 model)."
@@ -77,8 +77,8 @@ def recognize_from_audio():
 	for audio_path in args.input:
 		logger.info(audio_path)
 
-		model = SenseVoiceSmall(env_id=args.env_id, onnx=args.onnx, ailia_audio=args.ailia_audio)
-		vad = Fsmn_vad_online(env_id=args.env_id, onnx=args.onnx, ailia_audio=args.ailia_audio)
+		model = SenseVoiceSmall(env_id=args.env_id, onnx=args.onnx, ailia_audio=not args.disable_ailia_audio)
+		vad = Fsmn_vad_online(env_id=args.env_id, onnx=args.onnx, ailia_audio=not args.disable_ailia_audio)
 
 		# vad
 		speech, sample_rate = soundfile.read(audio_path)

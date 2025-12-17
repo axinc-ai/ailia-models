@@ -8,7 +8,7 @@ import numpy as np
 import librosa
 import ailia.audio
 
-USE_AILIA_AUDIO = False
+USE_AILIA_AUDIO = True
 
 # -*- coding: utf-8 -*-
 
