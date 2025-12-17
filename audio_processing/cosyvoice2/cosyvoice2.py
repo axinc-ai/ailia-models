@@ -22,7 +22,7 @@ from model_utils import check_and_download_models, check_and_download_file
 from math_utils import softmax
 
 from audio_utils import load_wav, mel_spectrogram, log_mel_spectrogram, compute_fbank
-from cosyvoice_utils import text_normalize
+from cosyvoice2_utils import text_normalize
 
 
 logger = getLogger(__name__)
@@ -651,7 +651,6 @@ def main():
         )
         hift = onnxruntime.InferenceSession(WEIGHT_HIFT_PATH, providers=providers)
 
-    args.disable_ailia_tokenizer = True
     if args.disable_ailia_tokenizer:
         import transformers
 

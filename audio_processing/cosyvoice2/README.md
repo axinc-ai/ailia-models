@@ -1,4 +1,4 @@
-# CosyVoice
+# CosyVoice2
 
 ## Input
 
