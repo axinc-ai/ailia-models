@@ -5,7 +5,7 @@ from pathlib import Path
 model_dir = "damo/speech_fsmn_vad_zh-cn-16k-common-pytorch"
 wav_path = "ja.wav"
 
-model = Fsmn_vad_online(model_dir)
+model = Fsmn_vad_online(model_dir, cache_dir="./")
 
 
 ##online vad

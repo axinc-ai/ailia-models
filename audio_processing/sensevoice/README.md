@@ -48,4 +48,5 @@ ONNX opset=14
 
 ## Netron
 
+[speech_fsmn_vad_zh-cn-16k-common.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/sensevoice/speech_fsmn_vad_zh-cn-16k-common.onnx.prototxt)  
 [sensevoice_small.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/sensevoice/sensevoice_small.onnx.prototxt)  
