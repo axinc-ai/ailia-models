@@ -64,13 +64,17 @@ class AiliaOnlineFbank:
         self.snip_edges = getattr(self.opts.frame_opts, "snip_edges", True)
         self._waveform_buffer = np.array([], dtype=np.float32)
         self._frames_cache = None
-
+        self.preemphasis_coefficient = 0.97
+        
     # ――― Kaldi オンライン互換インターフェース ―――
     def accept_waveform(self, sampling_rate: float, waveform):
         """Receive waveform and append it to buffer."""
         waveform = np.asarray(waveform, dtype=np.float32)
         if self.dither > 0:
             waveform += np.random.normal(scale=self.dither, size=len(waveform)).astype(np.float32)
+        if self.preemphasis_coefficient > 0: # Kaldiの内部処理をシミュレート
+            alpha = self.preemphasis_coefficient
+            waveform = np.append(waveform[0], waveform[1:] - alpha * waveform[:-1])
         self._waveform_buffer = np.concatenate([self._waveform_buffer, waveform])
         self._compute_fbanks()
 
@@ -88,7 +92,7 @@ class AiliaOnlineFbank:
             mel_spec = ailia.audio.mel_spectrogram(
                 wav=self._waveform_buffer,
                 sample_rate=self.sr,
-                fft_n=2048 if win_length > 2048 else win_length,
+                fft_n= win_length,
                 hop_n=hop_length,
                 win_n=win_length,
                 win_type=self.window_type,
@@ -100,7 +104,7 @@ class AiliaOnlineFbank:
             mel_spec = librosa.feature.melspectrogram(
                 y=self._waveform_buffer,
                 sr=self.sr,
-                n_fft=2048 if win_length > 2048 else win_length,
+                n_fft=win_length,
                 hop_length=hop_length,
                 win_length=win_length,
                 window=self.window_type,
