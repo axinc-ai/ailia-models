@@ -128,7 +128,8 @@ class SenseVoiceSmall:
         textnorm_input = kwargs.get("textnorm", "woitn")
         language_list, textnorm_list = self.read_tags(language_input, textnorm_input)
         
-        waveform_list = self.load_data(wav_content, self.frontend.opts.frame_opts.samp_freq)
+        waveform_list = [wav_content]
+        #waveform_list = self.load_data(wav_content, self.frontend.opts.frame_opts.samp_freq)
         waveform_nums = len(waveform_list)
         
         assert len(language_list) == 1 or len(language_list) == waveform_nums, \

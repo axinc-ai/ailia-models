@@ -5,6 +5,10 @@ from logging import getLogger
 
 from funasr_onnx import SenseVoiceSmall
 from funasr_onnx.utils.postprocess_utils import rich_transcription_postprocess
+from funasr_onnx import Fsmn_vad_online
+
+import soundfile
+import librosa
 
 import numpy as np
 
@@ -27,7 +31,7 @@ SAVE_TEXT_PATH = "output.txt"
 # Arguemnt Parser Config
 # ======================
 
-parser = get_base_parser("SenseVoice", WAV_PATH, SAVE_TEXT_PATH, input_ftype="audio")
+parser = get_base_parser("SenseVoice", WAV_PATH, SAVE_TEXT_PATH, input_ftype="audio", fp16_support = False)
 #parser.add_argument(
 #    "--intermediate", action="store_true", help="display intermediate state."
 #)
@@ -35,7 +39,7 @@ parser = get_base_parser("SenseVoice", WAV_PATH, SAVE_TEXT_PATH, input_ftype="au
 #    "--fp16", action="store_true", help="use fp16 model (default : fp32 model)."
 #)
 parser.add_argument(
-    "--onnx", action="store_true", help="use onnx runtime."
+	"--onnx", action="store_true", help="use onnx runtime."
 )
 args = update_parser(parser)
 
@@ -46,6 +50,10 @@ args = update_parser(parser)
 
 WEIGHT_PATH = "sensevoice_small.onnx"
 MODEL_PATH = "sensevoice_small.onnx.prototxt"
+
+VAD_WEIGHT_PATH = "speech_fsmn_vad_zh-cn-16k-common.onnx"
+VAD_MODEL_PATH = "speech_fsmn_vad_zh-cn-16k-common.onnx.prototxt"
+
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/sensevoice/"
 
 def recognize_from_audio():
@@ -54,17 +62,71 @@ def recognize_from_audio():
 		logger.info(audio_path)
 
 		model = SenseVoiceSmall(model_dir="./", batch_size=10, quantize=False, cache_dir="./", env_id=args.env_id, onnx=args.onnx)
+		vad = Fsmn_vad_online(model_dir="./", cache_dir="./")
 
-		# inference
-		wav_or_scp = [audio_path]
+		# vad
+		speech, sample_rate = soundfile.read(audio_path)
+		if speech.ndim > 1:
+			speech = np.mean(speech, axis=1)
+		target_sr = 16000
+		if sample_rate != target_sr:
+			speech = librosa.resample(speech, orig_sr=sample_rate, target_sr=target_sr)
 
-		start = int(round(time.time() * 1000))
-		res = model(wav_or_scp, language="auto", use_itn=True)
-		end = int(round(time.time() * 1000))
-		estimation_time = end - start
-		logger.info(f"\tencoder processing time {estimation_time} ms")
+		vad_enable = False
+
+		if vad_enable:
+			speech_length = speech.shape[0]
+			sample_offset = 0
+			step = 1600
+			param_dict = {"in_cache": []}
+			start = -1
+			end = -1
+			for sample_offset in range(0, speech_length, min(step, speech_length - sample_offset)):
+				if sample_offset + step >= speech_length - 1:
+					step = speech_length - sample_offset
+					is_final = True
+				else:
+					is_final = False
+				param_dict["is_final"] = is_final
+				segments_result = vad(
+					audio_in=speech[sample_offset : sample_offset + step], param_dict=param_dict
+				)
+				if True:
+					if segments_result:
+						print(segments_result)
+				else:
+					for segment in segments_result:
+						for s in segment:
+							print(s)
+							if s[0] != -1:
+								start = s[0]
+							if s[1] != -1:
+								end = s[1]
+							if start != -1 and end != -1:
+								audio = speech[start:end]
+								start = -1
+								end = -1
+								print(audio.shape)
+
+								start = int(round(time.time() * 1000))
+								res = model(audio, language="auto", use_itn=True)
+								end = int(round(time.time() * 1000))
+								estimation_time = end - start
+								logger.info(f"\tencoder processing time {estimation_time} ms")
+								
+								print([rich_transcription_postprocess(i) for i in res])
+		else:
+			# s2t
+			wav_or_scp = speech#[audio_path]
+			#print(speech.shape)
+
+			start = int(round(time.time() * 1000))
+			res = model(wav_or_scp, language="auto", use_itn=True) # 16khz
+			end = int(round(time.time() * 1000))
+			estimation_time = end - start
+			logger.info(f"\tencoder processing time {estimation_time} ms")
 		
-		print([rich_transcription_postprocess(i) for i in res])
+			print([rich_transcription_postprocess(i) for i in res])
 
 		# inference
 		logger.info("Start inference...")
@@ -73,6 +135,7 @@ def recognize_from_audio():
 
 def main():
 	check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+	check_and_download_models(VAD_WEIGHT_PATH, VAD_MODEL_PATH, REMOTE_PATH)
 	
 	recognize_from_audio()
 
