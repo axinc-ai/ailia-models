@@ -13,13 +13,6 @@ Recognized speech text
 うちの中学は弁当制で持っていきない場合は50円の学校販売のパンを買う
 ```
 
-## Requirements
-
-This model requires additional module.
-```
-pip3 install sentencepiece
-```
-
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
 It is necessary to be connected to the Internet while downloading.
