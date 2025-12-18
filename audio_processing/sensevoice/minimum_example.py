@@ -5,10 +5,6 @@ import librosa
 
 import numpy as np
 
-# -*- encoding: utf-8 -*-
-from pathlib import Path
-from typing import List, Tuple, Union
-
 import numpy as np
 
 import librosa
@@ -22,7 +18,7 @@ import os.path
 import librosa
 import numpy as np
 from pathlib import Path
-from typing import List, Union, Tuple
+from typing import List, Union, Tuple, Dict
 import yaml
 
 frame_opts_samp_freq = 16000
@@ -103,11 +99,13 @@ class SimpleDecoder():
 		return feat, feat_len
 
 	def lfr_cmvn(self, feat: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+		self.lfr_m = 7
+		self.lfr_n = 6
+
 		if self.lfr_m != 1 or self.lfr_n != 1:
 			feat = self.apply_lfr(feat, self.lfr_m, self.lfr_n)
 
-		if self.cmvn_file:
-			feat = self.apply_cmvn(feat)
+		feat = self.apply_cmvn(feat)
 
 		feat_len = np.array(feat.shape[0]).astype(np.int32)
 		return feat, feat_len
@@ -145,7 +143,7 @@ class SimpleDecoder():
 		inputs = (inputs + means) * vars
 		return inputs
 
-	def load_cmvn(cmvn_file: Union[str, Path]) -> np.ndarray:
+	def load_cmvn(self, cmvn_file: Union[str, Path]) -> np.ndarray:
 		"""load cmvn file to numpy array. 
 
 		Args:
@@ -186,7 +184,7 @@ class SimpleDecoder():
 		cmvn = np.array([means, vars])
 		return cmvn
 
-	def read_yaml(yaml_path: Union[str, Path]) -> Dict:
+	def read_yaml(self, yaml_path: Union[str, Path]) -> Dict:
 		if not Path(yaml_path).exists():
 			raise FileExistsError(f"The {yaml_path} does not exist.")
 
@@ -326,12 +324,12 @@ class SimpleDecoder():
 	def extract_feat(self, waveform_list: List[np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:
 		feats, feats_len = [], []
 		for waveform in waveform_list:
-			speech, _ = self.frontend.fbank(waveform)
+			speech, _ = self.fbank(waveform)
 
 			if speech is None or speech.size == 0:
 				print("detected speech size {speech.size}")
 				raise ValueError("Empty speech detected, skipping this waveform.")
-			feat, feat_len = self.frontend.lfr_cmvn(speech)
+			feat, feat_len = self.lfr_cmvn(speech)
 			feats.append(feat)
 			feats_len.append(feat_len)
 
@@ -356,7 +354,7 @@ class SimpleDecoder():
 		language: np.ndarray,
 		textnorm: np.ndarray,
 	) -> Tuple[np.ndarray, np.ndarray]:
-		outputs = self.ort_infer([feats, feats_len, language, textnorm])
+		outputs = self.model.run([feats, feats_len, language, textnorm])
 		return outputs
 
 
