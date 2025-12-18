@@ -24,9 +24,11 @@ If you would like to try on your computer:
 [ailia-models wiki](https://deepwiki.com/axinc-ai/ailia-models)
 
 # Supported models
-385 models as of November 7, 2025
+390 models as of December 17, 2025
 
 # Latest update
+- 2025.12.17 Add sensevoice, cosyvoice2
+- 2025.12.01 Add glass, mobilevlm, donut
 - 2025.11.07 Add mobile_sam, yolox_body_head_hand_face, yolov12 (ailia SDK 1.6)
 - 2025.11.03 Add fp16 version of whisper tiny and base
 - 2025.09.29 Add ruri-v3 (embedding)
