@@ -13,77 +13,41 @@ import ailia.audio
 from typing import List
 from typing import Union
 
-import os.path
 import librosa
 import numpy as np
 from typing import List, Union, Tuple, Dict
 
-frame_opts_samp_freq = 16000
-mel_opts_num_bins = 80
-frame_opts_window_type = "hamming"
-frame_opts_frame_length_ms = 25
-frame_opts_frame_shift_ms = 10
-
 class SimpleDecoder():
-	def accept_waveform(self, sampling_rate: float, waveform):
-		self.sr = int(frame_opts_samp_freq)
-		self.dither = 1.0
-		self.window_type = frame_opts_window_type
-		self.frame_length_ms = float(frame_opts_frame_length_ms)
-		self.frame_shift_ms = float(frame_opts_frame_shift_ms)
-		self.n_mels = int(mel_opts_num_bins)
-		self.frame_length = int(self.sr * self.frame_length_ms / 1000)
-		self.frame_shift = int(self.sr * self.frame_shift_ms / 1000)
-		self.snip_edges = True
-		self._waveform_buffer = np.array([], dtype=np.float32)
-		self._frames_cache = None
-		self.preemphasis_coefficient = 0.97
-			
-		waveform = np.asarray(waveform, dtype=np.float32)
-		waveform += np.random.normal(scale=self.dither, size=len(waveform)).astype(np.float32)
-		self._waveform_buffer = np.concatenate([self._waveform_buffer, waveform])
-
-		hop_length = self.frame_shift
-		win_length = self.frame_length
-
-		mel_spec = ailia.audio.mel_spectrogram(
-			wav=self._waveform_buffer,
-			sample_rate=self.sr,
-			fft_n= win_length,
-			hop_n=hop_length,
-			win_n=win_length,
-			win_type=self.window_type,
-			mel_n=self.n_mels,
-			center_mode=not self.snip_edges,
-			power=2.0,
-		)
-		mel_spec = np.log(np.maximum(mel_spec, 1e-10)).T.astype(np.float32)
-		self._frames_cache = mel_spec
-
 	def fbank(self, waveform: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
 		waveform = waveform * (1 << 15)
-		self.accept_waveform(frame_opts_samp_freq, waveform.tolist())
-		frames = self._frames_cache.shape[0]
-		mat = np.empty([frames, mel_opts_num_bins])
-		for i in range(frames):
-			mat[i, :] = self._frames_cache[i]
-		feat = mat.astype(np.float32)
-		feat_len = np.array(mat.shape[0]).astype(np.int32)
-		return feat, feat_len
-
-	def lfr_cmvn(self, feat: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-		self.lfr_m = 7
-		self.lfr_n = 6
-
-		feat = self.apply_lfr(feat, self.lfr_m, self.lfr_n)
-		feat = self.apply_cmvn(feat)
-
+		waveform = np.asarray(waveform, dtype=np.float32)
+		waveform += np.random.normal(scale=1.0, size=len(waveform)).astype(np.float32)
+		mel_spec = ailia.audio.mel_spectrogram(
+			wav=waveform,
+			sample_rate=16000,
+			fft_n=400,
+			hop_n=160,
+			win_n=400,
+			win_type="hamming",
+			mel_n=80,
+			center_mode=False,
+			power=2.0,
+		)
+		feat = np.log(np.maximum(mel_spec, 1e-10)).T.astype(np.float32)
 		feat_len = np.array(feat.shape[0]).astype(np.int32)
 		return feat, feat_len
 
-	@staticmethod
-	def apply_lfr(inputs: np.ndarray, lfr_m: int, lfr_n: int) -> np.ndarray:
+	def lfr_cmvn(self, feat: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+		feat = self.apply_lfr(feat)
+		feat = self.apply_cmvn(feat)
+		feat_len = np.array(feat.shape[0]).astype(np.int32)
+		return feat, feat_len
+
+	def apply_lfr(self, inputs: np.ndarray) -> np.ndarray:
 		LFR_inputs = []
+
+		lfr_m = 7
+		lfr_n = 6
 
 		T = inputs.shape[0]
 		T_lfr = int(np.ceil(T / lfr_n))
@@ -155,15 +119,15 @@ class SimpleDecoder():
 		
 		asr_res = []
 
-		feats, feats_len = self.extract_feat([wav_content])
+		feats, feats_len = self.extract_feat(wav_content)
 		_language_list = language_list
 		_textnorm_list = textnorm_list
-		ctc_logits, encoder_out_lens = self.infer(
+		ctc_logits, encoder_out_lens = self.model.run([
 			feats,
 			feats_len,
 			np.array(_language_list, dtype=np.int32),
 			np.array(_textnorm_list, dtype=np.int32),
-		)
+		])
 
 		x = ctc_logits[0, : encoder_out_lens[0].item(), :]
 		yseq = np.argmax(x, axis=-1)
@@ -179,42 +143,10 @@ class SimpleDecoder():
 
 		return asr_res
 
-	def extract_feat(self, waveform_list: List[np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:
-		feats, feats_len = [], []
-		for waveform in waveform_list:
-			speech, _ = self.fbank(waveform)
-
-			if speech is None or speech.size == 0:
-				print("detected speech size {speech.size}")
-				raise ValueError("Empty speech detected, skipping this waveform.")
-			feat, feat_len = self.lfr_cmvn(speech)
-			feats.append(feat)
-			feats_len.append(feat_len)
-
-		feats = self.pad_feats(feats, np.max(feats_len))
-		feats_len = np.array(feats_len).astype(np.int32)
-		return feats, feats_len
-
-	@staticmethod
-	def pad_feats(feats: List[np.ndarray], max_feat_len: int) -> np.ndarray:
-		def pad_feat(feat: np.ndarray, cur_len: int) -> np.ndarray:
-			pad_width = ((0, max_feat_len - cur_len), (0, 0))
-			return np.pad(feat, pad_width, "constant", constant_values=0)
-
-		feat_res = [pad_feat(feat, feat.shape[0]) for feat in feats]
-		feats = np.array(feat_res).astype(np.float32)
-		return feats
-
-	def infer(
-		self,
-		feats: np.ndarray,
-		feats_len: np.ndarray,
-		language: np.ndarray,
-		textnorm: np.ndarray,
-	) -> Tuple[np.ndarray, np.ndarray]:
-		outputs = self.model.run([feats, feats_len, language, textnorm])
-		return outputs
-
+	def extract_feat(self, waveform) -> Tuple[np.ndarray, np.ndarray]:
+		speech, _ = self.fbank(waveform)
+		feat, feat_len = self.lfr_cmvn(speech)
+		return np.expand_dims(feat, axis=0), np.expand_dims(feat_len, axis=0)
 
 emo_dict = {
     "<|HAPPY|>": "😊",
