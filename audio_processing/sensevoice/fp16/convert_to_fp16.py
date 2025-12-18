@@ -6,37 +6,42 @@
 import onnx
 from onnxconverter_common.float16 import convert_float_to_float16
 
-op_block_list = [
-	"ArrayFeatureExtractor",
-	"Binarizer",
-	"CastMap",
-	"CategoryMapper",
-	"DictVectorizer",
-	"FeatureVectorizer",
-	"Imputer",
-	"LabelEncoder",
-	"LinearClassifier",
-	"LinearRegressor",
-	"Normalizer",
-	"OneHotEncoder",
-	"RandomUniformLike",
-	"SVMClassifier",
-	"SVMRegressor",
-	"Scaler",
-	"TreeEnsembleClassifier",
-	"TreeEnsembleRegressor",
-	"ZipMap",
-	"NonMaxSuppression",
-	"TopK",
-	"RoiAlign",
-	"Resize",
-	"Range",
-	"CumSum",
-	"Min",
-	"Max",
-	"Upsample",
-	"Range", "Equal", "Where" # ONNX Runtimeではこの3つのオペレータはFP16に対応していない
-]
+ONNXRUNTIME_SUPPORT = False
+
+if ONNXRUNTIME_SUPPORT:
+	op_block_list = [
+		"ArrayFeatureExtractor",
+		"Binarizer",
+		"CastMap",
+		"CategoryMapper",
+		"DictVectorizer",
+		"FeatureVectorizer",
+		"Imputer",
+		"LabelEncoder",
+		"LinearClassifier",
+		"LinearRegressor",
+		"Normalizer",
+		"OneHotEncoder",
+		"RandomUniformLike",
+		"SVMClassifier",
+		"SVMRegressor",
+		"Scaler",
+		"TreeEnsembleClassifier",
+		"TreeEnsembleRegressor",
+		"ZipMap",
+		"NonMaxSuppression",
+		"TopK",
+		"RoiAlign",
+		"Resize",
+		"Range",
+		"CumSum",
+		"Min",
+		"Max",
+		"Upsample",
+		"Range", "Equal", "Where" # ONNX Runtimeではこの3つのオペレータはFP16に対応していない
+	]
+else:
+	op_block_list = None
 
 model = onnx.load("../sensevoice_small.onnx")
 model_fp16 = convert_float_to_float16(model, disable_shape_infer=False, keep_io_types=False, op_block_list = op_block_list)
@@ -72,7 +77,7 @@ def modify_onnx(model_path: str, output_path: str):
 					connected_to_range = True
 					break
 
-		if connected_to_range:
+		if connected_to_range and ONNXRUNTIME_SUPPORT:
 			continue
 
 		for attr in node.attribute:
@@ -85,7 +90,7 @@ def modify_onnx(model_path: str, output_path: str):
 	initializer_dict = {init.name: init for init in graph.initializer}
 
 	for node in graph.node:
-		if node.op_type != "Sub":
+		if node.op_type != "Sub" and (ONNXRUNTIME_SUPPORT or node.op_type != "Equal"):
 			continue
 
 		for inp_name in node.input:
@@ -109,7 +114,7 @@ def modify_onnx(model_path: str, output_path: str):
 	# RangeのInitializerをFloat32に置き換え
 	initializer_dict = {init.name: init for init in graph.initializer}
 
-	if True:
+	if ONNXRUNTIME_SUPPORT:
 		for node in graph.node:
 			if node.op_type != "Range":
 				continue
