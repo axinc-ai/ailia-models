@@ -9,6 +9,7 @@ from g2p_en import G2p
 from pypinyin import pinyin, Style
 from text import text_to_sequence
 import re
+import onnx
 
 # ===========================
 # Settings
@@ -31,16 +32,13 @@ PREPROCESS_CONFIG = "config/LJSpeech/preprocess.yaml"
 # ★重要: エクスポート時と同じ最大長 (VRAM不足回避のため 600 で統一)
 MODEL_MAX_LENGTH = 600
 
-# 音声途切れを防ぐためのバッファ (10フレーム ≈ 0.1秒)
-MEL_BUFFER_FRAMES = 40
-
 # ===========================
 # Arguments
 # ===========================
 parser = get_base_parser(
-    'FastSpeech2',
-    'fastspeech2.py',
-    'output.wav'
+    'FastSpeech2 (Ailia Inference)',
+    'inference_ailia.py',
+    'output_ailia.wav'
 )
 # 元のFastSpeech2リポジトリと同じ引数名
 parser.add_argument(
@@ -206,10 +204,16 @@ def infer():
     print("Loading ONNX Models...")
     env_id = args.env_id
     
+    # ONNXモデルの出力名を取得（ailiaSDKでは直接取得できないため、ONNXファイルから読み込む）
+    onnx_model = onnx.load(args.onnx_fs2)
+    fs2_output_names = [output.name for output in onnx_model.graph.output]
+    fs2_input_names = [inp.name for inp in onnx_model.graph.input 
+                       if inp.name not in [n.name for n in onnx_model.graph.initializer]]
+    
     # ailia.Netの初期化
     fs2_net = ailia.Net(MODEL_PATH_FS2, args.onnx_fs2, env_id=env_id)
     hifi_net = ailia.Net(MODEL_PATH_HIFI, args.onnx_hifi, env_id=env_id)
-
+    
     # -------------------------------------------
     # 入力データの準備（パディング処理）
     # -------------------------------------------
@@ -245,7 +249,7 @@ def infer():
         
         preprocess_func = get_preprocess_method(preprocess_config)
         sequence = preprocess_func(text, preprocess_config)
-        
+    
         real_len = len(sequence)
         print(f"Original Length: {real_len}")
         
@@ -260,119 +264,164 @@ def infer():
         # 入力変数（引数から制御パラメータを取得）
         texts = padded_sequence
         src_lens = np.array([real_len], dtype=np.int64)
-        max_src_len = np.array([MODEL_MAX_LENGTH], dtype=np.int64)
-        speakers = np.array([speaker_id], dtype=np.int64)
+        
+        # max_src_lenの形状を確認して適切に設定
+        max_src_len = None
+        if "max_src_len" in fs2_input_names:
+            for inp in onnx_model.graph.input:
+                if inp.name == "max_src_len":
+                    if hasattr(inp.type, 'tensor_type') and hasattr(inp.type.tensor_type, 'shape'):
+                        max_src_len_shape = [d.dim_value if d.dim_value > 0 else d.dim_param 
+                                             for d in inp.type.tensor_type.shape.dim]
+                        if len(max_src_len_shape) == 0:
+                            # スカラーとして渡す
+                            max_src_len = np.array(MODEL_MAX_LENGTH, dtype=np.int64)
+                        else:
+                            # 配列として渡す（通常は[1]）
+                            max_src_len = np.array([MODEL_MAX_LENGTH], dtype=np.int64)
+                    else:
+                        # デフォルトで配列として渡す（LJSpeech互換性のため）
+                        max_src_len = np.array([MODEL_MAX_LENGTH], dtype=np.int64)
+                    break
+        
+        # speakersの形状を確認して適切に設定
+        if "speakers" in fs2_input_names:
+            # ONNXモデルの実際の入力形状を確認
+            for inp in onnx_model.graph.input:
+                if inp.name == "speakers":
+                    if hasattr(inp.type, 'tensor_type') and hasattr(inp.type.tensor_type, 'shape'):
+                        speakers_shape = [d.dim_value if d.dim_value > 0 else d.dim_param 
+                                         for d in inp.type.tensor_type.shape.dim]
+                        if len(speakers_shape) == 2 and (speakers_shape[1] == 1 or speakers_shape[1] == 'batch_size'):
+                            # (batch, 1) の形状
+                            speakers = np.array([[speaker_id]], dtype=np.int64)
+                        else:
+                            # (batch,) の形状
+                            speakers = np.array([speaker_id], dtype=np.int64)
+                    else:
+                        # デフォルトで (batch, 1) を試す
+                        speakers = np.array([[speaker_id]], dtype=np.int64)
+                    break
+        else:
+            speakers = None
+        
         p_control = np.array(args.pitch_control, dtype=np.float32)
         e_control = np.array(args.energy_control, dtype=np.float32)
         d_control = np.array(args.duration_control, dtype=np.float32)
 
         # FastSpeech2推論とHiFi-GAN処理を実行
         _synthesize(fs2_net, hifi_net, texts, src_lens, max_src_len, speakers, 
-                   p_control, e_control, d_control, preprocess_config, sequence, real_len, idx)
+                   p_control, e_control, d_control, preprocess_config, sequence, real_len, idx, 
+                   fs2_output_names, fs2_input_names)
 
 def _synthesize(fs2_net, hifi_net, texts, src_lens, max_src_len, speakers, 
-               p_control, e_control, d_control, preprocess_config, sequence, real_len, idx=0):
+               p_control, e_control, d_control, preprocess_config, sequence, real_len, idx, 
+               fs2_output_names, fs2_input_names):
 
     # -------------------------------------------
-    # FastSpeech2 推論 (Smart Input & Shape Setting)
+    # FastSpeech2 推論
     # -------------------------------------------
     print("Running FastSpeech2...")
 
-    # AILIAにシェイプを通知 (エラー回避)
-    try:
-        fs2_net.set_input_shape(fs2_net.find_blob_index_by_name("texts"), texts.shape)
-        fs2_net.set_input_shape(fs2_net.find_blob_index_by_name("src_lens"), (1,))
-        fs2_net.set_input_shape(fs2_net.find_blob_index_by_name("max_src_len"), (1,))
-    except: pass
-    
     inputs = {}
     inputs["texts"] = texts
     inputs["src_lens"] = src_lens
-    inputs["max_src_len"] = max_src_len
-    inputs["p_control"] = p_control
-    inputs["d_control"] = d_control
-
-    # オプション入力のチェック
-    try:
-        if fs2_net.find_blob_index_by_name("speakers") != -1:
-            inputs["speakers"] = speakers
-    except: pass
+    if max_src_len is not None:
+        inputs["max_src_len"] = max_src_len
     
-    try:
-        if fs2_net.find_blob_index_by_name("e_control") != -1:
-            inputs["e_control"] = e_control
-    except: pass
-
-    # 推論実行
-    fs2_res = fs2_net.predict(inputs)
+    # control変数はスカラーまたは配列のどちらでも動作するように
+    if "p_control" in fs2_input_names:
+        inputs["p_control"] = p_control
+    if "d_control" in fs2_input_names:
+        inputs["d_control"] = d_control
+    if "e_control" in fs2_input_names:
+        inputs["e_control"] = e_control
     
+    if speakers is not None:
+        inputs["speakers"] = speakers
+
+    # 入力形状のデバッグ情報
+    print("\n=== FastSpeech2 Input Shapes ===")
+    for k, v in inputs.items():
+        print(f"  {k:20s}: {v.shape if hasattr(v, 'shape') else type(v)}")
+    print("=" * 40)
+
+    try:
+        fs2_res = fs2_net.predict(inputs)
+    except Exception as e:
+        print(f"❌ FastSpeech2 inference failed: {e}")
+        return
     
     # -------------------------------------------
-    # 結果のクリーンアップ (spノイズ除去と正確な切り出し)
+    # 結果の切り出し
     # -------------------------------------------
-    mel_output_padded = fs2_res[1]
-    d_rounded = fs2_res[5] # 各文字の長さ
-
-    # --- [Step 1] sp (無音) 区間の完全ミュート処理 ---
-    # sp の ID を特定
-    cleaner_name = preprocess_config["preprocessing"]["text"]["text_cleaners"]
-    sp_id_seq = text_to_sequence("{sp}", cleaner_name)
-    sp_id = sp_id_seq[0]
-
-    # Mel全体の最小値（=無音レベル）を取得
-    min_mel_val = np.min(mel_output_padded)
-
-    current_frame = 0
-    # 入力テキストの各トークンを走査し、spなら塗りつぶす
-    for i in range(real_len):
-        dur = int(d_rounded[0, i])
-        token_id = sequence[i]
-
-        if token_id == sp_id:
-            # sp区間を最小値で上書き (ノイズ除去)
-            mel_output_padded[0, current_frame : current_frame + dur, :] = min_mel_val
+    try:
+        d_rounded_index = fs2_output_names.index("d_rounded")
+        postnet_index = fs2_output_names.index("postnet_output")
+    except ValueError:
+        d_rounded_index = 5
+        postnet_index = 1
         
-        current_frame += dur
+    mel_output_whole = fs2_res[postnet_index] # [1, MaxLen, 80]
+    d_rounded = fs2_res[d_rounded_index]      # [1, MaxLen]
 
-    # --- [Step 2] 正確な切り出しとバッファ処理 ---
-    # 有効な音声長を計算
+    # 元のリポジトリと同じ処理：mel_lenを計算（synth_samplesと同様）
     valid_durations = d_rounded[0, :real_len]
-    valid_mel_len = int(np.sum(valid_durations))
-    print(f"Calculated Mel Length (Content): {valid_mel_len}")
+    mel_len = int(np.sum(valid_durations))
+    
+    print(f"Generated Mel Length: {mel_len}")
+    
+    # 元のリポジトリと同じ処理：mel_lenで切り出す（バッファなし）
+    mel_output = mel_output_whole[:, :mel_len, :]
 
-    # ゴミを含まないよう、有効部分だけを切り出す
-    mel_output_clean = mel_output_padded[:, :valid_mel_len, :]
-    
-    # バッファ（余韻）が必要な場合、無音（最小値）を追加
-    if MEL_BUFFER_FRAMES > 0:
-        silence_padding = np.full(
-            (1, MEL_BUFFER_FRAMES, mel_output_clean.shape[2]),
-            min_mel_val,
-            dtype=mel_output_clean.dtype
-        )
-        mel_output = np.concatenate([mel_output_clean, silence_padding], axis=1)
-        print(f"Added {MEL_BUFFER_FRAMES} frames of silence padding.")
-    else:
-        mel_output = mel_output_clean
-    
     # -------------------------------------------
-    # HiFi-GAN 推論
+    # HiFi-GAN 推論（元のリポジトリと同じ処理）
     # -------------------------------------------
     print("Running HiFi-GAN...")
     
-    mel_input = np.ascontiguousarray(mel_output.transpose(0, 2, 1))
+    # 元のリポジトリと同じ処理：[1, MelLen, 80] -> [1, 80, MelLen]
+    # synth_samplesでは predictions[1].transpose(1, 2) を使用
+    mel_input = mel_output.transpose(0, 2, 1).astype(np.float32)
+    
+    # HiFi-GANのONNXモデルは固定長（3000フレーム）を期待しているため、パディングが必要
+    # ただし、元のリポジトリの処理に近づけるため、シンプルなパディングを使用
+    HIFI_FIXED_LENGTH = 3000
+    hop_length = preprocess_config["preprocessing"]["stft"]["hop_length"]
+    actual_mel_len = mel_input.shape[2]
+    
+    if actual_mel_len < HIFI_FIXED_LENGTH:
+        # 元のリポジトリに近い処理：最後のフレームを繰り返してパディング
+        pad_length = HIFI_FIXED_LENGTH - actual_mel_len
+        last_frame = mel_input[:, :, -1:]
+        padding = np.repeat(last_frame, pad_length, axis=2)
+        mel_input = np.concatenate([mel_input, padding], axis=2)
+        print(f"Padded mel_input from {actual_mel_len} to {HIFI_FIXED_LENGTH} frames")
+    elif actual_mel_len > HIFI_FIXED_LENGTH:
+        # 3000フレームを超える場合は切り詰め
+        mel_input = mel_input[:, :, :HIFI_FIXED_LENGTH]
+        actual_mel_len = HIFI_FIXED_LENGTH
+        print(f"Truncated mel_input from {actual_mel_len} to {HIFI_FIXED_LENGTH} frames")
     
     try:
-        hifi_net.set_input_shape(hifi_net.find_blob_index_by_name("mel_input"), mel_input.shape)
-    except: pass
-
-    audio_res = hifi_net.predict([mel_input])
-    wav = audio_res[0].squeeze()
+        audio_res = hifi_net.predict([mel_input])
+        wav = audio_res[0].squeeze()
+    except Exception as e:
+        print(f"❌ HiFi-GAN inference failed: {e}")
+        return
+    
+    # 元のリポジトリと同じ処理：lengths = mel_len * hop_length で切り出す
+    # vocoder_inferでは lengths[i] で切り出している
+    audio_len = mel_len * hop_length
+    if len(wav) > audio_len:
+        wav = wav[:audio_len]
+        print(f"Trimmed audio to {audio_len} samples (mel_len={mel_len} * hop_length={hop_length})")
 
     # -------------------------------------------
-    # 保存
+    # 保存（元のリポジトリと同じ処理）
     # -------------------------------------------
-    MAX_WAV_VALUE = 32768.0
+    # 元のリポジトリのvocoder_inferと同じ処理：
+    # wavs = wavs.cpu().numpy() * max_wav_value
+    MAX_WAV_VALUE = preprocess_config["preprocessing"]["audio"]["max_wav_value"]
     wav = wav * MAX_WAV_VALUE
     wav = wav.astype('int16')
     
@@ -402,3 +451,4 @@ def _synthesize(fs2_net, hifi_net, texts, src_lens, max_src_len, speakers,
 
 if __name__ == "__main__":
     infer()
+

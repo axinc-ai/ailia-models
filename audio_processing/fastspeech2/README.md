@@ -67,7 +67,7 @@ This is the second sentence.
 
 ### Multi-Speaker Models
 
-For LibriTTS (English, Multi-Speaker): //実行できない
+For LibriTTS (English, Multi-Speaker)
 
 ```bash
 $ python3 fastspeech2.py \

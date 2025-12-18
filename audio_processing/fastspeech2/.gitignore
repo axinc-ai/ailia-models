@@ -3,3 +3,6 @@ venv310
 onnx
 output_mel.png
 output.wave
+*.onnx
+*.wav
+*.png
