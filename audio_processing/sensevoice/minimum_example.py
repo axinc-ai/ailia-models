@@ -153,41 +153,29 @@ class SimpleDecoder():
 		textnorm_input = kwargs.get("textnorm", "woitn")
 		language_list, textnorm_list = self.read_tags(language_input, textnorm_input)
 		
-		waveform_list = [wav_content]
-		waveform_nums = len(waveform_list)
-		
 		asr_res = []
-		for beg_idx in range(0, waveform_nums, self.batch_size):
-			end_idx = min(waveform_nums, beg_idx + self.batch_size)
-			feats, feats_len = self.extract_feat(waveform_list[beg_idx:end_idx])
-			_language_list = language_list[beg_idx:end_idx]
-			_textnorm_list = textnorm_list[beg_idx:end_idx]
-			if not len(_language_list):
-				_language_list = [language_list[0]]
-				_textnorm_list = [textnorm_list[0]]
-			B = feats.shape[0]
-			if len(_language_list) == 1 and B != 1:
-				_language_list = _language_list * B
-			if len(_textnorm_list) == 1 and B != 1:
-				_textnorm_list = _textnorm_list * B
-			ctc_logits, encoder_out_lens = self.infer(
-				feats,
-				feats_len,
-				np.array(_language_list, dtype=np.int32),
-				np.array(_textnorm_list, dtype=np.int32),
-			)
-			for b in range(feats.shape[0]):
-				x = ctc_logits[b, : encoder_out_lens[b].item(), :]
-				yseq = np.argmax(x, axis=-1)
-				# Use np.diff and np.where instead of torch.unique_consecutive.
-				mask = np.concatenate(([True], np.diff(yseq) != 0))
-				yseq = yseq[mask]
 
-				mask = yseq != self.blank_id
-				token_int = yseq[mask].tolist()
+		feats, feats_len = self.extract_feat([wav_content])
+		_language_list = language_list
+		_textnorm_list = textnorm_list
+		ctc_logits, encoder_out_lens = self.infer(
+			feats,
+			feats_len,
+			np.array(_language_list, dtype=np.int32),
+			np.array(_textnorm_list, dtype=np.int32),
+		)
 
-				text = self.tokenizer.decode(token_int, skip_special_tokens=True)
-				asr_res.append(text)
+		x = ctc_logits[0, : encoder_out_lens[0].item(), :]
+		yseq = np.argmax(x, axis=-1)
+		# Use np.diff and np.where instead of torch.unique_consecutive.
+		mask = np.concatenate(([True], np.diff(yseq) != 0))
+		yseq = yseq[mask]
+
+		mask = yseq != self.blank_id
+		token_int = yseq[mask].tolist()
+
+		text = self.tokenizer.decode(token_int, skip_special_tokens=True)
+		asr_res.append(text)
 
 		return asr_res
 
@@ -228,8 +216,129 @@ class SimpleDecoder():
 		return outputs
 
 
+emo_dict = {
+    "<|HAPPY|>": "😊",
+    "<|SAD|>": "😔",
+    "<|ANGRY|>": "😡",
+    "<|NEUTRAL|>": "",
+    "<|FEARFUL|>": "😰",
+    "<|DISGUSTED|>": "🤢",
+    "<|SURPRISED|>": "😮",
+}
+
+event_dict = {
+    "<|BGM|>": "🎼",
+    "<|Speech|>": "",
+    "<|Applause|>": "👏",
+    "<|Laughter|>": "😀",
+    "<|Cry|>": "😭",
+    "<|Sneeze|>": "🤧",
+    "<|Breath|>": "",
+    "<|Cough|>": "🤧",
+}
+
+lang_dict = {
+    "<|zh|>": "<|lang|>",
+    "<|en|>": "<|lang|>",
+    "<|yue|>": "<|lang|>",
+    "<|ja|>": "<|lang|>",
+    "<|ko|>": "<|lang|>",
+    "<|nospeech|>": "<|lang|>",
+}
+
+emoji_dict = {
+    "<|nospeech|><|Event_UNK|>": "❓",
+    "<|zh|>": "",
+    "<|en|>": "",
+    "<|yue|>": "",
+    "<|ja|>": "",
+    "<|ko|>": "",
+    "<|nospeech|>": "",
+    "<|HAPPY|>": "😊",
+    "<|SAD|>": "😔",
+    "<|ANGRY|>": "😡",
+    "<|NEUTRAL|>": "",
+    "<|BGM|>": "🎼",
+    "<|Speech|>": "",
+    "<|Applause|>": "👏",
+    "<|Laughter|>": "😀",
+    "<|FEARFUL|>": "😰",
+    "<|DISGUSTED|>": "🤢",
+    "<|SURPRISED|>": "😮",
+    "<|Cry|>": "😭",
+    "<|EMO_UNKNOWN|>": "",
+    "<|Sneeze|>": "🤧",
+    "<|Breath|>": "",
+    "<|Cough|>": "😷",
+    "<|Sing|>": "",
+    "<|Speech_Noise|>": "",
+    "<|withitn|>": "",
+    "<|woitn|>": "",
+    "<|GBG|>": "",
+    "<|Event_UNK|>": "",
+}
+
+emo_set = {"😊", "😔", "😡", "😰", "🤢", "😮"}
+event_set = {
+    "🎼",
+    "👏",
+    "😀",
+    "😭",
+    "🤧",
+    "😷",
+}
+
+
+def format_str_v2(s):
+    sptk_dict = {}
+    for sptk in emoji_dict:
+        sptk_dict[sptk] = s.count(sptk)
+        s = s.replace(sptk, "")
+    emo = "<|NEUTRAL|>"
+    for e in emo_dict:
+        if sptk_dict[e] > sptk_dict[emo]:
+            emo = e
+    for e in event_dict:
+        if sptk_dict[e] > 0:
+            s = event_dict[e] + s
+    s = s + emo_dict[emo]
+
+    for emoji in emo_set.union(event_set):
+        s = s.replace(" " + emoji, emoji)
+        s = s.replace(emoji + " ", emoji)
+    return s.strip()
+
+
+def rich_transcription_postprocess(s):
+    def get_emo(s):
+        return s[-1] if s[-1] in emo_set else None
+
+    def get_event(s):
+        return s[0] if s[0] in event_set else None
+
+    s = s.replace("<|nospeech|><|Event_UNK|>", "❓")
+    for lang in lang_dict:
+        s = s.replace(lang, "<|lang|>")
+    s_list = [format_str_v2(s_i).strip(" ") for s_i in s.split("<|lang|>")]
+    new_s = " " + s_list[0]
+    cur_ent_event = get_event(new_s)
+    for i in range(1, len(s_list)):
+        if len(s_list[i]) == 0:
+            continue
+        if get_event(s_list[i]) == cur_ent_event and get_event(s_list[i]) != None:
+            s_list[i] = s_list[i][1:]
+        # else:
+        cur_ent_event = get_event(s_list[i])
+        if get_emo(s_list[i]) != None and get_emo(s_list[i]) == get_emo(new_s):
+            new_s = new_s[:-1]
+        new_s += s_list[i].strip().lstrip()
+    new_s = new_s.replace("The.", " ")
+    return new_s.strip()
+
 def main():
-	speech, sample_rate = soundfile.read("ja.wav")
+	path = "ja.wav"
+	#path = "ax.wav"
+	speech, sample_rate = soundfile.read(path)
 	if speech.ndim > 1:
 		speech = np.mean(speech, axis=1)
 	target_sr = 16000
@@ -239,7 +348,7 @@ def main():
 	wav_or_scp = speech
 	decoder = SimpleDecoder()
 	res = decoder(wav_or_scp, language="auto", use_itn=True) # 16khz
-	print(res)
+	print(rich_transcription_postprocess(res[0]))
 
 if __name__ == "__main__":
 	main()
