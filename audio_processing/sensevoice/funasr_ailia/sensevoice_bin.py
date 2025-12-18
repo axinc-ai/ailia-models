@@ -33,9 +33,10 @@ class SenseVoiceSmall:
         env_id: int = -1,
         onnx: bool = False,
         ailia_audio: bool = False,
+        profile: bool = False,
+        model_file = "./sensevoice_small.onnx",
     ):
 
-        model_file = "./sensevoice_small.onnx"
         config_file = "./s2t_config/config.yaml"
         cmvn_file ="./s2t_config/am.mvn"
 
@@ -52,7 +53,7 @@ class SenseVoiceSmall:
             )
         else:
             self.ort_infer = AiliaInferSession(
-                model_file, env_id=env_id
+                model_file, env_id = env_id, profile = profile
             )
         self.batch_size = batch_size
         self.blank_id = 0

@@ -71,12 +71,21 @@ class OrtInferSession:
         return [v.name for v in self.session.get_outputs()]
 
 class AiliaInferSession:
-    def __init__(self, model_file, env_id = -1):
+    session = None
+
+    def __init__(self, model_file, env_id = -1, profile = False):
         import ailia
         self.session = ailia.Net(weight=model_file, env_id=env_id, memory_mode=11)
+        self.profile = profile
+        self.session.set_profile_mode(True)
 
     def __call__(self, input_content: List[Union[np.ndarray, np.ndarray]], run_options = None) -> np.ndarray:
         return self.session.run(input_content)
+
+    def __del__(self):
+        if self.session is not None:
+            if self.profile is True:
+                print(self.session.get_summary())
 
 def read_yaml(yaml_path: Union[str, Path]) -> Dict:
     if not Path(yaml_path).exists():

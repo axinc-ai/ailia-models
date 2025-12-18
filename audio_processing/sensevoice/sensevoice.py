@@ -35,9 +35,9 @@ parser = get_base_parser("SenseVoice", WAV_PATH, SAVE_TEXT_PATH, input_ftype="au
 parser.add_argument(
     "--disable_ailia_audio", action="store_true", help="disable ailia_audio."
 )
-#parser.add_argument(
-#    "--fp16", action="store_true", help="use fp16 model (default : fp32 model)."
-#)
+parser.add_argument(
+    "--fp16", action="store_true", help="use fp16 model (default : fp32 model)."
+)
 parser.add_argument(
 	"--onnx", action="store_true", help="use onnx runtime."
 )
@@ -47,11 +47,15 @@ args = update_parser(parser)
 # Models
 # ======================
 
-WEIGHT_PATH = "sensevoice_small.onnx"
-MODEL_PATH = "sensevoice_small.onnx.prototxt"
+if args.fp16:
+	WEIGHT_PATH = "sensevoice_small_fp16.onnx"
+	VAD_WEIGHT_PATH = "speech_fsmn_vad_zh-cn-16k-common_fp16.onnx"
+else:
+	WEIGHT_PATH = "sensevoice_small.onnx"
+	VAD_WEIGHT_PATH = "speech_fsmn_vad_zh-cn-16k-common.onnx"
 
-VAD_WEIGHT_PATH = "speech_fsmn_vad_zh-cn-16k-common.onnx"
-VAD_MODEL_PATH = "speech_fsmn_vad_zh-cn-16k-common.onnx.prototxt"
+MODEL_PATH = WEIGHT_PATH + ".prototxt"
+VAD_MODEL_PATH = VAD_WEIGHT_PATH + ".prototxt"
 
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/sensevoice/"
 
@@ -74,11 +78,12 @@ def format_timestamp(seconds: float, always_include_hours: bool = False):
 
 def recognize_from_audio():
 	# input audio loop
+	logger.info("Start inference...")
 	for audio_path in args.input:
 		logger.info(audio_path)
 
-		model = SenseVoiceSmall(env_id=args.env_id, onnx=args.onnx, ailia_audio=not args.disable_ailia_audio)
-		vad = Fsmn_vad_online(env_id=args.env_id, onnx=args.onnx, ailia_audio=not args.disable_ailia_audio)
+		model = SenseVoiceSmall(env_id=args.env_id, onnx=args.onnx, ailia_audio=not args.disable_ailia_audio, profile=args.profile, model_file=WEIGHT_PATH)
+		vad = Fsmn_vad_online(env_id=args.env_id, onnx=args.onnx, ailia_audio=not args.disable_ailia_audio, profile=args.profile, model_file=VAD_WEIGHT_PATH)
 
 		# vad
 		speech, sample_rate = soundfile.read(audio_path)
@@ -132,7 +137,8 @@ def recognize_from_audio():
 
 			end_profile = int(round(time.time() * 1000))
 			estimation_time = end_profile - start_profile
-			logger.info(f"\ts2t processing time {estimation_time} ms")
+			if args.benchmark:
+				logger.info(f"\ts2t processing time {estimation_time} ms")
 		else:
 			# s2t
 			wav_or_scp = speech
@@ -142,10 +148,8 @@ def recognize_from_audio():
 			estimation_time = end - start
 		
 			print([rich_transcription_postprocess(i) for i in res])
-			logger.info(f"\ts2t processing time {estimation_time} ms")
-
-		# inference
-		logger.info("Start inference...")
+			if args.benchmark:
+				logger.info(f"\ts2t processing time {estimation_time} ms")
 
 	logger.info("Script finished successfully.")
 
