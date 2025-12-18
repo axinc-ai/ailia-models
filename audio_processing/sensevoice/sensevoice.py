@@ -78,6 +78,7 @@ def format_timestamp(seconds: float, always_include_hours: bool = False):
 
 def recognize_from_audio():
 	# input audio loop
+	logger.info("Start inference...")
 	for audio_path in args.input:
 		logger.info(audio_path)
 
@@ -149,9 +150,6 @@ def recognize_from_audio():
 			print([rich_transcription_postprocess(i) for i in res])
 			if args.benchmark:
 				logger.info(f"\ts2t processing time {estimation_time} ms")
-
-		# inference
-		logger.info("Start inference...")
 
 	logger.info("Script finished successfully.")
 
