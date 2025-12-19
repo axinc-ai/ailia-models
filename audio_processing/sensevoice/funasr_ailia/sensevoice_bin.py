@@ -33,6 +33,7 @@ class SenseVoiceSmall:
         env_id: int = -1,
         onnx: bool = False,
         ailia_audio: bool = False,
+        ailia_tokenizer: bool = False,
         profile: bool = False,
         model_file = "./sensevoice_small.onnx",
     ):
@@ -43,7 +44,7 @@ class SenseVoiceSmall:
         config = read_yaml(config_file)
 
         self.tokenizer = SentencepiecesTokenizer(
-            bpemodel="./s2t_config/chn_jpn_yue_eng_ko_spectok.bpe.model"
+            bpemodel="./tokenizer/tokenizer.model", ailia_tokenizer=ailia_tokenizer
         )
         config["frontend_conf"]["cmvn_file"] = cmvn_file
         self.frontend = WavFrontend(ailia_audio = ailia_audio, **config["frontend_conf"])

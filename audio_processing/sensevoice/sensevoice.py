@@ -33,7 +33,10 @@ SAVE_TEXT_PATH = "output.txt"
 
 parser = get_base_parser("SenseVoice", WAV_PATH, SAVE_TEXT_PATH, input_ftype="audio", fp16_support = False)
 parser.add_argument(
-    "--disable_ailia_audio", action="store_true", help="disable ailia_audio."
+    "--disable_ailia_audio", action="store_true", help="disable ailia_audio. (Require kaldi_native_fbank)"
+)
+parser.add_argument(
+    "--disable_ailia_tokenizer", action="store_true", help="disable ailia_tokenizer. (Require sentencepiece)"
 )
 parser.add_argument(
     "--fp16", action="store_true", help="use fp16 model (default : fp32 model)."
@@ -82,7 +85,7 @@ def recognize_from_audio():
 	for audio_path in args.input:
 		logger.info(audio_path)
 
-		model = SenseVoiceSmall(env_id=args.env_id, onnx=args.onnx, ailia_audio=not args.disable_ailia_audio, profile=args.profile, model_file=WEIGHT_PATH)
+		model = SenseVoiceSmall(env_id=args.env_id, onnx=args.onnx, ailia_audio=not args.disable_ailia_audio, ailia_tokenizer=not args.disable_ailia_tokenizer, profile=args.profile, model_file=WEIGHT_PATH)
 		vad = Fsmn_vad_online(env_id=args.env_id, onnx=args.onnx, ailia_audio=not args.disable_ailia_audio, profile=args.profile, model_file=VAD_WEIGHT_PATH)
 
 		# vad
