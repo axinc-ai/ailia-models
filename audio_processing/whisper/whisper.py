@@ -180,7 +180,7 @@ else:
     )
 
 if not args.disable_ailia_tokenizer:
-    from ailia_tokenizer import get_tokenizer
+    from ailia_simple_tokenizer import get_tokenizer
 else:
     from tokenizer import get_tokenizer
 
