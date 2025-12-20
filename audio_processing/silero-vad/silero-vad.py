@@ -77,19 +77,19 @@ else:
 def audio_recognition(model):
   # **Speech timestapms from full audio**
 
-  wav = read_audio('en_example.wav', sampling_rate=SAMPLING_RATE)
+  wav = read_audio(args.input[0], sampling_rate=SAMPLING_RATE)
   # get speech timestamps from full audio file
   speech_timestamps = get_speech_timestamps(wav, model, sampling_rate=SAMPLING_RATE)
   logger.info("Speech timestamp")
   logger.info(speech_timestamps)
 
   # merge all speech chunks to one audio
-  save_audio('only_speech.wav',
+  save_audio(args.savepath,
             collect_chunks(speech_timestamps, wav), sampling_rate=SAMPLING_RATE) 
 
   ## using VADIterator class
   vad_iterator = VADIterator(model)
-  wav = read_audio(f'en_example.wav', sampling_rate=SAMPLING_RATE)
+  wav = read_audio(args.input[0], sampling_rate=SAMPLING_RATE)
 
   logger.info("VADIterator")
   if args.version == "v4":
@@ -107,7 +107,7 @@ def audio_recognition(model):
 
   ## just probabilities
   logger.info("Speech Probablities")
-  wav = read_audio('en_example.wav', sampling_rate=SAMPLING_RATE)
+  wav = read_audio(args.input[0], sampling_rate=SAMPLING_RATE)
   speech_probs = []
   if args.version == "v4":
     window_size_samples = 1536
