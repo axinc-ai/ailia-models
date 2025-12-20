@@ -49,21 +49,14 @@ class OnnxWrapper():
 
         x = x.numpy().astype(np.float32)
 
-        if self.version == "v4":
-            num_samples = 1536
-        else:
-            num_samples = 512 if sr == 16000 else 256
-
-        if x.shape[-1] != num_samples:
-            raise ValueError(f"Provided number of samples is {x.shape[-1]} (Supported values: 256 for 8000 sample rate, 512 for 16000)")
-
         if sr == 16000:
             context_size = 64
         else:
             context_size = 32
-        if not len(self._context) and self.version != "v4":
-            self._context = np.zeros((batch_size, context_size), dtype=np.float32)
-            x = np.concatenate([self._context, x], axis=1)
+        if self.version != "v4":
+            if not len(self._context):
+                self._context = np.zeros((batch_size, context_size), dtype=np.float32)
+                x = np.concatenate([self._context, x], axis=1)
 
         if not self._last_batch_size:
             self.reset_states(batch_size)
