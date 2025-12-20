@@ -29,8 +29,6 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_PATH = 'silero_vad.onnx'
-MODEL_PATH = 'silero_vad.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/silero-vad/'
 
 WAVE_PATH = "en_example.wav"
@@ -51,7 +49,26 @@ parser.add_argument(
     action='store_true',
     help='execute onnxruntime version.'
 )
+parser.add_argument(
+    "-v",
+    "--version",
+    default="v4",
+    choices=(
+        "v4", # default
+        "v5", # recommended
+        "v6", # unstable
+        "v6_2", # unstable
+    ),
+    help="versionn",
+)
 args = update_parser(parser)
+
+if args.version == "v4":
+    WEIGHT_PATH = 'silero_vad.onnx'
+    MODEL_PATH = 'silero_vad.onnx.prototxt'
+else:
+    WEIGHT_PATH = 'silero_vad_' + args.version + '.onnx'
+    MODEL_PATH = 'silero_vad_' + args.version + '.onnx.prototxt'
 
 # ======================
 # Logic
@@ -75,7 +92,10 @@ def audio_recognition(model):
   wav = read_audio(f'en_example.wav', sampling_rate=SAMPLING_RATE)
 
   logger.info("VADIterator")
-  window_size_samples = 1536 # number of samples in a single audio chunk
+  if args.version == "v4":
+    window_size_samples = 1536 # number of samples in a single audio chunk
+  else:
+    window_size_samples = 512 if SAMPLING_RATE == 16000 else 256
   for i in range(0, len(wav), window_size_samples):
       chunk = wav[i: i+ window_size_samples]
       if len(chunk) < window_size_samples:
@@ -89,7 +109,10 @@ def audio_recognition(model):
   logger.info("Speech Probablities")
   wav = read_audio('en_example.wav', sampling_rate=SAMPLING_RATE)
   speech_probs = []
-  window_size_samples = 1536
+  if args.version == "v4":
+    window_size_samples = 1536
+  else:
+    window_size_samples = 512 if SAMPLING_RATE == 16000 else 256
   for i in range(0, len(wav), window_size_samples):
       chunk = wav[i: i+ window_size_samples]
       if len(chunk) < window_size_samples:
@@ -118,7 +141,7 @@ def main():
         import onnxruntime
         session = onnxruntime.InferenceSession(WEIGHT_PATH)
 
-    model = OnnxWrapper('silero_vad.onnx')
+    model = OnnxWrapper(args.version)
     model.session = session
     model.ailia = not args.onnx
 
