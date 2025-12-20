@@ -33,7 +33,7 @@ class OnnxWrapper():
         return x, sr
 
     def reset_states(self, batch_size=1):
-        if self.version == "v4":
+        if self.version == "4":
             self._h = np.zeros((2, batch_size, 64)).astype('float32')
             self._c = np.zeros((2, batch_size, 64)).astype('float32')
         else:
@@ -53,10 +53,10 @@ class OnnxWrapper():
             context_size = 64
         else:
             context_size = 32
-        if self.version != "v4":
+        if self.version != "4":
             if not len(self._context):
                 self._context = np.zeros((batch_size, context_size), dtype=np.float32)
-                x = np.concatenate([self._context, x], axis=1)
+            x = np.concatenate([self._context, x], axis=1)
 
         if not self._last_batch_size:
             self.reset_states(batch_size)
@@ -66,7 +66,7 @@ class OnnxWrapper():
             self.reset_states(batch_size)
 
         if sr in [8000, 16000]:
-            if self.version == "v4":
+            if self.version == "4":
                 ort_inputs = {'input': x, 'h': self._h, 'c': self._c, 'sr': np.array(sr, dtype='int64')}
             else:
                 ort_inputs = {'input': x, 'state': self._state, 'sr': np.array(sr, dtype='int64')}
@@ -74,7 +74,7 @@ class OnnxWrapper():
                 ort_outs = self.session.run(ort_inputs)
             else:
                 ort_outs = self.session.run(None, ort_inputs)
-            if self.version == "v4":
+            if self.version == "4":
                 out, self._h, self._c = ort_outs
             else:
                 out, self._state = ort_outs

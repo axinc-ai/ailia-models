@@ -18,15 +18,15 @@ For the sample wav,
 $ python3 sileo-vad.py --input ex_example.wav --output only_speech.wav
 ```
 
-You can specify the version by using the --version option. You can specify versions v4, v5, v6, or v6_2. Version v5 is recommended. The default is v4 for test compatibility.
+You can specify the version by using the --version option. You can specify versions 4, 5, 6, or 6_2. The default is 4 for test compatibility.
 
 ```bash
-$ python3 sileo-vad.py --input ex_example.wav --output only_speech.wav --version v5
+$ python3 sileo-vad.py --input ex_example.wav --output only_speech.wav --version 5
 ```
 
 ## Accuracy between versions
 
-Compared to the v4 model from 2023, the v5 models from 2024 have higher accuracy. Version 6 gives the impression that its accuracy is unstable when run with ONNX.
+Compared to the v4 model from 2023, the v5 and v6 models from 2024 and 2025 have higher accuracy.
 
 ![Accuracy](accuracy.png)
 

@@ -52,23 +52,23 @@ parser.add_argument(
 parser.add_argument(
     "-v",
     "--version",
-    default="v4",
+    default="4",
     choices=(
-        "v4", # default
-        "v5", # recommended
-        "v6", # unstable
-        "v6_2", # unstable
+        "4",
+        "5",
+        "6",
+        "6_2",
     ),
     help="versionn",
 )
 args = update_parser(parser)
 
-if args.version == "v4":
+if args.version == "4":
     WEIGHT_PATH = 'silero_vad.onnx'
     MODEL_PATH = 'silero_vad.onnx.prototxt'
 else:
-    WEIGHT_PATH = 'silero_vad_' + args.version + '.onnx'
-    MODEL_PATH = 'silero_vad_' + args.version + '.onnx.prototxt'
+    WEIGHT_PATH = 'silero_vad_v' + args.version + '.onnx'
+    MODEL_PATH = 'silero_vad_v' + args.version + '.onnx.prototxt'
 
 # ======================
 # Logic
@@ -92,7 +92,7 @@ def audio_recognition(model):
   wav = read_audio(args.input[0], sampling_rate=SAMPLING_RATE)
 
   logger.info("VADIterator")
-  if args.version == "v4":
+  if args.version == "4":
     window_size_samples = 1536 # number of samples in a single audio chunk
   else:
     window_size_samples = 512 if SAMPLING_RATE == 16000 else 256
@@ -109,7 +109,7 @@ def audio_recognition(model):
   logger.info("Speech Probablities")
   wav = read_audio(args.input[0], sampling_rate=SAMPLING_RATE)
   speech_probs = []
-  if args.version == "v4":
+  if args.version == "4":
     window_size_samples = 1536
   else:
     window_size_samples = 512 if SAMPLING_RATE == 16000 else 256
