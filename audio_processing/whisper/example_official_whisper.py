@@ -18,9 +18,8 @@ whisper_small = whisper.load_model(model_size)
 
 start = int(round(time.time() * 1000))
 result = whisper_small.transcribe("axell_130.wav", language="ja", beam_size = 1, verbose=True)
+print(result["text"])
 end = int(round(time.time() * 1000))
 estimation_time = (end - start)
-
-print(result["text"])
 
 print(f'\ttotal processing time {estimation_time} ms')
