@@ -1,3 +1,5 @@
+# pip3 install ailia_speech
+
 import ailia_speech
 
 import librosa
