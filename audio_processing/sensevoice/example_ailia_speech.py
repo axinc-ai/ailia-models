@@ -16,7 +16,7 @@ audio_waveform, sampling_rate = librosa.load(input_file_path, mono = True)
 
 # Infer
 speech = ailia_speech.SenseVoice()
-speech.initialize_model(model_path = "./models/", model_type = ailia_speech.AILIA_SPEECH_MODEL_TYPE_SENSEVOICE_SMALL)
+speech.initialize_model(model_path = "./models/", model_type = ailia_speech.AILIA_SPEECH_MODEL_TYPE_SENSEVOICE_SMALL, vad_version = "6_2")
 recognized_text = speech.transcribe(audio_waveform, sampling_rate)
 for text in recognized_text:
 	print(text)
