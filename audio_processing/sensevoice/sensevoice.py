@@ -33,13 +33,18 @@ SAVE_TEXT_PATH = "output.txt"
 
 parser = get_base_parser("SenseVoice", WAV_PATH, SAVE_TEXT_PATH, input_ftype="audio", fp16_support = False)
 parser.add_argument(
-    "--disable_ailia_audio", action="store_true", help="disable ailia_audio. (Require kaldi_native_fbank)"
+	"-V",
+	action="store_true",
+	help="use microphone input",
 )
 parser.add_argument(
-    "--disable_ailia_tokenizer", action="store_true", help="disable ailia_tokenizer. (Require sentencepiece)"
+	"--disable_ailia_audio", action="store_true", help="disable ailia_audio. (Require kaldi_native_fbank)"
 )
 parser.add_argument(
-    "--fp16", action="store_true", help="use fp16 model (default : fp32 model)."
+	"--disable_ailia_tokenizer", action="store_true", help="disable ailia_tokenizer. (Require sentencepiece)"
+)
+parser.add_argument(
+	"--fp16", action="store_true", help="use fp16 model (default : fp32 model)."
 )
 parser.add_argument(
 	"--onnx", action="store_true", help="use onnx runtime."
@@ -63,21 +68,21 @@ VAD_MODEL_PATH = VAD_WEIGHT_PATH + ".prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/sensevoice/"
 
 def format_timestamp(seconds: float, always_include_hours: bool = False):
-    assert seconds >= 0, "non-negative timestamp expected"
-    milliseconds = round(seconds * 1000.0)
+	assert seconds >= 0, "non-negative timestamp expected"
+	milliseconds = round(seconds * 1000.0)
 
-    hours = milliseconds // 3_600_000
-    milliseconds -= hours * 3_600_000
+	hours = milliseconds // 3_600_000
+	milliseconds -= hours * 3_600_000
 
-    minutes = milliseconds // 60_000
-    milliseconds -= minutes * 60_000
+	minutes = milliseconds // 60_000
+	milliseconds -= minutes * 60_000
 
-    seconds = milliseconds // 1_000
-    milliseconds -= seconds * 1_000
+	seconds = milliseconds // 1_000
+	milliseconds -= seconds * 1_000
 
-    hours_marker = f"{hours}:" if always_include_hours or hours > 0 else ""
+	hours_marker = f"{hours}:" if always_include_hours or hours > 0 else ""
 
-    return f"{hours_marker}{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
+	return f"{hours_marker}{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
 
 def recognize_from_audio():
 	# input audio loop
@@ -156,11 +161,76 @@ def recognize_from_audio():
 
 	logger.info("Script finished successfully.")
 
+def recognize_from_mic():
+	# input audio loop
+	logger.info("Start inference...")
+
+	model = SenseVoiceSmall(env_id=args.env_id, onnx=args.onnx, ailia_audio=not args.disable_ailia_audio, ailia_tokenizer=not args.disable_ailia_tokenizer, profile=args.profile, model_file=WEIGHT_PATH)
+	vad = Fsmn_vad_online(env_id=args.env_id, onnx=args.onnx, ailia_audio=not args.disable_ailia_audio, profile=args.profile, model_file=VAD_WEIGHT_PATH)
+
+	import sounddevice
+
+	devices = sounddevice.query_devices()
+	if len(devices) == 0:
+		logger.error("No microphone devices found")
+		return
+
+	#logger.info(devices)
+	default_input_device_idx = sounddevice.default.device[0]
+	logger.info(f'Input device: {devices[default_input_device_idx]["name"]}')
+
+	param_dict = {"in_cache": []}
+	param_dict["is_final"] = False
+
+	start = -1
+	end = -1
+
+	samples_per_read = int(0.1 * 16000)
+	target_sr = 16000
+	samples = np.zeros((0))
+	
+	logger.info("Waiting microphone input...")
+
+	try:
+		with sounddevice.InputStream(channels=1, dtype="float32", samplerate=16000) as mic:
+			while True:
+				speech, _ = mic.read(samples_per_read)
+				speech = speech[:, 0]
+				samples = np.concatenate([samples, speech])
+				segments_result = vad(
+					audio_in=speech, param_dict=param_dict
+				)
+				for segment in segments_result:
+					for s in segment:
+						if s[0] != -1:
+							start = s[0]
+						if s[1] != -1:
+							end = s[1]
+						if start != -1 and end != -1:
+							start_int = int(start / 1000 * target_sr)
+							end_int = int(end / 1000 * target_sr)
+							audio = samples[start_int:end_int]
+
+							res = model(audio, language="auto", use_itn=True)
+							
+							for i in res:
+								print("[" + format_timestamp(start / 1000) + " --> " + format_timestamp(end / 1000) + "] " + rich_transcription_postprocess(i))
+
+							start = -1
+							end = -1
+	except KeyboardInterrupt:
+		pass
+
+	logger.info("Script finished successfully.")
+
 def main():
 	check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 	check_and_download_models(VAD_WEIGHT_PATH, VAD_MODEL_PATH, REMOTE_PATH)
 	
-	recognize_from_audio()
+	if args.V:
+		recognize_from_mic()
+	else:
+		recognize_from_audio()
 
 if __name__ == "__main__":
 	main()
