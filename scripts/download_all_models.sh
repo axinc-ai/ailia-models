@@ -45,6 +45,8 @@ cd ../../audio_processing/bert-vits2/; python3 bert-vits2.py ${OPTION}
 cd ../../audio_processing/dtln/; python3 dtln.py ${OPTION}
 cd ../../audio_processing/pytorch_wavenet/; python3 pytorch_wavenet.py ${OPTION}
 cd ../../audio_processing/audiosep/; python3 audiosep.py ${OPTION}
+cd ../../audio_processing/cosyvoice2/; python3 cosyvoice2.py ${OPTION}
+cd ../../audio_processing/sensevoice/; python3 sensevoice.py ${OPTION}
 cd ../../background_ramoval/deep-image-matting; python3 deep-image-matting.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py -a small ${OPTION}
@@ -378,6 +380,7 @@ cd ../../text_recognition/paddleocr; python3 paddleocr.py ${OPTION}
 cd ../../text_recognition/paddleocr_v3; python3 paddleocr_v3.py ${OPTION}
 cd ../../text_recognition/easyocr; python3 easyocr.py ${OPTION}
 cd ../../text_recognition/ndlocr_text_recognition; python3 ndlocr_text_recognition.py ${OPTION}
+cd ../../text_recognition/donut; python3 donut.py ${OPTION}
 cd ../../time_series_forecasting/informer2020; python3 informer2020.py ${OPTION}
 cd ../../time_series_forecasting/timesfm; python3 timesfm.py ${OPTION}
 cd ../../vehicle_recognition/vehicle-attributes-recognition-barrier; python3 vehicle-attributes-recognition-barrier.py ${OPTION}
@@ -386,3 +389,4 @@ cd ../../vision_language_model/llava; python3 llava.py ${OPTION}
 cd ../../vision_language_model/florence2; python3 florence2.py ${OPTION}
 cd ../../vision_language_model/qwen2_vl; python3 qwen2_vl.py ${OPTION}
 cd ../../vision_language_model/llava-jp; python3 llava-jp.py ${OPTION}
+cd ../../vision_language_model/mobilevlm; python3 mobilevlm.py ${OPTION}
