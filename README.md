@@ -236,6 +236,12 @@ If you would like to try on your computer:
 | [<img src="diffusion/daclip-sde/output.png" width=128px>](diffusion/daclip-sde/) | [DA-CLIP](/diffusion/daclip-sde/) | [DA-CLIP](https://github.com/Algolzw/daclip-uir) | Pytorch | 1.2.16 and later |
 | [<img src="diffusion/marigold/output_colorize.png" width=128px>](diffusion/marigold/) | [marigold](/diffusion/marigold/) | [Marigold: Repurposing Diffusion-Based Image Generators for Monocular Depth Estimation](https://github.com/prs-eth/Marigold) | Pytorch | 1.2.16 and later |
 
+## Autonomous Driving
+
+| Model | Reference | Exported From | Supported Ailia Version | Blog |
+|------------:|:------------:|:------------:|:------------:|:------------:|
+|[uniad](/autonomous_driving/uniad/) | [UniAD: Unified Driving](https://github.com/OpenDriveLab/UniAD) | Pytorch | 1.6.1 and later | |
+
 ## Face detection
 
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
