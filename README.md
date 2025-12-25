@@ -157,6 +157,12 @@ If you would like to try on your computer:
 |------------:|:------------:|:------------:|:------------:|:------------:|
 | [rvc](/audio_processing/rvc/) | [Retrieval-based-Voice-Conversion-WebUI](https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI) | Pytorch | 1.2.12 and later | [JP](https://medium.com/axinc/rvc-ai%E3%82%92%E4%BD%BF%E7%94%A8%E3%81%97%E3%81%9F%E3%83%9C%E3%82%A4%E3%82%B9%E3%83%81%E3%82%A7%E3%83%B3%E3%82%B8%E3%83%A3%E3%83%BC-64a813c7a0c4) |
 
+## Autonomous Driving
+
+| Model | Reference | Exported From | Supported Ailia Version | Blog |
+|------------:|:------------:|:------------:|:------------:|:------------:|
+|[uniad](/autonomous_driving/uniad/) | [UniAD: Unified Driving](https://github.com/OpenDriveLab/UniAD) | Pytorch | 1.6.1 and later | |
+
 ## Background removal
 
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
@@ -235,12 +241,6 @@ If you would like to try on your computer:
 | [<img src="diffusion/latent-diffusion-superresolution/output.png" width=128px>](diffusion/latent-diffusion-superresolution/) | [latent-diffusion-superresolution](/diffusion/latent-diffusion-superresolution/) | [Latent Diffusion - Super-resolution](https://github.com/CompVis/latent-diffusion) | Pytorch | 1.2.10 and later |
 | [<img src="diffusion/daclip-sde/output.png" width=128px>](diffusion/daclip-sde/) | [DA-CLIP](/diffusion/daclip-sde/) | [DA-CLIP](https://github.com/Algolzw/daclip-uir) | Pytorch | 1.2.16 and later |
 | [<img src="diffusion/marigold/output_colorize.png" width=128px>](diffusion/marigold/) | [marigold](/diffusion/marigold/) | [Marigold: Repurposing Diffusion-Based Image Generators for Monocular Depth Estimation](https://github.com/prs-eth/Marigold) | Pytorch | 1.2.16 and later |
-
-## Autonomous Driving
-
-| Model | Reference | Exported From | Supported Ailia Version | Blog |
-|------------:|:------------:|:------------:|:------------:|:------------:|
-|[uniad](/autonomous_driving/uniad/) | [UniAD: Unified Driving](https://github.com/OpenDriveLab/UniAD) | Pytorch | 1.6.1 and later | |
 
 ## Face detection
 
