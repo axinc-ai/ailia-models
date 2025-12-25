@@ -699,13 +699,14 @@ If you would like to try on your computer:
 | [<img src="object_tracking/strong_sort/output.png" width=128px>](object_tracking/strong_sort/) | [strong_sort](/object_tracking/strong_sort/) | [StrongSORT](https://github.com/dyhBUPT/StrongSORT) | Pytorch | 1.2.15 and later |　|
 | [<img src="object_tracking/centroids-reid/output.png" width=128px>](object_tracking/centroids-reid/) | [centroids-reid](/object_tracking/centroids-reid/) | [On the Unreasonable Effectiveness of Centroids in Image Retrieval](https://github.com/mikwieczorek/centroids-reidh) | Pytorch | 1.2.9 and later |　|
 | [<img src="object_tracking/deepsort_vehicle/01840_c40752s1_00280_01.jpg" width=128px>](object_tracking/deepsort_vehicle/) | [deepsort_vehicle](/object_tracking/deepsort_vehicle/) | [Multi-Camera Live Object Tracking](https://github.com/LeonLok/Multi-Camera-Live-Object-Tracking) | Pytorch | 1.2.9 and later |  |
+| [<img src="object_tracking/samurai/example.jpg" width=128px>](object_tracking/samurai/) | [samurai](/object_tracking/samurai/) | [SAMURAI: Adapting Segment Anything Model for Zero-Shot Visual Tracking with Motion-Aware Memory](https://github.com/yangchris11/samurai) | Pytorch | 1.6.1 and later |  |
 
 ## Optical Flow Estimation
 
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
 | [<img src="optical_flow_estimation/raft/output.png" width=128px>](optical_flow_estimation/raft/) | [raft](/optical_flow_estimation/raft/) | [RAFT: Recurrent All Pairs Field Transforms for Optical Flow](https://github.com/princeton-vl/RAFT) | Pytorch | 1.2.6 and later | [EN](https://medium.com/axinc-ai/raft-a-machine-learning-model-for-estimating-optical-flow-6ab6d077e178) [JP](https://medium.com/axinc/raft-optical-flow%E3%82%92%E6%8E%A8%E5%AE%9A%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-bf898965de05)　|
-
+| [<img src="optical_flow_estimation/cotracker3/output.gif" width=128px>](optical_flow_estimation/cotracker3/) | [cotracker3](/optical_flow_estimation/cotracker3/) | [ CoTracker3: Simpler and Better Point Tracking by Pseudo-Labelling Real Videos](https://github.com/facebookresearch/co-tracker) | Pytorch | 1.6.1 and later |  |
 ## Point segmentation
 
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
