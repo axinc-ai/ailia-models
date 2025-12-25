@@ -1,4 +1,4 @@
-# SAMURAI
+# SAMURAI: Adapting Segment Anything Model for Zero-Shot Visual Tracking with Motion-Aware Memory
 
 ## Input
 - A video file or a directory containing images
