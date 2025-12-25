@@ -21,11 +21,11 @@ from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 
 # モデル設定
-WEIGHT_PATH_FS2 = './onnx/fastspeech2/ljspeech.onnx'
-MODEL_PATH_FS2 = None
-WEIGHT_PATH_HIFI = './onnx/hifigan/hifigan.onnx'
-MODEL_PATH_HIFI = None
-REMOTE_PATH = ""
+WEIGHT_PATH_FS2 = 'ljspeech.onnx'
+MODEL_PATH_FS2 = 'ljspeech.onnx.prototxt'
+WEIGHT_PATH_HIFI = 'hifigan.onnx'
+MODEL_PATH_HIFI = 'hifigan.onnx.prototxt'
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/fastspeech2/"
 
 PREPROCESS_CONFIG = "config/LJSpeech/preprocess.yaml"
 
@@ -37,7 +37,7 @@ MODEL_MAX_LENGTH = 600
 # ===========================
 parser = get_base_parser(
     'FastSpeech2 (Ailia Inference)',
-    'inference_ailia.py',
+     None,
     'output_ailia.wav'
 )
 # 元のFastSpeech2リポジトリと同じ引数名
