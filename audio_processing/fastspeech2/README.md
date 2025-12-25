@@ -1,8 +1,8 @@
-# FastSpeech2
+# FastSpeech2 : Fast and High-Quality End-to-End Text to Speech
 
 ## Input
 
-[FastSpeech 2: Fast and High-Quality End-to-End Text to Speech](https://arxiv.org/abs/2006.04558)
+Text
 
 ## Output
 
