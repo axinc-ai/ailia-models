@@ -38,7 +38,7 @@ MODEL_MAX_LENGTH = 600
 parser = get_base_parser(
     'FastSpeech2 (Ailia Inference)',
      None,
-    'output_ailia.wav'
+    'output.wav'
 )
 # 元のFastSpeech2リポジトリと同じ引数名
 parser.add_argument(
@@ -196,8 +196,8 @@ def get_preprocess_method(preprocess_config):
 # ===========================
 def infer():
     # モデルのダウンロード
-    check_and_download_models(args.onnx_fs2, MODEL_PATH_FS2, REMOTE_PATH)
-    check_and_download_models(args.onnx_hifi, MODEL_PATH_HIFI, REMOTE_PATH)
+    check_and_download_models(args.onnx_fs2, args.onnx_fs2 + ".prototxt", REMOTE_PATH)
+    check_and_download_models(args.onnx_hifi, args.onnx_hifi + ".prototxt", REMOTE_PATH)
 
     logger.info("Loading Config...")
     # preprocess_configを読み込み
@@ -206,18 +206,12 @@ def infer():
     logger.info("Loading ONNX Models...")
     env_id = args.env_id
     
-    # ONNXモデルの出力名を取得（ailiaSDKでは直接取得できないため、ONNXファイルから読み込む）
-    #import onnx
-    #onnx_model = onnx.load(args.onnx_fs2)
-    #fs2_output_names = [output.name for output in onnx_model.graph.output]
-    #fs2_input_names = [inp.name for inp in onnx_model.graph.input 
-    #                   if inp.name not in [n.name for n in onnx_model.graph.initializer]]
-
     # ailia.Netの初期化
     memory_mode = ailia.get_memory_mode(True, True, False, True)
-    fs2_net = ailia.Net(MODEL_PATH_FS2, args.onnx_fs2, env_id=env_id, memory_mode=memory_mode)
-    hifi_net = ailia.Net(MODEL_PATH_HIFI, args.onnx_hifi, env_id=env_id, memory_mode=memory_mode)
+    fs2_net = ailia.Net(args.onnx_fs2 + ".prototxt", args.onnx_fs2, env_id=env_id, memory_mode=memory_mode)
+    hifi_net = ailia.Net(args.onnx_hifi + ".prototxt", args.onnx_hifi, env_id=env_id, memory_mode=memory_mode)
 
+    # 入力テンソルと出力テンソルの名前を取得
     fs2_input_names = []
     for i in fs2_net.get_input_blob_list():
         fs2_input_names.append(fs2_net.get_blob_name(i))
@@ -288,16 +282,11 @@ def infer():
                 # 配列として渡す（通常は[1]）
                 max_src_len = np.array([MODEL_MAX_LENGTH], dtype=np.int64)
         
-        # speakersの形状を確認して適切に設定
+        # speakersの形状を設定（全モデルが (batch, 1))
         speakers = None
         if "speakers" in fs2_input_names:
-            speakers_shape = fs2_net.get_blob_shape("speakers")
-            if len(speakers_shape) == 2 and (speakers_shape[1] == 1 or speakers_shape[1] == 'batch_size'):
-                # (batch, 1) の形状
-                speakers = np.array([[speaker_id]], dtype=np.int64)
-            else:
-                # (batch,) の形状
-                speakers = np.array([speaker_id], dtype=np.int64)
+            # (batch, 1) の形状
+            speakers = np.array([[speaker_id]], dtype=np.int64)
         
         p_control = np.array(args.pitch_control, dtype=np.float32)
         e_control = np.array(args.energy_control, dtype=np.float32)

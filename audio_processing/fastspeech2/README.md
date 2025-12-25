@@ -77,7 +77,7 @@ $ python3 fastspeech2.py \
   --speaker_id 0
 ```
 
-For AISHELL-3 (Mandarin, Multi-Speaker): //実行できない
+For AISHELL-3 (Mandarin, Multi-Speaker):
 
 ```bash
 $ python3 fastspeech2.py \
