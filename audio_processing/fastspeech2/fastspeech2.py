@@ -5,11 +5,9 @@ import sys
 import matplotlib.pyplot as plt
 import os
 import scipy.io.wavfile as wavfile
-from g2p_en import G2p
-from pypinyin import pinyin, Style
 from text import text_to_sequence
 import re
-import onnx
+from logging import getLogger
 
 # ===========================
 # Settings
@@ -19,6 +17,8 @@ import onnx
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
+
+logger = getLogger(__name__)
 
 # モデル設定
 WEIGHT_PATH_FS2 = 'ljspeech.onnx'
@@ -122,6 +122,7 @@ args = update_parser(parser)
 # 2. 前処理(英語と中国語で異なる)
 # ===========================
 def preprocess_english(text, preprocess_config):
+    from g2p_en import G2p
     g2p = G2p()
     phones = []
     words = re.split(r"([,;.\-\?\!\s+])", text)
@@ -132,7 +133,7 @@ def preprocess_english(text, preprocess_config):
     phones = re.sub(r"\{[^\w\s]?\}", "{sp}", phones)
     phones = phones.replace("}{", " ")
     
-    print(f"Phonemes: {phones}")
+    logger.info(f"Phonemes: {phones}")
     
     sequence = np.array(
         text_to_sequence(
@@ -142,6 +143,7 @@ def preprocess_english(text, preprocess_config):
     return sequence
 
 def preprocess_mandarin(text, preprocess_config):
+    from pypinyin import pinyin, Style
     lexicon = read_lexicon(preprocess_config["path"]["lexicon_path"])
 
     phones = []
@@ -158,7 +160,7 @@ def preprocess_mandarin(text, preprocess_config):
             phones.append("sp")
 
     phones = "{" + " ".join(phones) + "}"
-    print(f"Phonemes: {phones}")
+    logger.info(f"Phonemes: {phones}")
 
     sequence = np.array(
         text_to_sequence(
@@ -197,30 +199,40 @@ def infer():
     check_and_download_models(args.onnx_fs2, MODEL_PATH_FS2, REMOTE_PATH)
     check_and_download_models(args.onnx_hifi, MODEL_PATH_HIFI, REMOTE_PATH)
 
-    print("Loading Config...")
+    logger.info("Loading Config...")
     # preprocess_configを読み込み
     preprocess_config = yaml.load(open(args.preprocess_config, "r"), Loader=yaml.FullLoader)
     
-    print("Loading ONNX Models...")
+    logger.info("Loading ONNX Models...")
     env_id = args.env_id
     
     # ONNXモデルの出力名を取得（ailiaSDKでは直接取得できないため、ONNXファイルから読み込む）
-    onnx_model = onnx.load(args.onnx_fs2)
-    fs2_output_names = [output.name for output in onnx_model.graph.output]
-    fs2_input_names = [inp.name for inp in onnx_model.graph.input 
-                       if inp.name not in [n.name for n in onnx_model.graph.initializer]]
-    
+    #import onnx
+    #onnx_model = onnx.load(args.onnx_fs2)
+    #fs2_output_names = [output.name for output in onnx_model.graph.output]
+    #fs2_input_names = [inp.name for inp in onnx_model.graph.input 
+    #                   if inp.name not in [n.name for n in onnx_model.graph.initializer]]
+
     # ailia.Netの初期化
-    fs2_net = ailia.Net(MODEL_PATH_FS2, args.onnx_fs2, env_id=env_id)
-    hifi_net = ailia.Net(MODEL_PATH_HIFI, args.onnx_hifi, env_id=env_id)
-    
+    memory_mode = ailia.get_memory_mode(True, True, False, True)
+    fs2_net = ailia.Net(MODEL_PATH_FS2, args.onnx_fs2, env_id=env_id, memory_mode=memory_mode)
+    hifi_net = ailia.Net(MODEL_PATH_HIFI, args.onnx_hifi, env_id=env_id, memory_mode=memory_mode)
+
+    fs2_input_names = []
+    for i in fs2_net.get_input_blob_list():
+        fs2_input_names.append(fs2_net.get_blob_name(i))
+    fs2_output_names = []
+    for i in fs2_net.get_output_blob_list():
+        fs2_output_names.append(fs2_net.get_blob_name(i))
+
+   
     # -------------------------------------------
     # 入力データの準備（パディング処理）
     # -------------------------------------------
     # sourceファイルがあればそこから読み込み、なければtextを使用
     texts_to_process = []
     if hasattr(args, 'source') and args.source and os.path.exists(args.source):
-        print(f"Reading texts from source file: {args.source}")
+        logger.info(f"Reading texts from source file: {args.source}")
         with open(args.source, 'r', encoding='utf-8') as f:
             for line in f:
                 line = line.strip()
@@ -242,20 +254,20 @@ def infer():
     for idx, (speaker_str, text) in enumerate(texts_to_process):
         speaker_id = int(speaker_str) if speaker_str.isdigit() else args.speaker_id
         
-        print(f"\n{'='*60}")
-        print(f"Processing text {idx+1}/{len(texts_to_process)}")
-        print(f"Speaker ID: {speaker_id}")
-        print(f"Input Text: {text}")
+        #logger.info(f"\n{'='*60}")
+        logger.info(f"Processing text {idx+1}/{len(texts_to_process)}")
+        logger.info(f"Speaker ID: {speaker_id}")
+        logger.info(f"Input Text: {text}")
         
         preprocess_func = get_preprocess_method(preprocess_config)
         sequence = preprocess_func(text, preprocess_config)
     
         real_len = len(sequence)
-        print(f"Original Length: {real_len}")
+        logger.info(f"Original Length: {real_len}")
         
         # 1. パディング処理: 常に max_length に揃える
         if real_len > MODEL_MAX_LENGTH:
-            print(f"Warning: Text too long ({real_len}). Truncating to {MODEL_MAX_LENGTH}.")
+            logger.info(f"Warning: Text too long ({real_len}). Truncating to {MODEL_MAX_LENGTH}.")
             real_len = MODEL_MAX_LENGTH # Safety limit
 
         padded_sequence = np.zeros((1, MODEL_MAX_LENGTH), dtype=np.int64)
@@ -268,42 +280,24 @@ def infer():
         # max_src_lenの形状を確認して適切に設定
         max_src_len = None
         if "max_src_len" in fs2_input_names:
-            for inp in onnx_model.graph.input:
-                if inp.name == "max_src_len":
-                    if hasattr(inp.type, 'tensor_type') and hasattr(inp.type.tensor_type, 'shape'):
-                        max_src_len_shape = [d.dim_value if d.dim_value > 0 else d.dim_param 
-                                             for d in inp.type.tensor_type.shape.dim]
-                        if len(max_src_len_shape) == 0:
-                            # スカラーとして渡す
-                            max_src_len = np.array(MODEL_MAX_LENGTH, dtype=np.int64)
-                        else:
-                            # 配列として渡す（通常は[1]）
-                            max_src_len = np.array([MODEL_MAX_LENGTH], dtype=np.int64)
-                    else:
-                        # デフォルトで配列として渡す（LJSpeech互換性のため）
-                        max_src_len = np.array([MODEL_MAX_LENGTH], dtype=np.int64)
-                    break
+            max_src_len_shape = fs2_net.get_blob_shape("max_src_len")
+            if len(max_src_len_shape) == 0:
+                # スカラーとして渡す
+                max_src_len = np.array(MODEL_MAX_LENGTH, dtype=np.int64)
+            else:
+                # 配列として渡す（通常は[1]）
+                max_src_len = np.array([MODEL_MAX_LENGTH], dtype=np.int64)
         
         # speakersの形状を確認して適切に設定
+        speakers = None
         if "speakers" in fs2_input_names:
-            # ONNXモデルの実際の入力形状を確認
-            for inp in onnx_model.graph.input:
-                if inp.name == "speakers":
-                    if hasattr(inp.type, 'tensor_type') and hasattr(inp.type.tensor_type, 'shape'):
-                        speakers_shape = [d.dim_value if d.dim_value > 0 else d.dim_param 
-                                         for d in inp.type.tensor_type.shape.dim]
-                        if len(speakers_shape) == 2 and (speakers_shape[1] == 1 or speakers_shape[1] == 'batch_size'):
-                            # (batch, 1) の形状
-                            speakers = np.array([[speaker_id]], dtype=np.int64)
-                        else:
-                            # (batch,) の形状
-                            speakers = np.array([speaker_id], dtype=np.int64)
-                    else:
-                        # デフォルトで (batch, 1) を試す
-                        speakers = np.array([[speaker_id]], dtype=np.int64)
-                    break
-        else:
-            speakers = None
+            speakers_shape = fs2_net.get_blob_shape("speakers")
+            if len(speakers_shape) == 2 and (speakers_shape[1] == 1 or speakers_shape[1] == 'batch_size'):
+                # (batch, 1) の形状
+                speakers = np.array([[speaker_id]], dtype=np.int64)
+            else:
+                # (batch,) の形状
+                speakers = np.array([speaker_id], dtype=np.int64)
         
         p_control = np.array(args.pitch_control, dtype=np.float32)
         e_control = np.array(args.energy_control, dtype=np.float32)
@@ -321,7 +315,7 @@ def _synthesize(fs2_net, hifi_net, texts, src_lens, max_src_len, speakers,
     # -------------------------------------------
     # FastSpeech2 推論
     # -------------------------------------------
-    print("Running FastSpeech2...")
+    logger.info("Running FastSpeech2...")
 
     inputs = {}
     inputs["texts"] = texts
@@ -341,15 +335,15 @@ def _synthesize(fs2_net, hifi_net, texts, src_lens, max_src_len, speakers,
         inputs["speakers"] = speakers
 
     # 入力形状のデバッグ情報
-    print("\n=== FastSpeech2 Input Shapes ===")
-    for k, v in inputs.items():
-        print(f"  {k:20s}: {v.shape if hasattr(v, 'shape') else type(v)}")
-    print("=" * 40)
+    #logger.info("\n=== FastSpeech2 Input Shapes ===")
+    #for k, v in inputs.items():
+    #    logger.info(f"  {k:20s}: {v.shape if hasattr(v, 'shape') else type(v)}")
+    #logger.info("=" * 40)
 
     try:
         fs2_res = fs2_net.predict(inputs)
     except Exception as e:
-        print(f"❌ FastSpeech2 inference failed: {e}")
+        logger.error(f"FastSpeech2 inference failed: {e}")
         return
     
     # -------------------------------------------
@@ -369,7 +363,7 @@ def _synthesize(fs2_net, hifi_net, texts, src_lens, max_src_len, speakers,
     valid_durations = d_rounded[0, :real_len]
     mel_len = int(np.sum(valid_durations))
     
-    print(f"Generated Mel Length: {mel_len}")
+    logger.info(f"Generated Mel Length: {mel_len}")
     
     # 元のリポジトリと同じ処理：mel_lenで切り出す（バッファなし）
     mel_output = mel_output_whole[:, :mel_len, :]
@@ -377,7 +371,7 @@ def _synthesize(fs2_net, hifi_net, texts, src_lens, max_src_len, speakers,
     # -------------------------------------------
     # HiFi-GAN 推論（元のリポジトリと同じ処理）
     # -------------------------------------------
-    print("Running HiFi-GAN...")
+    logger.info("Running HiFi-GAN...")
     
     # 元のリポジトリと同じ処理：[1, MelLen, 80] -> [1, 80, MelLen]
     # synth_samplesでは predictions[1].transpose(1, 2) を使用
@@ -395,18 +389,18 @@ def _synthesize(fs2_net, hifi_net, texts, src_lens, max_src_len, speakers,
         last_frame = mel_input[:, :, -1:]
         padding = np.repeat(last_frame, pad_length, axis=2)
         mel_input = np.concatenate([mel_input, padding], axis=2)
-        print(f"Padded mel_input from {actual_mel_len} to {HIFI_FIXED_LENGTH} frames")
+        logger.info(f"Padded mel_input from {actual_mel_len} to {HIFI_FIXED_LENGTH} frames")
     elif actual_mel_len > HIFI_FIXED_LENGTH:
         # 3000フレームを超える場合は切り詰め
         mel_input = mel_input[:, :, :HIFI_FIXED_LENGTH]
         actual_mel_len = HIFI_FIXED_LENGTH
-        print(f"Truncated mel_input from {actual_mel_len} to {HIFI_FIXED_LENGTH} frames")
+        logger.info(f"Truncated mel_input from {actual_mel_len} to {HIFI_FIXED_LENGTH} frames")
     
     try:
         audio_res = hifi_net.predict([mel_input])
         wav = audio_res[0].squeeze()
     except Exception as e:
-        print(f"❌ HiFi-GAN inference failed: {e}")
+        logger.error(f"HiFi-GAN inference failed: {e}")
         return
     
     # 元のリポジトリと同じ処理：lengths = mel_len * hop_length で切り出す
@@ -414,7 +408,7 @@ def _synthesize(fs2_net, hifi_net, texts, src_lens, max_src_len, speakers,
     audio_len = mel_len * hop_length
     if len(wav) > audio_len:
         wav = wav[:audio_len]
-        print(f"Trimmed audio to {audio_len} samples (mel_len={mel_len} * hop_length={hop_length})")
+        logger.info(f"Trimmed audio to {audio_len} samples (mel_len={mel_len} * hop_length={hop_length})")
 
     # -------------------------------------------
     # 保存（元のリポジトリと同じ処理）
@@ -432,22 +426,22 @@ def _synthesize(fs2_net, hifi_net, texts, src_lens, max_src_len, speakers,
     else:
         savepath = args.savepath
     
-    print(f"Saving to {savepath}")
+    logger.info(f"Saving to {savepath}")
     
     sampling_rate = preprocess_config["preprocessing"]["audio"]["sampling_rate"]
     wavfile.write(savepath, sampling_rate, wav)
-    print(f"🎉 Saved Audio: {savepath}")
+    logger.info(f"Saved Audio: {savepath}")
 
     # Plot saving
-    plot_path = savepath.replace(".wav", "_mel.png")
-    plt.figure(figsize=(10, 4))
-    plt.imshow(mel_output[0].T, aspect="auto", origin="lower")
-    plt.title(f"Generated Mel (Len: {mel_output.shape[1]})")
-    plt.colorbar()
-    plt.tight_layout()
-    plt.savefig(plot_path)
-    plt.close()
-    print(f"🎉 Saved Plot: {plot_path}")
+    #plot_path = savepath.replace(".wav", "_mel.png")
+    #plt.figure(figsize=(10, 4))
+    #plt.imshow(mel_output[0].T, aspect="auto", origin="lower")
+    #plt.title(f"Generated Mel (Len: {mel_output.shape[1]})")
+    #plt.colorbar()
+    #plt.tight_layout()
+    #plt.savefig(plot_path)
+    #plt.close()
+    #logger.info(f"Saved Plot: {plot_path}")
 
 if __name__ == "__main__":
     infer()

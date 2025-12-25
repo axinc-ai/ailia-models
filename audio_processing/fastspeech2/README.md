@@ -6,7 +6,7 @@
 
 ## Output
 
-Audio file (`output.wav`) and Mel-spectrogram plot (`output_mel.png`).
+Audio file (`output.wav`).
 
 ## Usage
 
@@ -73,7 +73,7 @@ For LibriTTS (English, Multi-Speaker)
 $ python3 fastspeech2.py \
   --text "Hello, I am speaking from a multi-speaker model." \
   --preprocess_config config/LibriTTS/preprocess.yaml \
-  --onnx_fs2 onnx/fastspeech2/libritts.onnx \
+  --onnx_fs2 libritts.onnx \
   --speaker_id 0
 ```
 
@@ -83,7 +83,7 @@ For AISHELL-3 (Mandarin, Multi-Speaker): //実行できない
 $ python3 fastspeech2.py \
   --text "你好" \
   --preprocess_config config/AISHELL3/preprocess.yaml \
-  --onnx_fs2 onnx/fastspeech2/aishell3.onnx \
+  --onnx_fs2 onnx/aishell3.onnx \
   --speaker_id 16
 ```
 
@@ -119,3 +119,4 @@ $ python3 fastspeech2.py \
 
 - ailia SDK
 - g2p_en
+- pypinyin
