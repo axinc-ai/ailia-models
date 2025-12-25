@@ -24,17 +24,16 @@ If you would like to try on your computer:
 [ailia-models wiki](https://deepwiki.com/axinc-ai/ailia-models)
 
 # Supported models
-382 models as of September 29, 2025
+390 models as of December 17, 2025
 
 # Latest update
+- 2025.12.17 Add sensevoice, cosyvoice2
+- 2025.12.01 Add glass, mobilevlm, donut
+- 2025.11.07 Add mobile_sam, yolox_body_head_hand_face, yolov12 (ailia SDK 1.6)
+- 2025.11.03 Add fp16 version of whisper tiny and base
 - 2025.09.29 Add ruri-v3 (embedding)
 - 2025.09.22 Add paddleocr_v3
 - 2025.07.17 Add 6d_repnet_360, siglip2
-- 2025.06.27 Add edge_sam
-- 2025.04.19 Add yolov11-seg, gpt-sovits-v3
-- 2025.02.28 Add multilingual-minilmv2
-- 2025.01.02 Add qwen_audio, audiosep
-- 2025.01.01 Add RT-DETRv2, gazelle, lama, anything_v3, depth_anything_controlnet, deepfacelive, llava-jp
 
 - More information in our [Wiki](https://github.com/axinc-ai/ailia-models/wiki)
 
@@ -57,6 +56,7 @@ If you would like to try on your computer:
 | [<img src="anomaly_detection/spade-pytorch/output.png" width=128px>](anomaly_detection/spade-pytorch/) | [spade-pytorch](/anomaly_detection/spade-pytorch/) | [Sub-Image Anomaly Detection with Deep Pyramid Correspondences](https://github.com/byungjae89/SPADE-pytorch) | Pytorch | 1.2.6 and later | May 2020 | |
 | [<img src="anomaly_detection/padim/output.png" width=128px>](anomaly_detection/padim/) | [padim](/anomaly_detection/padim/) | [PaDiM-Anomaly-Detection-Localization-master](https://github.com/xiahaifeng1995/PaDiM-Anomaly-Detection-Localization-master) | Pytorch | 1.2.6 and later | Nov 2020 | [EN](https://medium.com/axinc-ai/padim-a-machine-learning-model-for-detecting-defective-products-without-retraining-5daa6f203377) [JP](https://medium.com/axinc/padim-%E5%86%8D%E5%AD%A6%E7%BF%92%E4%B8%8D%E8%A6%81%E3%81%A7%E4%B8%8D%E8%89%AF%E5%93%81%E6%A4%9C%E7%9F%A5%E3%82%92%E8%A1%8C%E3%81%86%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-69add653fbd3) |
 | [<img src="anomaly_detection/patchcore/output.png" width=128px>](anomaly_detection/patchcore/) | [patchcore](/anomaly_detection/patchcore/) | [PatchCore_anomaly_detection](https://github.com/hcw-00/PatchCore_anomaly_detection) | Pytorch | 1.2.6 and later | Jun 2021 | |
+| [<img src="anomaly_detection/glass/output.png" width=128px>](anomaly_detection/glass/) | [glass](/anomaly_detection/glass/) | [A Unified Anomaly Synthesis Strategy with Gradient Ascent for Industrial Anomaly Detection and Localization](https://github.com/cqylunlun/GLASS) | Pytorch | 1.2.14 and later | Jul 2024 | |
 
 ## Audio Language Model
 
@@ -130,6 +130,7 @@ If you would like to try on your computer:
 | [distil-whisper](/audio_processing/distil-whisper/) | [Hugging Face - Distil-Whisper](https://github.com/huggingface/distil-whisper) | Pytorch | 1.2.16 and later | Nov 2023 | |
 | [reazon_speech2](/audio_processing/reazon_speech2/) | [ReazonSpeech2](https://research.reazon.jp/projects/ReazonSpeech/) | Pytorch | 1.4.0 and later | Feb 2024 | |
 | [kotoba-whisper](/audio_processing/kotoba-whisper/) | [kotoba-whisper](https://huggingface.co/kotoba-tech/kotoba-whisper-v1.0) | Pytorch | 1.2.16 and later | Apr 2024 | |
+| [sensevoice](/audio_processing/sensevoice/) | [SenseVoice](https://github.com/FunAudioLLM/SenseVoice) | Pytorch | 1.2.13 and later | July 2024 | |
 
 ### Text to speech
 
@@ -142,6 +143,7 @@ If you would like to try on your computer:
 | [gpt-sovits](/audio_processing/gpt-sovits/) | [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) | Pytorch | 1.4.0 and later | Feb 2024 | [JP](https://medium.com/axinc/gpt-sovits-%E3%83%95%E3%82%A1%E3%82%A4%E3%83%B3%E3%83%81%E3%83%A5%E3%83%BC%E3%83%8B%E3%83%B3%E3%82%B0%E3%81%A7%E3%81%8D%E3%82%8B0%E3%82%B7%E3%83%A7%E3%83%83%E3%83%88%E3%81%AE%E9%9F%B3%E5%A3%B0%E5%90%88%E6%88%90%E3%83%A2%E3%83%87%E3%83%AB-2212eeb5ad20) |
 | [gpt-sovits-v2](/audio_processing/gpt-sovits-v2/) | [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) | Pytorch | 1.4.0 and later | Aug 2024 |  |
 | [gpt-sovits-v3](/audio_processing/gpt-sovits-v3/) | [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) | Pytorch | 1.4.0 and later | Feb 2025 |  |
+| [cosyvoice2](/audio_processing/cosyvoice2/) | [CosyVoice2](https://github.com/FunAudioLLM/CosyVoice/tree/main) | Pytorch | 1.4.0 and later | Dec 2024 |  |
 
 ### Voice activity detection
 
@@ -480,6 +482,7 @@ If you would like to try on your computer:
 | [<img src="image_segmentation/grounded_sam/output.png" width=128px>](image_segmentation/grounded_sam/) | [grounded_sam](/image_segmentation/grounded_sam/) | [Grounded-SAM](https://github.com/IDEA-Research/Grounded-Segment-Anything/tree/main) | Pytorch | 1.2.16 and later |
 | [<img src="image_segmentation/segment-anything-2/output.png" width=128px>](image_segmentation/segment-anything-2/) | [segment-anything-2](/image_segmentation/segment-anything-2/) | [Segment Anything 2](https://github.com/facebookresearch/segment-anything-2) | Pytorch | 1.2.16 and later |
 | [<img src="image_segmentation/fast_sam/output.png" width=128px>](image_segmentation/fast_sam/) | [fast_sam](/image_segmentation/fast_sam/) | [FastSAM](https://github.com/CASIA-IVA-Lab/FastSAM) | Pytorch | 1.2.14 and later |
+| [<img src="image_segmentation/mobile_sam/example/output1.png" width=128px>](image_segmentation/mobile_sam/) | [mobile_sam](/image_segmentation/mobile_sam/) | [MobileSAM](https://github.com/ChaoningZhang/MobileSAM) | Pytorch | 1.6.0 and later |
 | [<img src="image_segmentation/yolov8-seg/output.png" width=128px>](image_segmentation/yolov8-seg/) | [yolov8-seg](/image_segmentation/yolov8-seg/) | [YOLOv8](https://github.com/ultralytics/ultralytics) | Pytorch | 1.2.14.1 and later |  |
 | [<img src="image_segmentation/yolov11-seg/output.png" width=128px>](image_segmentation/yolov11-seg/) | [yolov11-seg](/image_segmentation/yolov11-seg/) | [Ultralytics YOLO11](https://github.com/ultralytics/ultralytics) | Pytorch | 1.2.14.1 and later |  |
 | [<img src="image_segmentation/edge_sam/output.png" width=128px>](image_segmentation/edge_sam/) | [edge_sam](/image_segmentation/edge_sam/) | [EdgeSAM](https://github.com/chongzhou96/EdgeSAM) | Pytorch | 1.2.10 and later |
@@ -631,8 +634,10 @@ If you would like to try on your computer:
 | [<img src="object_detection/yolov9/output.png" width=128px>](object_detection/yolov9/) | [yolov9](/object_detection/yolov9/) | [YOLOv9](https://github.com/WongKinYiu/yolov9) | Pytorch | 1.2.10 and later |  |
 | [<img src="object_detection/yolov10/output.png" width=128px>](object_detection/yolov10/) | [yolov10](/object_detection/yolov10/) | [YOLOv10](https://github.com/THU-MIG/yolov10) | Pytorch | 1.2.11 and later |  |
 | [<img src="object_detection/yolov11/output.png" width=128px>](object_detection/yolov11/) | [yolov11](/object_detection/yolov11/) | [YOLOv11](https://github.com/ultralytics/ultralytics) | Pytorch | 1.2.14 and later |  |
+| [<img src="object_detection/yolov12/output.png" width=128px>](object_detection/yolov12/) | [yolov12](/object_detection/yolov12/) | [YOLOv12](https://github.com/sunsmarterjie/yolov12) | Pytorch | 1.2.14 and later |  |
 | [<img src="object_detection/yolor/output.jpg" width=128px>](object_detection/yolor/) | [yolor](/object_detection/yolor/) | [yolor](https://github.com/WongKinYiu/yolor/tree/paper) | Pytorch | 1.2.5 and later |
 | [<img src="object_detection/yolox/output.jpg" width=128px>](object_detection/yolox/) | [yolox](/object_detection/yolox/) | [YOLOX](https://github.com/Megvii-BaseDetection/YOLOX) | Pytorch | 1.2.6 and later | [EN](https://medium.com/axinc-ai/yolox-object-detection-model-exceeding-yolov5-d6cea6d3c4bc) [JP](https://medium.com/axinc/yolox-yolov5%E3%82%92%E8%B6%85%E3%81%88%E3%82%8B%E7%89%A9%E4%BD%93%E6%A4%9C%E5%87%BA%E3%83%A2%E3%83%87%E3%83%AB-e9706e15fef2) |
+| [<img src="object_detection/yolox_body_head_hand_face/output.jpg" width=128px>](object_detection/yolox_body_head_hand_face/) | [yolox_body_head_hand_face](/object_detection/yolox_body_head_hand_face/) | [YOLOX-Body-Head-Hand-Face](https://github.com/PINTO0309/PINTO_model_zoo/tree/main/434_YOLOX-Body-Head-Hand-Face) | Pytorch | 1.2.15 and later | |
 | [<img src="object_detection/yolox-ti-lite/output.jpg" width=128px>](object_detection/yolox-ti-lite/) | [yolox-ti-lite](/object_detection/yolox-ti-lite/) | [edgeai-yolox](https://github.com/TexasInstruments/edgeai-yolox) | Pytorch | 1.2.9 and later | |
 | [<img src="object_detection/yolov/output.jpg" width=128px>](object_detection/yolov/) | [yolov](/object_detection/yolov/) | [YOLOV](https://github.com/YuHengsss/YOLOV) | Pytorch | 1.2.10 and later | |
 | [<img src="object_detection/mobilenet_ssd/output.png" width=128px>](object_detection/mobilenet_ssd/) | [mobilenet_ssd](/object_detection/mobilenet_ssd/) | [MobileNetV1, MobileNetV2, VGG based SSD/SSD-lite implementation in Pytorch](https://github.com/qfgaohao/pytorch-ssd) | Pytorch | 1.2.1 and later | [EN](https://medium.com/axinc-ai/mobilenetssd-a-machine-learning-model-for-fast-object-detection-37352ce6da7d) [JP](https://medium.com/axinc/mobilenetssd-%E9%AB%98%E9%80%9F%E3%81%AB%E7%89%A9%E4%BD%93%E6%A4%9C%E5%87%BA%E3%82%92%E8%A1%8C%E3%81%86%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-be3ca37c411) |
@@ -798,6 +803,7 @@ If you would like to try on your computer:
 | [<img src="text_recognition/paddleocr_v3/output.png" width=64px>](text_recognition/paddleocr_v3/) |[paddleocr_v3](/text_recognition/paddleocr_v3/) | [PaddleOCR : Awesome multilingual OCR toolkits based on PaddlePaddle](https://github.com/PaddlePaddle/PaddleOCR) | Pytorch | 1.2.17 and later | |
 | [<img src="text_recognition/easyocr/example/chinese.jpg" width=64px>](text_recognition/easyocr/) |[easyocr](/text_recognition/easyocr/) | [Ready-to-use OCR with 80+ supported languages](https://github.com/JaidedAI/EasyOCR) | Pytorch | 1.2.6 and later | |
 | [<img src="text_recognition/ndlocr_text_recognition/demo.png" width=64px>](text_recognition/ndlocr_text_recognition/) |[ndlocr_text_recognition](/text_recognition/ndlocr_text_recognition/) | [NDL OCR](https://github.com/ndl-lab/text_recognition) | Pytorch | 1.2.5 and later | |
+| [<img src="text_recognition/donut/cord_sample_receipt1.png" width=64px>](text_recognition/donut/) |[donut](/text_recognition/donut/) | [Donut](https://github.com/clovaai/donut) | Pytorch | 1.2.16 and later | |
 
 ## Time-Series Forecasting
 
@@ -821,6 +827,7 @@ If you would like to try on your computer:
 | [<img src="vision_language_model/florence2/car.jpg" width=128px>](vision_language_model/florence2/) | [florence2](vision_language_model/florence2) | [Hugging Face - microsoft/Florence-2-base](https://huggingface.co/microsoft/Florence-2-base) | Pytorch | 1.2.16 and later | |
 | [<img src="vision_language_model/qwen2_vl/demo.jpeg" width=128px>](vision_language_model/qwen2_vl/) | [qwen2_vl](vision_language_model/qwen2_vl) | [Qwen2-VL](https://github.com/QwenLM/Qwen2-VL) | Pytorch | 1.5.0 and later | |
 | [<img src="vision_language_model/llava-jp/sample.jpg" width=128px>](vision_language_model/llava-jp/) | [llava-jp](vision_language_model/llava-jp) | [LLaVA-JP](https://github.com/tosiyuki/LLaVA-JP/tree/main) | Pytorch | 1.5.0 and later | |
+| [<img src="vision_language_model/mobilevlm/demo.jpg" width=128px>](vision_language_model/mobilevlm/) | [mobilevlm](vision_language_model/mobilevlm) | [MobileVLM](https://github.com/Meituan-AutoML/MobileVLM) | Pytorch | 1.5.0 and later | |
 
 ## Commercial model
 

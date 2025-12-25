@@ -10,6 +10,7 @@ cd ../../anomaly_detection/padim; python3 padim.py ${OPTION}
 cd ../../anomaly_detection/spade-pytorch; python3 spade-pytorch.py ${OPTION}
 cd ../../anomaly_detection/patchcore; python3 patchcore.py ${OPTION}
 cd ../../anomaly_detection/mahalanobisad; python3 mahalanobisad.py ${OPTION}
+cd ../../anomaly_detection/glass; python3 glass.py ${OPTION}
 cd ../../audio_language_model/qwen_audio; python3 qwen_audio.py ${OPTION}
 cd ../../audio_processing/crnn_audio_classification; python3 crnn_audio_classification.py ${OPTION}
 cd ../../audio_processing/deepspeech2; python3 deepspeech2.py ${OPTION}
@@ -44,6 +45,8 @@ cd ../../audio_processing/bert-vits2/; python3 bert-vits2.py ${OPTION}
 cd ../../audio_processing/dtln/; python3 dtln.py ${OPTION}
 cd ../../audio_processing/pytorch_wavenet/; python3 pytorch_wavenet.py ${OPTION}
 cd ../../audio_processing/audiosep/; python3 audiosep.py ${OPTION}
+cd ../../audio_processing/cosyvoice2/; python3 cosyvoice2.py ${OPTION}
+cd ../../audio_processing/sensevoice/; python3 sensevoice.py ${OPTION}
 cd ../../background_ramoval/deep-image-matting; python3 deep-image-matting.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py -a small ${OPTION}
@@ -221,6 +224,7 @@ cd ../../image_segmentation/pytorch-fcn; python3 pytorch-fcn.py ${OPTION}
 cd ../../image_segmentation/grounded_sam; python3 grounded_sam.py ${OPTION}
 cd ../../image_segmentation/segment-anything-2; python3 segment-anything-2.py ${OPTION}
 cd ../../image_segmentation/fast_sam; python3 fast_sam.py ${OPTION}
+cd ../../image_segmentation/mobile_sam; python3 mobile_sam.py ${OPTION}
 cd ../../image_segmentation/yolov8-seg; python3 yolov8-seg.py ${OPTION}
 cd ../../image_segmentation/yolov11-seg; python3 yolov11-seg.py ${OPTION}
 cd ../../image_segmentation/edge_sam; python3 edge_sam.py ${OPTION}
@@ -281,7 +285,9 @@ cd ../../object_detection/yolov8; python3 yolov8.py ${OPTION}
 cd ../../object_detection/yolov9; python3 yolov9.py ${OPTION}
 cd ../../object_detection/yolov10; python3 yolov10.py ${OPTION}
 cd ../../object_detection/yolov11; python3 yolov11.py ${OPTION}
+cd ../../object_detection/yolov12; python3 yolov12.py ${OPTION}
 cd ../../object_detection/yolox; python3 yolox.py ${OPTION}
+cd ../../object_detection/yolox_body_head_hand_face; python3 yolox_body_head_hand_face.py ${OPTION}
 cd ../../object_detection/yolox-ti-lite; python3 yolox-ti-lite.py ${OPTION}
 cd ../../object_detection/yolov; python3 yolov.py ${OPTION}
 cd ../../object_detection/pedestrian_detection; python3 pedestrian_detection.py ${OPTION}
@@ -374,6 +380,7 @@ cd ../../text_recognition/paddleocr; python3 paddleocr.py ${OPTION}
 cd ../../text_recognition/paddleocr_v3; python3 paddleocr_v3.py ${OPTION}
 cd ../../text_recognition/easyocr; python3 easyocr.py ${OPTION}
 cd ../../text_recognition/ndlocr_text_recognition; python3 ndlocr_text_recognition.py ${OPTION}
+cd ../../text_recognition/donut; python3 donut.py ${OPTION}
 cd ../../time_series_forecasting/informer2020; python3 informer2020.py ${OPTION}
 cd ../../time_series_forecasting/timesfm; python3 timesfm.py ${OPTION}
 cd ../../vehicle_recognition/vehicle-attributes-recognition-barrier; python3 vehicle-attributes-recognition-barrier.py ${OPTION}
@@ -382,3 +389,4 @@ cd ../../vision_language_model/llava; python3 llava.py ${OPTION}
 cd ../../vision_language_model/florence2; python3 florence2.py ${OPTION}
 cd ../../vision_language_model/qwen2_vl; python3 qwen2_vl.py ${OPTION}
 cd ../../vision_language_model/llava-jp; python3 llava-jp.py ${OPTION}
+cd ../../vision_language_model/mobilevlm; python3 mobilevlm.py ${OPTION}

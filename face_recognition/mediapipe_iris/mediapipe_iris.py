@@ -4,6 +4,7 @@ import time
 import ailia
 import cv2
 import numpy as np
+import json
 
 import mediapipe_iris_utils as iut
 
@@ -40,6 +41,11 @@ parser.add_argument(
     help='By default, the optimized model is used, but with this option, ' +
     'you can switch to the normal (not optimized) model'
 )
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='save result to json'
+)
 args = update_parser(parser)
 
 
@@ -71,13 +77,9 @@ LANDMARK2_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/mediapipe_
 # ======================
 # Utils
 # ======================
-def draw_roi(img, roi):
-    for i in range(roi.shape[0]):
-        (x1, x2, x3, x4), (y1, y2, y3, y4) = roi[i]
-        cv2.line(img, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 0), 2)
-        cv2.line(img, (int(x1), int(y1)), (int(x3), int(y3)), (0, 255, 0), 2)
-        cv2.line(img, (int(x2), int(y2)), (int(x4), int(y4)), (0, 0, 0), 2)
-        cv2.line(img, (int(x3), int(y3)), (int(x4), int(y4)), (0, 0, 0), 2)
+EYE_CONTOUR_ORDERED = [
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 15, 14, 13, 12, 11, 10, 9
+]
 
 
 def draw_landmarks(img, points, color=(0, 0, 255), size=2):
@@ -99,9 +101,6 @@ def draw_eye_iris(
     """
     TODO: docstring
     """
-    EYE_CONTOUR_ORDERED = [
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 15, 14, 13, 12, 11, 10, 9
-    ]
 
     for i in range(2):
         pts = eyes[i, EYE_CONTOUR_ORDERED, :2].round().astype(np.int32)
@@ -112,6 +111,25 @@ def draw_eye_iris(
         radius = int(np.linalg.norm(iris[i, 1] - iris[i, 0]).round())
         cv2.circle(img, center, radius, iris_color, thickness=size)
         draw_landmarks(img, iris[i], color=iris_pt_color, size=size)
+
+
+def save_json(
+        json_path,
+        eyes,
+        iris
+):
+    output = []
+    for eyes_idx in range(len(eyes)):
+        e = eyes[eyes_idx, :, :16, :2]
+        i = iris[eyes_idx, :, :, :2]
+        o = {}
+        for eye_idx in range(2):
+            o[f'contour_pts_{eye_idx}'] = e[eye_idx, EYE_CONTOUR_ORDERED, :2].tolist()
+            o[f'landmarks_{eye_idx}'] = i[eye_idx].tolist()
+        output.append(o)
+
+    with open(json_path, 'w') as f:
+        json.dump(output, f, indent=2)
 
 
 # ======================
@@ -201,6 +219,10 @@ def recognize_from_image():
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, src_img)
+
+        if args.write_json:
+            save_json((savepath.rsplit('.', 1)[0]) + '.json', eyes, iris)
+
     logger.info('Script finished successfully.')
 
 
