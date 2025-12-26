@@ -85,7 +85,7 @@ def get_base_parser(
               'execution performance. (Cannot be used in video mode)')
     )
     default_env_id = ailia.get_gpu_environment_id() if AILIA_EXIST else 0
-    if platform.machine().startswith("arm") and ("rasp" in platform.platform().lower() or "rpt-rpi" in platform.platform().lower()):
+    if (platform.machine().startswith("arm") or platform.machine().startswith("aarch64")) and ("rasp" in platform.platform().lower() or "rpt-rpi" in platform.platform().lower()):
         default_env_id = ailia.ENVIRONMENT_AUTO # Since Vulkan on the Raspberry Pi is slow, the CPU is recommended.
     if AILIA_EXIST and default_env_id != ailia.ENVIRONMENT_AUTO:
         if not fp16_support:
