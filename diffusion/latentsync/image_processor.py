@@ -52,6 +52,7 @@ class ImageProcessor:
         self.fa = face_alignment.FaceAlignment(
             face_alignment.LandmarksType.TWO_D,
             flip_input=False,
+            device='cpu'
         )
 
     def affine_transform(self, image: np.ndarray) -> np.ndarray:
