@@ -180,7 +180,7 @@ else:
     )
 
 if not args.disable_ailia_tokenizer:
-    from ailia_tokenizer import get_tokenizer
+    from ailia_simple_tokenizer import get_tokenizer
 else:
     from tokenizer import get_tokenizer
 
@@ -656,7 +656,7 @@ def detect_language(enc_net, dec_net, mel, tokenizer=None):
         language_tokens = language_tokens[0]
         language_probs = language_probs[0]
 
-    return language_tokens, language_probs
+    return language_tokens, language_probs, mel
 
 
 DecodingResult = namedtuple(
@@ -674,7 +674,7 @@ DecodingResult = namedtuple(
 )
 
 
-def decode(enc_net, dec_net, mel, options):
+def decode(enc_net, dec_net, mel, options, audio_features_cache = None):
     single = mel.ndim == 2
     if single:
         mel = mel.unsqueeze(0)
@@ -725,7 +725,10 @@ def decode(enc_net, dec_net, mel, options):
     decoder.reset()
     n_audio = mel.shape[0]
 
-    audio_features = get_audio_features(enc_net, mel)
+    if audio_features_cache is not None:
+        audio_features = audio_features_cache
+    else:
+        audio_features = get_audio_features(enc_net, mel)
     tokens = np.repeat(np.array([initial_tokens]), n_audio, axis=-1)
     languages = [language] * audio_features.shape[0]
 
@@ -832,7 +835,7 @@ def decode(enc_net, dec_net, mel, options):
     return result
 
 
-def decode_with_fallback(enc_net, dec_net, segment, decode_options):
+def decode_with_fallback(enc_net, dec_net, segment, decode_options, audio_features_cache = None):
     logprob_threshold = decode_options.get("logprob_threshold", -1.0)
     temperature = decode_options.get("temperature", 0)
     no_speech_threshold = decode_options.get("no_speech_threshold", 0.6)
@@ -855,7 +858,7 @@ def decode_with_fallback(enc_net, dec_net, segment, decode_options):
             kwargs.pop("best_of", None)
 
         options = {**kwargs, "temperature": t}
-        decode_result = decode(enc_net, dec_net, segment, options)[0]
+        decode_result = decode(enc_net, dec_net, segment, options, audio_features_cache = audio_features_cache)[0]
 
         needs_fallback = False
         if (
@@ -913,9 +916,10 @@ def predict(wav, enc_net, dec_net, immediate=False, microphone=False):
     mel = log_mel_spectrogram(wav, dims.n_mels, padding=N_SAMPLES)
     content_frames = mel.shape[-1] - N_FRAMES
 
+    audio_features_cache = None
     if language is None:
         segment = pad_or_trim(mel, N_FRAMES)
-        _, probs = detect_language(enc_net, dec_net, segment)
+        _, probs, audio_features_cache = detect_language(enc_net, dec_net, segment)
         decode_options["language"] = language = max(probs, key=probs.get)
         logger.info(
             f"Detected language: {LANGUAGES[decode_options['language']].title()}"
@@ -971,9 +975,11 @@ def predict(wav, enc_net, dec_net, immediate=False, microphone=False):
         mel_segment = pad_or_trim(mel_segment, N_FRAMES)
 
         decode_options["prompt"] = all_tokens[prompt_reset_since:]
-        result = decode_with_fallback(enc_net, dec_net, mel_segment, decode_options)
+        result = decode_with_fallback(enc_net, dec_net, mel_segment, decode_options, audio_features_cache = audio_features_cache)
         result = result[0]
         tokens = np.array(result.tokens)
+
+        audio_features_cache = None
 
         if no_speech_threshold is not None:
             # no voice activity check
