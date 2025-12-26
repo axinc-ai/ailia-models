@@ -144,6 +144,7 @@ If you would like to try on your computer:
 | [gpt-sovits-v2](/audio_processing/gpt-sovits-v2/) | [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) | Pytorch | 1.4.0 and later | Aug 2024 |  |
 | [gpt-sovits-v3](/audio_processing/gpt-sovits-v3/) | [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) | Pytorch | 1.4.0 and later | Feb 2025 |  |
 | [cosyvoice2](/audio_processing/cosyvoice2/) | [CosyVoice2](https://github.com/FunAudioLLM/CosyVoice/tree/main) | Pytorch | 1.4.0 and later | Dec 2024 |  |
+| [zonos](/audio_processing/zonos/) | [Zonos](https://github.com/Zyphra/Zonos) | Pytorch | 1.4.0 and later | Feb 2025 |  |
 
 ### Voice activity detection
 
