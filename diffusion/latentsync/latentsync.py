@@ -295,6 +295,7 @@ def main():
         )
         vae_decoder = onnxruntime.InferenceSession(
             WEIGHT_VAE_DEC_PATH, providers=providers
+        )
         audio_encoder = onnxruntime.InferenceSession(
             WEIGHT_AUDIO_ENC_PATH, providers=providers
         )
