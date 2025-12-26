@@ -158,7 +158,7 @@ def update_parser(parser, check_input_type=True):
                 logger.info("  env[" + str(idx) + "]=" + str(env))
 
         if args.env_id == ailia.ENVIRONMENT_AUTO:
-            if count >= 2:
+            if count >= 2 and ailia.get_environment(1).type == "BLAS":
                 args.env_id = 1
             else:
                 args.env_id = 0
