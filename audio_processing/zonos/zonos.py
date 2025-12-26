@@ -37,6 +37,8 @@ MODEL_COND_PATH = "conditioner.onnx.prototxt"
 MODEL_FIRST_PATH = "generator_first.onnx.prototxt"
 MODEL_STAGE_PATH = "generator_stage.onnx.prototxt"
 MODEL_DEC_PATH = "autoencoder.onnx.prototxt"
+PB_GENERATOR_STAGE_PATH = "generator_stage_weights.pb"
+PB_GENERATOR_FIRST_PATH = "generator_first_weights.pb"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/zonos/"
 
 REF_WAV_PATH = "exampleaudio.mp3"
@@ -404,6 +406,7 @@ def main():
     check_and_download_models(WEIGHT_FIRST_PATH, MODEL_FIRST_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_STAGE_PATH, MODEL_STAGE_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_DEC_PATH, MODEL_DEC_PATH, REMOTE_PATH)
+    check_and_download_models(PB_GENERATOR_STAGE_PATH, PB_GENERATOR_FIRST_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
