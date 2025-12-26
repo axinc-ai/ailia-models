@@ -21,8 +21,6 @@ G2PWは、中国語（北京語）の書記素（漢字）を音素に変換す�
 ```
 
 ## Usage
-初回実行時に、自動的にONNXファイルをダウンロードします。
-ダウンロード中はインターネットに接続している必要があります。
 
 デフォルトのテキストを使用する場合、
 ```bash
@@ -41,8 +39,7 @@ $ python3 g2pw.py --style pinyin
 
 ## Reference
 
-- [G2PW](https://github.com/jason-zyy/G2PW)
-
+- [G2PW]
 
 ## Model Format
 
