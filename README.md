@@ -312,7 +312,6 @@ If you would like to try on your computer:
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
 | [<img src="face_recognition/ax_facial_features/man-with-beard.jpg" width=128px>](face_recognition/ax_facial_features) | [ax_facial_features](/face_recognition/ax_facial_features/)| ax Facial Features | Pytorch | 1.2.5 and later |[EN](https://medium.com/axinc-ai/ax-facial-features-eyelids-eyelashes-and-facial-hair-classification-9b3b12f1d6a1) |
 | [<img src="face_recognition/face-anti-spoofing/output.png" width=128px>](face_recognition/face-anti-spoofing/) | [face-anti-spoofing](/face_recognition/face-anti-spoofing/) | [Lightweight Face Anti Spoofing](https://github.com/kprokofi/light-weight-face-anti-spoofing) | Pytorch | 1.2.5 and later | [EN](https://medium.com/axinc-ai/faceantispoofing-a-machine-learning-model-to-determine-if-a-face-is-real-b6c30f12abb6) [JP](https://medium.com/axinc/faceantispoofing-%E6%9C%AC%E7%89%A9%E3%81%AE%E9%A1%94%E3%81%8B%E3%81%A9%E3%81%86%E3%81%8B%E3%82%92%E5%88%A4%E5%AE%9A%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-c7092c1dde43) |
-| [<img src="face_recognition/sadtalker/input.png" width=128px>](face_recognition/sadtalker/) | [SadTalker](face_recognition/sadtalker/) | [SadTalker](https://github.com/OpenTalker/SadTalker) | Pytorch | 1.5.0 and later |  |
 
 
 ## Face restoration
@@ -350,6 +349,7 @@ If you would like to try on your computer:
 | [<img src="generative_adversarial_networks/encoder4editing/output.png" width=128px>](generative_adversarial_networks/encoder4editing/) | [encoder4editing](/generative_adversarial_networks/encoder4editing/) | [Designing an Encoder for StyleGAN Image Manipulation](https://github.com/omertov/encoder4editing) | Pytorch | 1.2.10 and later | |
 | [<img src="generative_adversarial_networks/lipgan/input.jpg" width=128px>](generative_adversarial_networks/lipgan/) | [lipgan](/generative_adversarial_networks/lipgan/) | [LipGAN](https://github.com/Rudrabha/LipGAN) | Keras | 1.2.15 and later | [JP](https://medium.com/axinc/lipgan-%E3%83%AA%E3%83%83%E3%83%97%E3%82%B7%E3%83%B3%E3%82%AF%E5%8B%95%E7%94%BB%E3%82%92%E7%94%9F%E6%88%90%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-57511508eaff) |
 | [<img src="generative_adversarial_networks/live_portrait/s6.jpg" width=128px>](generative_adversarial_networks/live_portrait/) | [live_portrait](/generative_adversarial_networks/live_portrait)| [LivePortrait](https://github.com/KwaiVGI/LivePortrait) | Pytorch | 1.5.0 and later | [JP](https://medium.com/axinc/live-portrait-1%E6%9E%9A%E3%81%AE%E7%94%BB%E5%83%8F%E3%82%92%E5%8B%95%E3%81%8B%E3%81%9B%E3%82%8Bai%E3%83%A2%E3%83%87%E3%83%AB-8eaa7d3eb683)|
+| [<img src="generative_adversarial_networks/sadtalker/input.png" width=128px>](generative_adversarial_networks/sadtalker/) | [SadTalker](generative_adversarial_networks/sadtalker/) | [SadTalker](https://github.com/OpenTalker/SadTalker) | Pytorch | 1.5.0 and later |  |
 
 ## Hand detection
 
