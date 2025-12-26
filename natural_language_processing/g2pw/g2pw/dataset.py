@@ -1,7 +1,4 @@
-import torch
-from torch.utils.data import Dataset
-from torch.nn.utils.rnn import pad_sequence
-
+import numpy as np
 from g2pw.utils import tokenize_and_map
 
 ANCHOR_CHAR = '▁'
@@ -42,7 +39,7 @@ def prepare_pos(pos_path):
      return open(pos_path).read().rstrip().split('\n')
 
 
-class TextDataset(Dataset):
+class TextDataset:
     POS_TAGS = ['UNK', 'A', 'C', 'D', 'I', 'N', 'P', 'T', 'V', 'DE', 'SHI']
 
     def __init__(self, tokenizer, labels, char2phonemes, chars, texts, query_ids, phonemes=None, pos_tags=None,
@@ -123,9 +120,9 @@ class TextDataset(Dataset):
 
         processed_tokens = ['[CLS]'] + tokens + ['[SEP]']
 
-        input_ids = torch.tensor(self.tokenizer.convert_tokens_to_ids(processed_tokens))
-        token_type_ids = torch.tensor([0] * len(processed_tokens))
-        attention_mask = torch.tensor([1] * len(processed_tokens))
+        input_ids = np.array(self.tokenizer.convert_tokens_to_ids(processed_tokens), dtype=np.int64)
+        token_type_ids = np.array([0] * len(processed_tokens), dtype=np.int64)
+        attention_mask = np.array([1] * len(processed_tokens), dtype=np.int64)
 
         query_char = text[query_id]
         phoneme_mask = [1 if i in self.char2phonemes[query_char] else 0 for i in range(len(self.labels))] \
@@ -164,17 +161,25 @@ class TextDataset(Dataset):
         return len(self.texts)
 
     def create_mini_batch(self, samples):
-
         def _agg(name):
             return [sample[name] for sample in samples]
 
-        # zero pad 到同一序列長度
-        input_ids = pad_sequence(_agg('input_ids'), batch_first=True)
-        token_type_ids = pad_sequence(_agg('token_type_ids'), batch_first=True)
-        attention_mask = pad_sequence(_agg('attention_mask'), batch_first=True)
-        phoneme_mask = torch.tensor(_agg('phoneme_mask'), dtype=torch.float)
-        char_ids = torch.tensor(_agg('char_id'), dtype=torch.long)
-        position_ids = torch.tensor(_agg('position_id'), dtype=torch.long)
+        # numpyによるpad_sequenceの実装
+        def pad_sequence_np(sequences, padding_value=0):
+            max_len = max([len(s) for s in sequences])
+            # (Batch, MaxLen)
+            out = np.full((len(sequences), max_len), padding_value, dtype=np.int64)
+            for i, seq in enumerate(sequences):
+                out[i, :len(seq)] = seq
+            return out
+
+        input_ids = pad_sequence_np(_agg('input_ids'))
+        token_type_ids = pad_sequence_np(_agg('token_type_ids'))
+        attention_mask = pad_sequence_np(_agg('attention_mask'))
+        
+        phoneme_mask = np.array(_agg('phoneme_mask'), dtype=np.float32)
+        char_ids = np.array(_agg('char_id'), dtype=np.int64)
+        position_ids = np.array(_agg('position_id'), dtype=np.int64)
 
         batch_output = {
             'input_ids': input_ids,
@@ -186,11 +191,11 @@ class TextDataset(Dataset):
         }
 
         if self.use_pos and self.pos_tags is not None:
-            pos_ids = torch.tensor(_agg('pos_id'), dtype=torch.long)
+            pos_ids = np.array(_agg('pos_id'), dtype=np.int64)
             batch_output['pos_ids'] = pos_ids
 
         if self.for_train:
-            label_ids = torch.tensor(_agg('label_id'), dtype=torch.long)
+            label_ids = np.array(_agg('label_id'), dtype=np.int64)
             batch_output['label_ids'] = label_ids
         else:
             infos = _agg('info')

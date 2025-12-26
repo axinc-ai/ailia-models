@@ -5,7 +5,6 @@ import zipfile
 from io import BytesIO
 import shutil
 
-from torch.utils.data import DataLoader
 from transformers import BertTokenizer
 from tqdm import tqdm
 import onnxruntime
@@ -17,24 +16,25 @@ from g2pw.utils import load_config
 MODEL_URL = 'https://storage.googleapis.com/esun-ai/g2pW/G2PWModel-v2-onnx.zip'
 
 
-def predict(onnx_session, dataloader, labels, turnoff_tqdm=False):
+def predict(onnx_session, dataloader_or_generator, labels, turnoff_tqdm=False):
     all_preds = []
     all_confidences = []
 
-    generator = dataloader if turnoff_tqdm else tqdm(dataloader, desc='predict')
+    generator = dataloader_or_generator if turnoff_tqdm else tqdm(dataloader_or_generator, desc='predict')
     for data in generator:
         input_ids, token_type_ids, attention_mask, phoneme_mask, char_ids, position_ids = \
             [data[name] for name in ('input_ids', 'token_type_ids', 'attention_mask', 'phoneme_mask', 'char_ids', 'position_ids')]
 
+        # データは既にnumpy配列になっているため、.numpy()呼び出しは不要
         probs = onnx_session.run(
             [],
             {
-                'input_ids': input_ids.numpy(),
-                'token_type_ids': token_type_ids.numpy(),
-                'attention_mask': attention_mask.numpy(),
-                'phoneme_mask': phoneme_mask.numpy(),
-                'char_ids': char_ids.numpy(),
-                'position_ids': position_ids.numpy()
+                'input_ids': input_ids,
+                'token_type_ids': token_type_ids,
+                'attention_mask': attention_mask,
+                'phoneme_mask': phoneme_mask,
+                'char_ids': char_ids,
+                'position_ids': position_ids
             }
         )[0]
 
@@ -146,14 +146,14 @@ class G2PWConverter:
                               use_mask=self.config.use_mask, use_char_phoneme=self.config.use_char_phoneme,
                               window_size=self.config.window_size, for_train=False)
 
-        dataloader = DataLoader(
-            dataset=dataset,
-            batch_size=self.batch_size,
-            collate_fn=dataset.create_mini_batch,
-            num_workers=self.num_workers
-        )
+        # DataLoaderの代わりにジェネレータ関数を定義
+        def batch_generator():
+            n_samples = len(dataset)
+            for i in range(0, n_samples, self.batch_size):
+                batch_samples = [dataset[j] for j in range(i, min(i + self.batch_size, n_samples))]
+                yield dataset.create_mini_batch(batch_samples)
 
-        preds, confidences = predict(self.session_g2pw, dataloader, self.labels, turnoff_tqdm=self.turnoff_tqdm)
+        preds, confidences = predict(self.session_g2pw, batch_generator(), self.labels, turnoff_tqdm=self.turnoff_tqdm)
 
         if self.config.use_char_phoneme:
             preds = [pred.split(' ')[1] for pred in preds]
