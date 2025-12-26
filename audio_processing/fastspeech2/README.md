@@ -45,26 +45,6 @@ $ python3 fastspeech2.py \
   --duration_control 0.8
 ```
 
-### Batch Synthesis
-
-Synthesize from a text file (like train.txt or val.txt format):
-
-```bash
-$ python3 fastspeech2.py --source input.txt --mode batch
-```
-
-The source file format should be like:
-```
-basename1|speaker_id|text
-basename2|speaker_id|text
-```
-
-Or simplified format (for single speaker):
-```
-This is the first sentence.
-This is the second sentence.
-```
-
 ### Multi-Speaker Models
 
 For LibriTTS (English, Multi-Speaker)
@@ -91,9 +71,7 @@ $ python3 fastspeech2.py \
 
 ### Core Arguments (same as original FastSpeech2 repo)
 
-- `--source`: Path to a source file with format like train.txt and val.txt (for batch mode)
 - `--restore_step`: Step for checkpoint to restore (default: 900000)
-- `--mode`: Synthesize mode - 'single' or 'batch' (default: 'single')
 - `--text`: Raw text to synthesize (for single-sentence mode only)
 - `--speaker_id`: Speaker ID for multi-speaker synthesis (for single-sentence mode only, default: 0)
 - `-p`, `--pitch_control`: Control the pitch of the whole utterance, larger value for higher pitch (default: 1.0)

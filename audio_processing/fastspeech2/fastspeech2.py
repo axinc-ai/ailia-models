@@ -25,7 +25,7 @@ WEIGHT_PATH_FS2 = 'ljspeech.onnx'
 MODEL_PATH_FS2 = 'ljspeech.onnx.prototxt'
 WEIGHT_PATH_HIFI = 'hifigan.onnx'
 MODEL_PATH_HIFI = 'hifigan.onnx.prototxt'
-REMOTE_PATH = "https://storage.googleapis.com/ailia-models/fastspeech2/"
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/fastspeech2"
 
 PREPROCESS_CONFIG = "config/LJSpeech/preprocess.yaml"
 
@@ -41,12 +41,14 @@ parser = get_base_parser(
     'output.wav'
 )
 # 元のFastSpeech2リポジトリと同じ引数名
-parser.add_argument(
-    '--source',
-    type=str,
-    default=None,
-    help='path to a source file with format like train.txt and val.txt'
-)
+
+# レビュワーの要望により、バッチ処理機能は削除
+# parser.add_argument(
+#     '--source',
+#     type=str,
+#     default=None,
+#     help='path to a source file with format like train.txt and val.txt'
+# )
 parser.add_argument(
     '--restore_step',
     type=int,
@@ -54,14 +56,14 @@ parser.add_argument(
     default=900000,
     help='step for checkpoint to restore'
 )
-parser.add_argument(
-    '--mode',
-    type=str,
-    choices=['batch', 'single'],
-    required=False,
-    default='single',
-    help='Synthesize a whole dataset or a single sentence'
-)
+# parser.add_argument(
+#     '--mode',
+#     type=str,
+#     choices=['batch', 'single'],
+#     required=False,
+#     default='single',
+#     help='Synthesize a whole dataset or a single sentence'
+# )
 parser.add_argument(
     '-t', '--text',
     type=str,
@@ -223,82 +225,59 @@ def infer():
     # -------------------------------------------
     # 入力データの準備（パディング処理）
     # -------------------------------------------
-    # sourceファイルがあればそこから読み込み、なければtextを使用
-    texts_to_process = []
-    if hasattr(args, 'source') and args.source and os.path.exists(args.source):
-        logger.info(f"Reading texts from source file: {args.source}")
-        with open(args.source, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    # フォーマット: speaker_id|text もしくは text のみ
-                    if '|' in line:
-                        parts = line.split('|')
-                        if len(parts) >= 2:
-                            texts_to_process.append((parts[0], '|'.join(parts[1:])))
-                        else:
-                            texts_to_process.append((str(args.speaker_id), line))
-                    else:
-                        texts_to_process.append((str(args.speaker_id), line))
-    else:
-        # コマンドラインからの単一テキスト
-        texts_to_process.append((str(args.speaker_id), args.text))
+    # 単一テキスト処理のみに限定
+    speaker_id = args.speaker_id
+    text = args.text
     
-    # 各テキストを処理
-    for idx, (speaker_str, text) in enumerate(texts_to_process):
-        speaker_id = int(speaker_str) if speaker_str.isdigit() else args.speaker_id
-        
-        #logger.info(f"\n{'='*60}")
-        logger.info(f"Processing text {idx+1}/{len(texts_to_process)}")
-        logger.info(f"Speaker ID: {speaker_id}")
-        logger.info(f"Input Text: {text}")
-        
-        preprocess_func = get_preprocess_method(preprocess_config)
-        sequence = preprocess_func(text, preprocess_config)
+    logger.info(f"Speaker ID: {speaker_id}")
+    logger.info(f"Input Text: {text}")
     
-        real_len = len(sequence)
-        logger.info(f"Original Length: {real_len}")
-        
-        # 1. パディング処理: 常に max_length に揃える
-        if real_len > MODEL_MAX_LENGTH:
-            logger.info(f"Warning: Text too long ({real_len}). Truncating to {MODEL_MAX_LENGTH}.")
-            real_len = MODEL_MAX_LENGTH # Safety limit
+    preprocess_func = get_preprocess_method(preprocess_config)
+    sequence = preprocess_func(text, preprocess_config)
 
-        padded_sequence = np.zeros((1, MODEL_MAX_LENGTH), dtype=np.int64)
-        padded_sequence[0, :real_len] = sequence[:real_len]
+    real_len = len(sequence)
+    logger.info(f"Original Length: {real_len}")
+    
+    # 1. パディング処理: 常に max_length に揃える
+    if real_len > MODEL_MAX_LENGTH:
+        logger.info(f"Warning: Text too long ({real_len}). Truncating to {MODEL_MAX_LENGTH}.")
+        real_len = MODEL_MAX_LENGTH # Safety limit
 
-        # 入力変数（引数から制御パラメータを取得）
-        texts = padded_sequence
-        src_lens = np.array([real_len], dtype=np.int64)
-        
-        # max_src_lenの形状を確認して適切に設定
-        max_src_len = None
-        if "max_src_len" in fs2_input_names:
-            max_src_len_shape = fs2_net.get_blob_shape("max_src_len")
-            if len(max_src_len_shape) == 0:
-                # スカラーとして渡す
-                max_src_len = np.array(MODEL_MAX_LENGTH, dtype=np.int64)
-            else:
-                # 配列として渡す（通常は[1]）
-                max_src_len = np.array([MODEL_MAX_LENGTH], dtype=np.int64)
-        
-        # speakersの形状を設定（全モデルが (batch, 1))
-        speakers = None
-        if "speakers" in fs2_input_names:
-            # (batch, 1) の形状
-            speakers = np.array([[speaker_id]], dtype=np.int64)
-        
-        p_control = np.array(args.pitch_control, dtype=np.float32)
-        e_control = np.array(args.energy_control, dtype=np.float32)
-        d_control = np.array(args.duration_control, dtype=np.float32)
+    padded_sequence = np.zeros((1, MODEL_MAX_LENGTH), dtype=np.int64)
+    padded_sequence[0, :real_len] = sequence[:real_len]
 
-        # FastSpeech2推論とHiFi-GAN処理を実行
-        _synthesize(fs2_net, hifi_net, texts, src_lens, max_src_len, speakers, 
-                   p_control, e_control, d_control, preprocess_config, sequence, real_len, idx, 
-                   fs2_output_names, fs2_input_names)
+    # 入力変数（引数から制御パラメータを取得）
+    texts = padded_sequence
+    src_lens = np.array([real_len], dtype=np.int64)
+    
+    # max_src_lenの形状を確認して適切に設定
+    max_src_len = None
+    if "max_src_len" in fs2_input_names:
+        max_src_len_shape = fs2_net.get_blob_shape("max_src_len")
+        if len(max_src_len_shape) == 0:
+            # スカラーとして渡す
+            max_src_len = np.array(MODEL_MAX_LENGTH, dtype=np.int64)
+        else:
+            # 配列として渡す（通常は[1]）
+            max_src_len = np.array([MODEL_MAX_LENGTH], dtype=np.int64)
+    
+    # speakersの形状を設定（全モデルが (batch, 1))
+    speakers = None
+    if "speakers" in fs2_input_names:
+        # (batch, 1) の形状
+        speakers = np.array([[speaker_id]], dtype=np.int64)
+    
+    p_control = np.array(args.pitch_control, dtype=np.float32)
+    e_control = np.array(args.energy_control, dtype=np.float32)
+    d_control = np.array(args.duration_control, dtype=np.float32)
+
+    # FastSpeech2推論とHiFi-GAN処理を実行
+    _synthesize(fs2_net, hifi_net, texts, src_lens, max_src_len, speakers, 
+               p_control, e_control, d_control, preprocess_config, sequence, real_len,
+               fs2_output_names, fs2_input_names)
 
 def _synthesize(fs2_net, hifi_net, texts, src_lens, max_src_len, speakers, 
-               p_control, e_control, d_control, preprocess_config, sequence, real_len, idx, 
+               p_control, e_control, d_control, preprocess_config, sequence, real_len,
                fs2_output_names, fs2_input_names):
 
     # -------------------------------------------
@@ -408,12 +387,8 @@ def _synthesize(fs2_net, hifi_net, texts, src_lens, max_src_len, speakers,
     wav = wav * MAX_WAV_VALUE
     wav = wav.astype('int16')
     
-    # 複数ファイル対応: インデックスを使った保存パス生成
-    if idx > 0:
-        base, ext = os.path.splitext(args.savepath)
-        savepath = f"{base}_{idx}{ext}"
-    else:
-        savepath = args.savepath
+    # 単一ファイル出力のため、保存パスはargs.savepathを直接使用
+    savepath = args.savepath
     
     logger.info(f"Saving to {savepath}")
     
