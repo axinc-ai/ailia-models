@@ -1,6 +1,6 @@
 # G2PW: A Neural Grapheme-to-Phoneme Converter for Mandarin Chinese
 
-G2PWは、中国語（北京語）の書記素（漢字）を音素に変換するニューラルネットワークモデルです。
+G2PW is a neural network model that converts Chinese (Mandarin) graphemes (characters) into phonemes.
 
 ## Input
 
@@ -22,29 +22,36 @@ G2PWは、中国語（北京語）の書記素（漢字）を音素に変換す�
 
 ## Usage
 
-デフォルトのテキストを使用する場合、
+Please ensure that the ONNX file is placed in the `G2PWModel/` directory.
+
+To run with the default text:
+
 ```bash
 $ python3 g2pw.py
 ```
 
-任意のテキストを指定する場合、
+To specify custom text:
+
 ```bash
 $ python3 g2pw.py --input '你好世界'
 ```
 
-出力スタイルを指定する場合、
+To specify the outout style:\
+[pinyin]
 ```bash
 $ python3 g2pw.py --style pinyin
 ```
-
+[Bopomofo]
+```bash
+$ python3 g2pw.py --style bopomofo
+```
 ## Reference
 
-- [G2PW]
+- [G2PW]  
+ https://github.com/GitYCC/g2pW
 
 ## Model Format
-
 ONNX opset=12
-
 
 ## Python version
 Python 3.6.13 
