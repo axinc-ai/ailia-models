@@ -40,15 +40,6 @@ parser = get_base_parser(
      None,
     'output.wav'
 )
-# 元のFastSpeech2リポジトリと同じ引数名
-
-# レビュワーの要望により、バッチ処理機能は削除
-# parser.add_argument(
-#     '--source',
-#     type=str,
-#     default=None,
-#     help='path to a source file with format like train.txt and val.txt'
-# )
 parser.add_argument(
     '--restore_step',
     type=int,
@@ -56,14 +47,6 @@ parser.add_argument(
     default=900000,
     help='step for checkpoint to restore'
 )
-# parser.add_argument(
-#     '--mode',
-#     type=str,
-#     choices=['batch', 'single'],
-#     required=False,
-#     default='single',
-#     help='Synthesize a whole dataset or a single sentence'
-# )
 parser.add_argument(
     '-t', '--text',
     type=str,

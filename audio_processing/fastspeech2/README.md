@@ -2,7 +2,7 @@
 
 ## Input
 
-Text
+Text (Supports English and Chinese)
 
 ## Output
 
@@ -63,7 +63,7 @@ For AISHELL-3 (Mandarin, Multi-Speaker):
 $ python3 fastspeech2.py \
   --text "你好" \
   --preprocess_config config/AISHELL3/preprocess.yaml \
-  --onnx_fs2 onnx/aishell3.onnx \
+  --onnx_fs2 aishell3.onnx \
   --speaker_id 16
 ```
 
