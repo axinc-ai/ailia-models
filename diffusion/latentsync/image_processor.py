@@ -47,12 +47,17 @@ class ImageProcessor:
     def __init__(self, size=256):
         self.resolution = size
 
+        device = "cpu"
+        import torch # face_alignment depend to torch
+        if torch.cuda.is_available():
+            device = "cuda"
+
         self.restorer = AlignRestore()
         self.smoother = laplacianSmooth()
         self.fa = face_alignment.FaceAlignment(
             face_alignment.LandmarksType.TWO_D,
             flip_input=False,
-            device='cpu'
+            device=device
         )
 
     def affine_transform(self, image: np.ndarray) -> np.ndarray:
