@@ -98,6 +98,7 @@ If you would like to try on your computer:
 | [rnnoise](/audio_processing/rnnoise/) | [rnnoise](https://github.com/xiph/rnnoise) | Keras | 1.2.15 and later | |
 | [dtln](/audio_processing/dtln/) | [Dual-signal Transformation LSTM Network](https://github.com/breizhn/DTLN) | Tensorflow | 1.3.0 and later |  |
 | [audiosep](/audio_processing/audiosep/) | [AudioSep](https://github.com/Audio-AGI/AudioSep) | Pytorch | 1.3.0 and later | |
+| [demucs](/audio_processing/demucs/) | [Demucs](https://github.com/facebookresearch/demucs) | Pytorch | 1.4.0 and later | |
 
 ### Phoneme alignment
 
