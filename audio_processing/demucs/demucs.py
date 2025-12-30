@@ -21,7 +21,7 @@ flg_ffmpeg = False
 if flg_ffmpeg:
     import ffmpeg
 
-flg_llame = False # save to mp3
+flg_llame = True # save to mp3
 
 try:
     import llameenc
@@ -57,7 +57,7 @@ SAVE_WAV_PATH = "output.wav"
 # ======================
 
 parser = get_base_parser(
-    "Demucs Music Source Separation", WAV_PATH, SAVE_WAV_PATH, input_ftype="audio"
+    "Demucs Music Source Separation", WAV_PATH, SAVE_WAV_PATH, input_ftype="audio", fp16_support=False
 )
 parser.add_argument(
     "-m",
