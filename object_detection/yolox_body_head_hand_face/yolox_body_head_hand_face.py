@@ -41,14 +41,11 @@ MODEL_YOLOX_L_NAME = 'yolox_l_body_head_hand_face_0086_0.5143_post_1x3x480x640'
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser('yolox body head hand face model', IMAGE_PATH, SAVE_IMAGE_PATH)
-#parser.add_argument(
-#    '-w', '--write_prediction',
-#    nargs='?',
-#    const='txt',
-#    choices=['txt', 'json'],
-#    type=str,
-#    help='Output results to txt or json file.'
-#)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='save result to json'
+)
 parser.add_argument(
     '-m', '--model_name', default='l',
     choices=('l'),#, 'm', 'n', 's', 't', 'x'),
@@ -145,21 +142,24 @@ class AbstractModel(ABC):
         env_id: Optional[int] = 0
     ):
         self._env_id = env_id
-        match self._env_id:
-            case 0:
-                providers = ['CPUExecutionProvider']
-            case 2:
-                providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
 
         self._runtime = runtime
         self._model_path = model_path
         self._weight_path = weight_path
         self._class_score_th = class_score_th
-        self._providers = providers
         
         # Model loading
         if self._runtime == 'onnx':
             import onnxruntime # type: ignore
+
+            match self._env_id:
+                case 0:
+                    providers = ['CPUExecutionProvider']
+                case 2:
+                    providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+                case _:
+                    providers = None
+
             session_option = onnxruntime.SessionOptions()
             session_option.log_severity_level = 3
             self._interpreter = \
@@ -564,6 +564,22 @@ def write_image_texts(debug_image, boxes, elapsed_time):
     return debug_image
 
 
+def save_json(json_path, output):
+    import json
+    result = []
+    for box in output:
+        result.append({
+            "classid": box.classid,
+            "score": box.score,
+            "x1": box.x1,
+            "y1": box.y1,
+            "x2": box.x2,
+            "y2": box.y2
+        })
+    with open(json_path, 'w') as f:
+        json.dump(result, f, indent=2)
+
+
 def recognize_from_image(model):
     for image_path in args.input:
         logger.debug(f'input image: {image_path}')
@@ -596,6 +612,10 @@ def recognize_from_image(model):
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
+
+        if args.write_json:
+            json_path = savepath.rsplit('.', 1)[0] + '.json'
+            save_json(json_path, output)
 
     logger.info('Script finished successfully.')
 
