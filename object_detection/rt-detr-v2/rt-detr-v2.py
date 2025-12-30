@@ -12,7 +12,7 @@ sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from image_utils import imread  # noqa
-from detector_utils import plot_results  # noqa
+from detector_utils import plot_results, write_predictions # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
 
 # logger
@@ -61,6 +61,12 @@ parser.add_argument(
     '-a', '--arch', metavar='ARCH',
     default='rtdetrv2_r18vd_120e', choices=MODEL_LISTS,
     help='model lists: ' + ' | '.join(MODEL_LISTS) + ' , ' 
+)
+
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
 )
 
 args = update_parser(parser)
@@ -146,6 +152,10 @@ def recognize_from_image(net):
         savepath = get_savepath(args.savepath, image_path, ext='.png')
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
+
+        if args.write_json:
+            jsonpath = "%s.%s" % (savepath.rsplit('.', 1)[0], 'json')
+            write_predictions(jsonpath, detect_object, img, category=COCO_CATEGORY, file_type='json')
 
     logger.info('Script finished successfully.')
 
