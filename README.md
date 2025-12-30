@@ -4,10 +4,10 @@ The collection of pre-trained, state-of-the-art AI models.
 
 # About ailia SDK
 
-[ailia SDK](https://axinc.jp/en/solutions/ailia_sdk.html) is a self-contained, cross-platform, high-speed inference SDK for AI. The ailia SDK provides a consistent C++ API across Windows, Mac, Linux, iOS, Android, Jetson, and Raspberry Pi platforms. It also supports Unity (C#), Python, Rust, Flutter(Dart) and JNI for efficient AI implementation. The ailia SDK makes extensive use of the GPU through Vulkan and Metal to enable accelerated computing.
+[ailia SDK](https://ailia.ai/en/sdk/) is a self-contained, cross-platform, high-speed inference SDK for AI. The ailia SDK provides a consistent C++ API across Windows, Mac, Linux, iOS, Android, Jetson, and Raspberry Pi platforms. It also supports Unity (C#), Python, Rust, Flutter(Dart) and JNI for efficient AI implementation. The ailia SDK makes extensive use of the GPU through Vulkan and Metal to enable accelerated computing.
 
 - [Contact us](https://www.ailia.ai/en-contact-product)
-- [Mail](mailto:contact@axinc.jp)
+- [Mail](mailto:contact@ailia.ai)
 
 # How to use
 
@@ -98,6 +98,7 @@ If you would like to try on your computer:
 | [rnnoise](/audio_processing/rnnoise/) | [rnnoise](https://github.com/xiph/rnnoise) | Keras | 1.2.15 and later | |
 | [dtln](/audio_processing/dtln/) | [Dual-signal Transformation LSTM Network](https://github.com/breizhn/DTLN) | Tensorflow | 1.3.0 and later |  |
 | [audiosep](/audio_processing/audiosep/) | [AudioSep](https://github.com/Audio-AGI/AudioSep) | Pytorch | 1.3.0 and later | |
+| [demucs](/audio_processing/demucs/) | [Demucs](https://github.com/facebookresearch/demucs) | Pytorch | 1.4.0 and later | |
 
 ### Phoneme alignment
 
