@@ -24,7 +24,7 @@ if flg_ffmpeg:
 flg_llame = True # save to mp3
 
 try:
-    import llameenc
+    import lameenc
 except:
     flg_llame = False
 
