@@ -7,7 +7,6 @@ from typing import Optional
 
 import numpy as np
 import librosa
-import lameenc
 import tqdm
 
 import ailia
@@ -21,6 +20,16 @@ flg_ffmpeg = False
 
 if flg_ffmpeg:
     import ffmpeg
+
+flg_llame = False # save to mp3
+
+try:
+    import llameenc
+except:
+    flg_llame = False
+
+if not flg_llame:
+    import soundfile as sf
 
 logger = getLogger(__name__)
 
@@ -313,12 +322,21 @@ def recognize_from_audio(models):
             output = predict(models, audio)
 
         # save result
-        _savepath = get_savepath(args.savepath, audio_path, ext=".mp3")
-        for name, wav in output.items():
-            wav = wav / max(1.01 * np.max(np.abs(wav)), 1)
-            savepath = _savepath.replace(".mp3", f"_{name}.mp3")
-            logger.info(f"saved at : {savepath}")
-            encode_mp3(wav, savepath, samplerate=SAMPLE_RATE, bitrate=320, quality=2)
+        if flg_llame:
+            _savepath = get_savepath(args.savepath, audio_path, ext=".mp3")
+            for name, wav in output.items():
+                wav = wav / max(1.01 * np.max(np.abs(wav)), 1)
+                savepath = _savepath.replace(".mp3", f"_{name}.mp3")
+                logger.info(f"saved at : {savepath}")
+                encode_mp3(wav, savepath, samplerate=SAMPLE_RATE, bitrate=320, quality=2)
+        else:
+            _savepath = get_savepath(args.savepath, audio_path, ext=".wav")
+            for name, wav in output.items():
+                wav = wav / max(1.01 * np.max(np.abs(wav)), 1)
+                wav = wav.T.astype(np.float32)
+                savepath = _savepath.replace(".wav", f"_{name}.wav")
+                logger.info(f"saved at : {savepath}")
+                sf.write(savepath, wav, SAMPLE_RATE)
 
     logger.info("Script finished successfully.")
 
