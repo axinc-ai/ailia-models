@@ -21,7 +21,7 @@ If you would like to try on your computer:
 
 # Documentation
 
-[ailia-models wiki](https://deepwiki.com/axinc-ai/ailia-models)
+[ailia-models wiki](https://deepwiki.com/ailia-ai/ailia-models)
 
 # Supported models
 390 models as of December 17, 2025
