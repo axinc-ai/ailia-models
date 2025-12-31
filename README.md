@@ -35,7 +35,7 @@ If you would like to try on your computer:
 - 2025.09.22 Add paddleocr_v3
 - 2025.07.17 Add 6d_repnet_360, siglip2
 
-- More information in our [Wiki](https://github.com/axinc-ai/ailia-models/wiki)
+- More information in our [Wiki](https://github.com/ailia-ai/ailia-models/wiki)
 
 ## Action recognition
 
@@ -243,9 +243,9 @@ If you would like to try on your computer:
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
 | [<img src="face_detection/yolov1-face/output.png" width=128px>](face_detection/yolov1-face/) | [yolov1-face](/face_detection/yolov1-face/) | [YOLO-Face-detection](https://github.com/dannyblueliu/YOLO-Face-detection/) | Darknet | 1.1.0 and later |
-| [<img src="face_detection/yolov3-face/output.png" width=128px>](face_detection/yolov3-face/) | [yolov3-face](/face_detection/yolov3-face/) | [Face detection using keras-yolov3](https://github.com/axinc-ai/yolov3-face) | Keras | 1.2.1 and later |
+| [<img src="face_detection/yolov3-face/output.png" width=128px>](face_detection/yolov3-face/) | [yolov3-face](/face_detection/yolov3-face/) | [Face detection using keras-yolov3](https://github.com/ailia-ai/yolov3-face) | Keras | 1.2.1 and later |
 | [<img src="face_detection/blazeface/result.png" width=128px>](face_detection/blazeface/) |[blazeface](/face_detection/blazeface/)| [BlazeFace-PyTorch](https://github.com/hollance/BlazeFace-PyTorch) | Pytorch | 1.2.1 and later | [EN](https://medium.com/axinc-ai/blazeface-a-machine-learning-model-for-fast-detection-of-face-positions-and-key-points-5dcfb9429d72) [JP](https://medium.com/axinc/blazeface-%E9%A1%94%E3%81%AE%E4%BD%8D%E7%BD%AE%E3%81%A8%E3%82%AD%E3%83%BC%E3%83%9D%E3%82%A4%E3%83%B3%E3%83%88%E3%82%92%E9%AB%98%E9%80%9F%E3%81%AB%E6%A4%9C%E5%87%BA%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-e851c348a32b) |
-| [<img src="face_detection/face-mask-detection/output.png" width=128px>](face_detection/face-mask-detection/)| [face-mask-detection](/face_detection/face-mask-detection/) | [Face detection using keras-yolov3](https://github.com/axinc-ai/yolov3-face) | Keras | 1.2.1 and later | [EN](https://medium.com/axinc-ai/facemaskdetection-a-machine-learning-model-to-determine-if-a-person-is-wearing-a-mask-e5a581ea8af9) [JP](https://medium.com/axinc/facemaskdetection-%E3%83%9E%E3%82%B9%E3%82%AF%E3%82%92%E4%BB%98%E3%81%91%E3%81%A6%E3%81%84%E3%82%8B%E3%81%8B%E3%82%92%E5%88%A4%E5%AE%9A%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-b06793f79a97) |
+| [<img src="face_detection/face-mask-detection/output.png" width=128px>](face_detection/face-mask-detection/)| [face-mask-detection](/face_detection/face-mask-detection/) | [Face detection using keras-yolov3](https://github.com/ailia-ai/yolov3-face) | Keras | 1.2.1 and later | [EN](https://medium.com/axinc-ai/facemaskdetection-a-machine-learning-model-to-determine-if-a-person-is-wearing-a-mask-e5a581ea8af9) [JP](https://medium.com/axinc/facemaskdetection-%E3%83%9E%E3%82%B9%E3%82%AF%E3%82%92%E4%BB%98%E3%81%91%E3%81%A6%E3%81%84%E3%82%8B%E3%81%8B%E3%82%92%E5%88%A4%E5%AE%9A%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-b06793f79a97) |
 | [<img src="face_detection/dbface/selfie_output.png" width=128px>](face_detection/dbface/)| [dbface](face_detection/dbface/) | [DBFace : real-time, single-stage detector for face detection, <br/>with faster speed and higher accuracy](https://github.com/dlunion/DBFace) | Pytorch | 1.2.2 and later |
 | [<img src="face_detection/retinaface/selfie_output.png" width=128px>](face_detection/retinaface/)| [retinaface](face_detection/retinaface/) | [RetinaFace: Single-stage Dense Face Localisation in the Wild.](https://github.com/biubug6/Pytorch_Retinaface) | Pytorch | 1.2.5 and later |  [JP](https://medium.com/axinc/retinaface-%E9%AB%98%E8%A7%A3%E5%83%8F%E5%BA%A6%E3%81%AB%E5%AF%BE%E5%BF%9C%E3%81%97%E3%81%9F%E9%A1%94%E6%A4%9C%E5%87%BA%E3%83%A2%E3%83%87%E3%83%AB-37d0807581ce) |
 | [<img src="face_detection/anime-face-detector/output.png" width=128px>](face_detection/anime-face-detector/)| [anime-face-detector](face_detection/anime-face-detector/) | [Anime Face Detector](https://github.com/hysts/anime-face-detector) | Pytorch | 1.2.6 and later |
@@ -301,7 +301,7 @@ If you would like to try on your computer:
 
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
-| [<img src="face_recognition/facial_feature/output.png" width=128px>](face_recognition/facial_feature/) |[facial_feature](/face_recognition/facial_feature/)|[kaggle-facial-keypoints](https://github.com/axinc-ai/kaggle-facial-keypoints)|Pytorch| 1.2.0 and later |
+| [<img src="face_recognition/facial_feature/output.png" width=128px>](face_recognition/facial_feature/) |[facial_feature](/face_recognition/facial_feature/)|[kaggle-facial-keypoints](https://github.com/ailia-ai/kaggle-facial-keypoints)|Pytorch| 1.2.0 and later |
 | [<img src="face_recognition/face_alignment/output_3d.png" width=128px>](face_recognition/face_alignment/) |[face_alignment](/face_recognition/face_alignment/)| [2D and 3D Face alignment library build using pytorch](https://github.com/1adrianb/face-alignment) | Pytorch | 1.2.1 and later | [EN](https://medium.com/axinc-ai/facealignment-a-machine-learning-model-for-recognizing-key-points-on-a-face-956f5e796efa) [JP](https://medium.com/axinc/facealignment-%E9%A1%94%E3%81%AE%E3%82%AD%E3%83%BC%E3%83%9D%E3%82%A4%E3%83%B3%E3%83%88%E3%82%92%E8%AA%8D%E8%AD%98%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-a46654c4da14) |
 | [<img src="face_recognition/prnet/results/dense_alignment.png" width=128px>](face_recognition/prnet/) |[prnet](/face_recognition/prnet)| [Joint 3D Face Reconstruction and Dense Alignment <br/>with Position Map Regression Network](https://github.com/YadiraF/PRNet) | TensorFlow | 1.2.2 and later |
 | [<img src="face_recognition/facemesh/output.png" width=128px>](face_recognition/facemesh/) | [facemesh](/face_recognition/facemesh/) | [facemesh.pytorch](https://github.com/thepowerfuldeez/facemesh.pytorch) | Pytorch | 1.2.2 and later | [EN](https://medium.com/axinc-ai/facemesh-detecting-key-points-on-faces-in-real-time-977c03f1bab) [JP](https://medium.com/axinc/facemesh-%E3%83%AA%E3%82%A2%E3%83%AB%E3%82%BF%E3%82%A4%E3%83%A0%E3%81%A7%E9%A1%94%E3%81%AE%E3%82%AD%E3%83%BC%E3%83%9D%E3%82%A4%E3%83%B3%E3%83%88%E3%82%92%E6%A4%9C%E5%87%BA%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-bf223a50b7d6) |
@@ -356,7 +356,7 @@ If you would like to try on your computer:
 
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
-| [<img src="hand_detection/yolov3-hand/output.png" width=128px>](hand_detection/yolov3-hand/) | [yolov3-hand](/hand_detection/yolov3-hand/) | [Hand detection branch of Face detection using keras-yolov3](https://github.com/axinc-ai/yolov3-face/tree/hand_detection) | Keras | 1.2.1 and later |
+| [<img src="hand_detection/yolov3-hand/output.png" width=128px>](hand_detection/yolov3-hand/) | [yolov3-hand](/hand_detection/yolov3-hand/) | [Hand detection branch of Face detection using keras-yolov3](https://github.com/ailia-ai/yolov3-face/tree/hand_detection) | Keras | 1.2.1 and later |
 | [<img src="hand_detection/hand_detection_pytorch/CARDS_OFFICE_output.jpg" width=128px>](hand_detection/hand_detection_pytorch/) | [hand_detection_pytorch](/hand_detection/hand_detection_pytorch/) | [hand-detection.PyTorch](https://github.com/zllrunning/hand-detection.PyTorch) | Pytorch | 1.2.2 and later |
 | [<img src="hand_detection/blazepalm/output.png" width=128px>](hand_detection/blazepalm/) |[blazepalm](/hand_detection/blazepalm/) | [MediaPipePyTorch](https://github.com/zmurez/MediaPipePyTorch) | Pytorch | 1.2.5 and later |
 
@@ -841,7 +841,7 @@ If you would like to try on your computer:
 
 # Other languages
 
-- [unity version](https://github.com/axinc-ai/ailia-models-unity)
-- [c++ version](https://github.com/axinc-ai/ailia-models-cpp)
-- [flutter version](https://github.com/axinc-ai/ailia-models-flutter)
-- [rust version](https://github.com/axinc-ai/ailia-models-rust)
+- [unity version](https://github.com/ailia-ai/ailia-models-unity)
+- [c++ version](https://github.com/ailia-ai/ailia-models-cpp)
+- [flutter version](https://github.com/ailia-ai/ailia-models-flutter)
+- [rust version](https://github.com/ailia-ai/ailia-models-rust)
