@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 # import original modules
 sys.path.append("../../util")
-from arg_utils import get_base_parser, update_parser  # noqa
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa
 from model_utils import check_and_download_file, check_and_download_models  # noqa
 
 logger = getLogger(__name__)
@@ -126,6 +126,77 @@ def crop_head(img, xywh):
     return img[y1:y2, x1:x2], (x1, y1, x2, y2)
 
 
+def alpha_blend(img_list):
+    """Over-composites straight-alpha RGBA images in list order."""
+    h, w = img_list[0].shape[:2]
+    rgb = np.zeros((h, w, 3), dtype=np.float32)
+    alpha = np.zeros((h, w, 1), dtype=np.float32)
+    for img in img_list:
+        a = img[..., 3:] / 255
+        # accumulated in float32 in place
+        alpha += a
+        alpha = np.clip(alpha, 0, 1)
+        rgb = rgb * (1 - a) + img[..., :3] * a
+    out = np.concatenate([rgb, np.clip(alpha, 0, 1) * 255], axis=2)
+    return np.clip(out, 0, 255).astype(np.uint8)
+
+
+def depth_blend(img_list, depth_list):
+    """Composites RGBA images so that the pixel with the smaller depth comes to the front."""
+    h, w = img_list[0].shape[:2]
+    rgb = np.zeros((h, w, 3), dtype=np.float32)
+    alpha = np.zeros((h, w, 1), dtype=np.float32)
+    final_depth = np.full_like(alpha, fill_value=255)
+    for img, depth in zip(img_list, depth_list):
+        depth = depth[..., None]
+        a = img[..., 3:] / 255
+        img = img[..., :3]
+        update_mask = (final_depth > depth).astype(np.uint8)
+        final_depth = update_mask * depth + (1 - update_mask) * final_depth
+        rgb = update_mask * (rgb * (1 - a) + img) + (1 - update_mask) * (
+            img * (1 - alpha) + rgb
+        )
+        alpha = np.clip(alpha + a, 0, 1)
+    out = np.concatenate([rgb, np.clip(alpha, 0, 1) * 255], axis=2)
+    return np.clip(out, 0, 255).astype(np.uint8)
+
+
+def pad_rgb(argb):
+    """Fills the color of transparent pixels from the surrounding opaque pixels.
+
+    argb: (4, H, W) in [0, 1]. A pyramid of alpha-premultiplied images is built by
+    shrinking 1/1.2 at a time, and the color is propagated from the coarsest level.
+    """
+
+    def resize(x, out_h, out_w):
+        x = cv2.resize(
+            x.transpose(1, 2, 0), (out_w, out_h), interpolation=cv2.INTER_LINEAR
+        )
+        return x.reshape(out_h, out_w, -1).transpose(2, 0, 1)
+
+    x = argb.copy()
+    x[1:] = x[1:] * x[:1]
+    pyramid = []
+    while True:
+        pyramid.append(x)
+        _, h, w = x.shape
+        if min(h, w) == 1:
+            break
+        # the output height/width are computed from the input width/height
+        x = resize(x, int(w / 1.2), int(h / 1.2))
+    pyramid = pyramid[::-1]
+
+    top = pyramid[0]
+    fg = top[1:].sum(axis=(1, 2), keepdims=True) / np.clip(
+        top[:1].sum(axis=(1, 2), keepdims=True), 1e-8, 1e32
+    )
+    for layer in pyramid:
+        _, lh, lw = layer.shape
+        fg = resize(fg, lw, lh)
+        fg = layer[1:] + fg * (1.0 - layer[:1])
+    return np.concatenate([argb[:1], fg], axis=0)
+
+
 # ======================
 # Schedulers
 # ======================
@@ -192,6 +263,48 @@ class DPMSolverSDEScheduler:
         self.prev_x0 = x0
         self.step_index += 1
         return x_t.astype(np.float32)
+
+
+class DDIMScheduler:
+    """DDIM (eta=0), v prediction, zero terminal SNR, "trailing" timestep spacing."""
+
+    def __init__(self, num_train_timesteps=1000):
+        self.num_train_timesteps = num_train_timesteps
+        alphas_cumprod = scaled_linear_alphas_cumprod(num_train_timesteps)
+
+        # rescale the betas to have zero terminal SNR
+        alphas_bar_sqrt = np.sqrt(alphas_cumprod)
+        a0, a_t = alphas_bar_sqrt[0], alphas_bar_sqrt[-1]
+        alphas_bar_sqrt = (alphas_bar_sqrt - a_t) * a0 / (a0 - a_t)
+        alphas_bar = alphas_bar_sqrt**2
+        alphas = np.concatenate([alphas_bar[:1], alphas_bar[1:] / alphas_bar[:-1]])
+        self.alphas_cumprod = np.cumprod(alphas, axis=0)
+        self.final_alpha_cumprod = self.alphas_cumprod[0]
+
+    def set_timesteps(self, num_inference_steps):
+        self.num_inference_steps = num_inference_steps
+        step_ratio = self.num_train_timesteps / num_inference_steps
+        timesteps = np.round(np.arange(self.num_train_timesteps, 0, -step_ratio))
+        self.timesteps = timesteps.astype(np.int64) - 1
+
+    def step(self, model_output, timestep, sample):
+        prev_timestep = timestep - self.num_train_timesteps // self.num_inference_steps
+        alpha_prod_t = self.alphas_cumprod[timestep]
+        alpha_prod_t_prev = (
+            self.alphas_cumprod[prev_timestep]
+            if prev_timestep >= 0
+            else self.final_alpha_cumprod
+        )
+        beta_prod_t = 1 - alpha_prod_t
+        pred_original_sample = (
+            alpha_prod_t**0.5 * sample - beta_prod_t**0.5 * model_output
+        )
+        pred_epsilon = alpha_prod_t**0.5 * model_output + beta_prod_t**0.5 * sample
+        pred_sample_direction = (1 - alpha_prod_t_prev) ** 0.5 * pred_epsilon
+        prev_sample = (
+            alpha_prod_t_prev**0.5 * pred_original_sample + pred_sample_direction
+        )
+        return prev_sample.astype(np.float32)
 
 
 # ======================
@@ -323,6 +436,120 @@ def run_layer_decomposition(models, input_img, body_embeds, head_embeds):
     return fullpage, layers
 
 
+def estimate_depth(models, tokenizer, fullpage, layers):
+    """Estimates the depth of all layers at once.
+
+    Returns uint8 depth maps keyed by tag, and the layers composited in depth order.
+    """
+    src_h, src_w = fullpage.shape[:2]
+    resolution = 768
+
+    img_list = []
+    for tag in DEPTH_TAGS:
+        if tag in layers:
+            img = layers[tag].copy()
+            img[..., -1][img[..., -1] < 15] = 0
+        else:
+            img = np.zeros((src_h, src_w, 4), dtype=np.uint8)
+        img_list.append(img)
+    compose_layers = {}
+    for tag, sub_tags in COMPOSE_TAGS.items():
+        imgs = []
+        for t in sub_tags:
+            img = layers[t].copy()
+            img[..., -1][img[..., -1] < 15] = 0
+            imgs.append(img)
+        img_list[DEPTH_TAGS.index(tag)] = alpha_blend(imgs)
+        compose_layers[tag] = imgs
+
+    blended_alpha = np.zeros((src_h, src_w), dtype=np.float32)
+    for img in img_list:
+        blended_alpha += img[..., -1].astype(np.float32) / 255
+    blended_alpha = (np.clip(blended_alpha, 0, 1) * 255).astype(np.uint8)
+    page = fullpage.copy()
+    page[..., -1] = blended_alpha
+    img_list.append(page)
+
+    src_rescaled = resolution != src_h or resolution != src_w
+    img_list_input = img_list
+    if src_rescaled:
+        img_list_input = [
+            smart_resize(img, (resolution, resolution)) for img in img_list
+        ]
+
+    latents = []
+    for img in img_list_input:
+        argb = (
+            np.concatenate([img[..., 3:], img[..., :3]], axis=2).astype(np.float32)
+            / 255.0
+        )
+        argb = pad_rgb(argb.transpose(2, 0, 1))
+        output = infer(models["mg_vae_encoder"], {"argb": argb[None]})
+        latents.append(output[0])
+    latents = np.concatenate(latents)
+    num_frames = len(latents)
+    cond_latent = np.concatenate(
+        [np.broadcast_to(latents[-1:], latents.shape), latents], axis=1
+    )
+
+    input_ids = tokenizer(
+        "", padding="do_not_pad", max_length=77, truncation=True, return_tensors="np"
+    ).input_ids.astype(np.int64)
+    output = infer(models["mg_text_encoder"], {"input_ids": input_ids})
+    empty_text_embed = output[0]
+    encoder_hidden_states = np.repeat(empty_text_embed, num_frames, axis=0)
+
+    target_latent = np.random.randn(num_frames, 4, *cond_latent.shape[-2:]).astype(
+        np.float32
+    )
+    scheduler = DDIMScheduler()
+    steps = 4
+    scheduler.set_timesteps(steps)
+    for t in tqdm(scheduler.timesteps):
+        sample = np.concatenate([cond_latent, target_latent], axis=1)[None]
+        output = infer(
+            models["mg_unet"],
+            {
+                "sample": sample,
+                "timestep": np.array([t], dtype=np.float32),
+                "encoder_hidden_states": encoder_hidden_states,
+            },
+        )
+        noise_pred = output[0][0]
+        target_latent = scheduler.step(noise_pred, t, target_latent)
+
+    depth_pred = []
+    for latent in target_latent:
+        output = infer(models["mg_vae_decoder"], {"latent": latent[None]})
+        depth = np.clip(output[0][0, 0], 0, 1)
+        if src_rescaled:
+            depth = smart_resize(depth, (src_h, src_w))
+        depth_pred.append(depth)
+    reconstruction = depth_blend(img_list[:-1], depth_pred[:-1])
+
+    depths = {}
+    for tag, depth in zip(DEPTH_TAGS, depth_pred[:-1]):
+        depth = (np.clip(depth, 0, 1) * 255).astype(np.uint8)
+        if tag not in compose_layers:
+            depths[tag] = depth
+            continue
+        # front layers first; pixels hidden by a front layer get the median depth
+        # of the visible part
+        mask = np.zeros((src_h, src_w), dtype=bool)
+        for t, img in zip(COMPOSE_TAGS[tag][::-1], compose_layers[tag][::-1]):
+            mask_local = img[..., -1] > 15
+            mask_invis = np.bitwise_and(mask, mask_local)
+            depth_local = np.full((src_h, src_w), fill_value=255, dtype=np.uint8)
+            depth_local[mask_local] = depth[mask_local]
+            if np.any(mask_invis):
+                depth_local[mask_invis] = np.median(
+                    depth[np.bitwise_and(mask_local, np.bitwise_not(mask_invis))]
+                )
+            mask = np.bitwise_or(mask, mask_local)
+            depths[t] = depth_local
+    return depths, reconstruction
+
+
 def recognize_from_image(models, tokenizers):
     tokenizer, tokenizer_2, tokenizer_mg = tokenizers
     # the tags are fixed, so their embeddings are computed once
@@ -339,6 +566,16 @@ def recognize_from_image(models, tokenizers):
         fullpage, layers = run_layer_decomposition(
             models, input_img, body_embeds, head_embeds
         )
+
+        np.random.seed(seed)
+        logger.info("Estimating depth...")
+        depths, reconstruction = estimate_depth(models, tokenizer_mg, fullpage, layers)
+
+        savepath = get_savepath(args.savepath, image_path, ext=".png")
+        Image.fromarray(reconstruction).save(savepath)
+        logger.info(f"saved at : {savepath}")
+
+    logger.info("Script finished successfully.")
 
 
 def load_tokenizers():
