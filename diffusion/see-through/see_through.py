@@ -1,10 +1,14 @@
+import gc
+import json
+import os
 import sys
 from logging import getLogger
 
 import ailia
 import cv2
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw
+from psd_tools import PSDImage
 from tqdm import tqdm
 
 # import original modules
@@ -71,6 +75,31 @@ COMPOSE_TAGS = {
 # ======================
 
 parser = get_base_parser("See-through", IMAGE_PATH, SAVE_PATH)
+parser.add_argument("--seed", type=int, default=42, help="random seed")
+parser.add_argument(
+    "--resolution",
+    type=int,
+    default=1280,
+    help="inference resolution of layer decomposition",
+)
+parser.add_argument(
+    "--resolution_depth",
+    type=int,
+    default=768,
+    help="inference resolution of depth estimation",
+)
+parser.add_argument(
+    "--steps",
+    type=int,
+    default=30,
+    help="number of sampling steps of layer decomposition",
+)
+parser.add_argument(
+    "--steps_depth",
+    type=int,
+    default=4,
+    help="number of sampling steps of depth estimation",
+)
 parser.add_argument(
     "--disable_ailia_tokenizer", action="store_true", help="disable ailia tokenizer."
 )
@@ -312,6 +341,32 @@ class DDIMScheduler:
 # ======================
 
 
+class LazyModel:
+    """Defers model loading until the first predict/run call."""
+
+    def __init__(self, loader_fn, name=""):
+        self._loader_fn = loader_fn
+        self._name = name
+        self._net = None
+
+    def load(self):
+        if self._net is None:
+            logger.info(f"Loading model: {self._name}")
+            self._net = self._loader_fn()
+        return self._net
+
+    def unload(self):
+        if self._net is not None:
+            self._net = None
+            gc.collect()
+
+    def predict(self, *args, **kwargs):
+        return self.load().predict(*args, **kwargs)
+
+    def run(self, *args, **kwargs):
+        return self.load().run(*args, **kwargs)
+
+
 def infer(net, feeds):
     if not args.onnx:
         return net.run(list(feeds.values()))
@@ -348,7 +403,9 @@ def decompose_layers(models, fullpage, prompt_embeds, text_embeds, group_index):
     rgb = fullpage[..., :3]
     argb = np.concatenate([np.full_like(rgb[..., :1], 255), rgb], axis=2)
     argb = (argb.transpose(2, 0, 1)[None] / 255).astype(np.float32)
+    # one model at a time is kept in memory, as the UNet alone takes most of the GPU memory
     mean, std = infer(models["ld_vae_encoder"], {"argb": argb})
+    models["ld_vae_encoder"].unload()
     c_concat = mean + std * np.random.randn(*mean.shape).astype(np.float32)
     lh, lw = c_concat.shape[-2:]
     c_concat = np.broadcast_to(c_concat[:, None], (1, num_frames, 4, lh, lw))
@@ -356,8 +413,7 @@ def decompose_layers(models, fullpage, prompt_embeds, text_embeds, group_index):
     # every frame starts from the same noise
     noise = np.random.randn(1, 1, 4, lh, lw).astype(np.float32)
     scheduler = DPMSolverSDEScheduler()
-    steps = 30
-    scheduler.set_timesteps(steps)
+    scheduler.set_timesteps(args.steps)
     latents = (
         np.broadcast_to(noise, (1, num_frames, 4, lh, lw)) * scheduler.init_noise_sigma
     )
@@ -380,6 +436,7 @@ def decompose_layers(models, fullpage, prompt_embeds, text_embeds, group_index):
         )
         noise_pred = output[0]
         latents = scheduler.step(noise_pred, latents)
+    models["ld_unet"].unload()
 
     layers = []
     for latent in latents[0]:
@@ -388,6 +445,7 @@ def decompose_layers(models, fullpage, prompt_embeds, text_embeds, group_index):
         alpha = argb[..., :1] * page_alpha
         png = np.concatenate([argb[..., 1:], alpha], axis=2)
         layers.append((png * 255.0).clip(0, 255).astype(np.uint8))
+    models["ld_vae_decoder"].unload()
     return layers
 
 
@@ -396,7 +454,7 @@ def run_layer_decomposition(models, input_img, body_embeds, head_embeds):
 
     Returns the input padded to a square and resized, and the layers keyed by tag.
     """
-    resolution = 1280
+    resolution = args.resolution
     fullpage, pad_size, pad_pos = center_square_pad_resize(input_img, resolution)
     scale = pad_size[0] / resolution
 
@@ -442,7 +500,7 @@ def estimate_depth(models, tokenizer, fullpage, layers):
     Returns uint8 depth maps keyed by tag, and the layers composited in depth order.
     """
     src_h, src_w = fullpage.shape[:2]
-    resolution = 768
+    resolution = args.resolution_depth
 
     img_list = []
     for tag in DEPTH_TAGS:
@@ -487,6 +545,7 @@ def estimate_depth(models, tokenizer, fullpage, layers):
         output = infer(models["mg_vae_encoder"], {"argb": argb[None]})
         latents.append(output[0])
     latents = np.concatenate(latents)
+    models["mg_vae_encoder"].unload()
     num_frames = len(latents)
     cond_latent = np.concatenate(
         [np.broadcast_to(latents[-1:], latents.shape), latents], axis=1
@@ -497,14 +556,14 @@ def estimate_depth(models, tokenizer, fullpage, layers):
     ).input_ids.astype(np.int64)
     output = infer(models["mg_text_encoder"], {"input_ids": input_ids})
     empty_text_embed = output[0]
+    models["mg_text_encoder"].unload()
     encoder_hidden_states = np.repeat(empty_text_embed, num_frames, axis=0)
 
     target_latent = np.random.randn(num_frames, 4, *cond_latent.shape[-2:]).astype(
         np.float32
     )
     scheduler = DDIMScheduler()
-    steps = 4
-    scheduler.set_timesteps(steps)
+    scheduler.set_timesteps(args.steps_depth)
     for t in tqdm(scheduler.timesteps):
         sample = np.concatenate([cond_latent, target_latent], axis=1)[None]
         output = infer(
@@ -517,6 +576,7 @@ def estimate_depth(models, tokenizer, fullpage, layers):
         )
         noise_pred = output[0][0]
         target_latent = scheduler.step(noise_pred, t, target_latent)
+    models["mg_unet"].unload()
 
     depth_pred = []
     for latent in target_latent:
@@ -550,30 +610,188 @@ def estimate_depth(models, tokenizer, fullpage, layers):
     return depths, reconstruction
 
 
+def extract_parts(fullpage, layers, depths):
+    """Crops each visible layer and assigns the median depth used for the layer order."""
+    parts = {}
+    for tag, depth in depths.items():
+        img = layers[tag]
+        mask = img[..., -1] > 10
+        p_test = max(img.shape[:2]) // 10
+        if np.sum(mask[:-p_test, :-p_test]) <= 4:
+            continue
+        x, y, w, h = cv2.boundingRect(cv2.findNonZero(mask.astype(np.uint8)))
+        x1, y1, x2, y2 = x, y, x + w, y + h
+        # the x extent is padded by (64 - bbox height), the y extent by (12 - bbox width)
+        p = 64 - h
+        if p > 0:
+            if x1 >= p:
+                x1 -= p
+            else:
+                x2 += p
+        p = 12 - w
+        if p > 0:
+            if y1 >= p:
+                y1 -= p
+            else:
+                y2 += p
+        parts[tag] = {
+            "img": img[y1:y2, x1:x2].copy(),
+            "depth": depth[y1:y2, x1:x2].astype(np.float32) / 255,
+            "xyxy": [x1, y1, x2, y2],
+            "part_id": len(parts),
+        }
+
+    for tag in ["nose", "mouth"]:
+        if tag in parts:
+            x1, y1, x2, y2 = parts[tag]["xyxy"]
+            parts[tag]["img"][..., :3] = fullpage[y1:y2, x1:x2, :3]
+
+    for tag, part in parts.items():
+        img, depth = part["img"], part["depth"]
+        mask = img[..., -1] > 10
+        part["depth_median"] = np.median(depth[mask])
+        x, y, w, h = cv2.boundingRect(cv2.findNonZero(mask.astype(np.uint8)))
+        part["img"] = img[y : y + h, x : x + w]
+        depth = depth[y : y + h, x : x + w]
+        part["depth"] = np.round(np.clip(depth, 0, 1) * 255).astype(np.uint8)
+        x1, y1, _, _ = part["xyxy"]
+        part["xyxy"] = [x1 + x, y1 + y, x1 + x + w, y1 + y + h]
+
+    if "face" in parts:
+        face_depth = parts["face"]["depth_median"]
+        for tag in ["nose", "mouth"]:
+            if tag in parts and parts[tag]["depth_median"] > face_depth:
+                parts[tag]["depth_median"] = face_depth - 0.001
+        if "ears" in parts:
+            parts["ears"]["depth_median"] = face_depth + 0.001
+
+    return parts
+
+
+def checkerboard(h, w, size=16):
+    yy, xx = np.mgrid[:h, :w]
+    board = (((yy // size) + (xx // size)) % 2).astype(np.float32)
+    return (board * 55 + 200)[..., None].repeat(3, axis=-1)
+
+
+def union_bbox(imgs, margin=0.05):
+    """Returns the square bbox (x1, y1, x2, y2) enclosing the opaque pixels of all images."""
+    mask = np.any([img[..., 3] > 15 for img in imgs], axis=0)
+    ys, xs = np.nonzero(mask)
+    h, w = mask.shape
+    cx, cy = (xs.min() + xs.max()) / 2, (ys.min() + ys.max()) / 2
+    half = max(xs.max() - xs.min(), ys.max() - ys.min()) * (0.5 + margin)
+    return (
+        int(max(cx - half, 0)),
+        int(max(cy - half, 0)),
+        int(min(cx + half, w)),
+        int(min(cy + half, h)),
+    )
+
+
+def save_layer_grid(savepath, fullpage, reconstruction, layers, cell=320, ncol=7):
+    """Saves the layers drawn over a checkerboard side by side.
+
+    The body layers are cropped to the whole character and the head layers to the head.
+    """
+    body = [("input", fullpage), ("reconstruction", reconstruction)]
+    body += [(tag, layers[tag]) for tag in BODY_TAGS]
+    head = [(tag, layers[tag]) for tag in HEAD_TAGS]
+
+    body_box = union_bbox([img for tag, img in body if tag != "input"])
+    head_box = union_bbox([img for _, img in head])
+    items = [(tag, img, body_box) for tag, img in body]
+    items += [(tag, img, head_box) for tag, img in head]
+
+    nrow = (len(items) + ncol - 1) // ncol
+    label_h = 20
+    grid = Image.new("RGB", (ncol * cell, nrow * (cell + label_h)), (255, 255, 255))
+    draw = ImageDraw.Draw(grid)
+    for i, (tag, img, (x1, y1, x2, y2)) in enumerate(items):
+        crop = Image.fromarray(img[y1:y2, x1:x2]).resize((cell, cell), Image.BILINEAR)
+        rgba = np.asarray(crop).astype(np.float32)
+        alpha = rgba[..., 3:] / 255
+        comp = rgba[..., :3] * alpha + checkerboard(cell, cell) * (1 - alpha)
+        x, y = (i % ncol) * cell, (i // ncol) * (cell + label_h)
+        grid.paste(Image.fromarray(comp.astype(np.uint8)), (x, y + label_h))
+        draw.text((x + 4, y + 4), tag, fill=(0, 0, 0))
+    grid.save(savepath)
+
+
+def save_psd(savepath, part_list, size, mode="RGBA", img_key="img"):
+    psd = PSDImage.new(mode=mode, size=size, depth=8)
+    for part in part_list:
+        x1, y1, _, _ = part["xyxy"]
+        psd.create_pixel_layer(
+            Image.fromarray(part[img_key]),
+            name=part["tag"],
+            top=y1,
+            left=x1,
+            opacity=255,
+        )
+    psd.save(savepath)
+
+
 def recognize_from_image(models, tokenizers):
     tokenizer, tokenizer_2, tokenizer_mg = tokenizers
     # the tags are fixed, so their embeddings are computed once
     body_embeds = encode_tags(models, (tokenizer, tokenizer_2), BODY_TAGS)
     head_embeds = encode_tags(models, (tokenizer, tokenizer_2), HEAD_TAGS)
+    models["ld_text_encoder"].unload()
+    models["ld_text_encoder_2"].unload()
 
     for image_path in args.input:
         logger.info(image_path)
         input_img = np.array(Image.open(image_path).convert("RGBA"))
 
-        seed = 42
-        np.random.seed(seed)
+        if args.seed is not None:
+            np.random.seed(args.seed)
         logger.info("Start inference...")
         fullpage, layers = run_layer_decomposition(
             models, input_img, body_embeds, head_embeds
         )
 
-        np.random.seed(seed)
+        if args.seed is not None:
+            np.random.seed(args.seed)
         logger.info("Estimating depth...")
         depths, reconstruction = estimate_depth(models, tokenizer_mg, fullpage, layers)
+        models["mg_vae_decoder"].unload()
+
+        parts = extract_parts(fullpage, layers, depths)
+        # layers are stacked from the back (largest depth)
+        part_list = [dict(tag=tag, **part) for tag, part in parts.items()]
+        part_list.sort(key=lambda x: x["depth_median"], reverse=True)
 
         savepath = get_savepath(args.savepath, image_path, ext=".png")
         Image.fromarray(reconstruction).save(savepath)
         logger.info(f"saved at : {savepath}")
+        grid_savepath = os.path.splitext(savepath)[0] + "_layers.png"
+        save_layer_grid(grid_savepath, fullpage, reconstruction, layers)
+        logger.info(f"saved at : {grid_savepath}")
+
+        psd_savepath = os.path.splitext(savepath)[0] + ".psd"
+        size = fullpage.shape[:2][::-1]
+        save_psd(psd_savepath, part_list, size)
+        logger.info(f"saved at : {psd_savepath}")
+        depth_savepath = os.path.splitext(savepath)[0] + "_depth.psd"
+        save_psd(depth_savepath, part_list, size, mode="L", img_key="depth")
+        logger.info(f"saved at : {depth_savepath}")
+
+        info = {
+            "parts": {
+                tag: {
+                    "xyxy": [int(v) for v in part["xyxy"]],
+                    "tag": tag,
+                    "part_id": part["part_id"],
+                    "depth_median": float(part["depth_median"]),
+                }
+                for tag, part in parts.items()
+            },
+            "frame_size": list(fullpage.shape[:2]),
+        }
+        with open(psd_savepath + ".json", "w", encoding="utf-8") as f:
+            f.write(json.dumps(info, ensure_ascii=False))
+        logger.info(f"saved at : {psd_savepath}.json")
 
     logger.info("Script finished successfully.")
 
@@ -655,28 +873,41 @@ def main():
             return onnxruntime.InferenceSession(weight_path, providers=providers)
 
     models = {
-        "ld_text_encoder": load_net(
-            MODEL_LD_TEXT_ENCODER_PATH, WEIGHT_LD_TEXT_ENCODER_PATH
+        "ld_text_encoder": LazyModel(
+            lambda: load_net(MODEL_LD_TEXT_ENCODER_PATH, WEIGHT_LD_TEXT_ENCODER_PATH),
+            "ld_text_encoder",
         ),
-        "ld_text_encoder_2": load_net(
-            MODEL_LD_TEXT_ENCODER_2_PATH, WEIGHT_LD_TEXT_ENCODER_2_PATH
+        "ld_text_encoder_2": LazyModel(
+            lambda: load_net(
+                MODEL_LD_TEXT_ENCODER_2_PATH, WEIGHT_LD_TEXT_ENCODER_2_PATH
+            ),
+            "ld_text_encoder_2",
         ),
-        "ld_vae_encoder": load_net(
-            MODEL_LD_VAE_ENCODER_PATH, WEIGHT_LD_VAE_ENCODER_PATH
+        "ld_vae_encoder": LazyModel(
+            lambda: load_net(MODEL_LD_VAE_ENCODER_PATH, WEIGHT_LD_VAE_ENCODER_PATH),
+            "ld_vae_encoder",
         ),
-        "ld_unet": load_net(MODEL_LD_UNET_PATH, WEIGHT_LD_UNET_PATH),
-        "ld_vae_decoder": load_net(
-            MODEL_LD_VAE_DECODER_PATH, WEIGHT_LD_VAE_DECODER_PATH
+        "ld_unet": LazyModel(
+            lambda: load_net(MODEL_LD_UNET_PATH, WEIGHT_LD_UNET_PATH), "ld_unet"
         ),
-        "mg_text_encoder": load_net(
-            MODEL_MG_TEXT_ENCODER_PATH, WEIGHT_MG_TEXT_ENCODER_PATH
+        "ld_vae_decoder": LazyModel(
+            lambda: load_net(MODEL_LD_VAE_DECODER_PATH, WEIGHT_LD_VAE_DECODER_PATH),
+            "ld_vae_decoder",
         ),
-        "mg_vae_encoder": load_net(
-            MODEL_MG_VAE_ENCODER_PATH, WEIGHT_MG_VAE_ENCODER_PATH
+        "mg_text_encoder": LazyModel(
+            lambda: load_net(MODEL_MG_TEXT_ENCODER_PATH, WEIGHT_MG_TEXT_ENCODER_PATH),
+            "mg_text_encoder",
         ),
-        "mg_unet": load_net(MODEL_MG_UNET_PATH, WEIGHT_MG_UNET_PATH),
-        "mg_vae_decoder": load_net(
-            MODEL_MG_VAE_DECODER_PATH, WEIGHT_MG_VAE_DECODER_PATH
+        "mg_vae_encoder": LazyModel(
+            lambda: load_net(MODEL_MG_VAE_ENCODER_PATH, WEIGHT_MG_VAE_ENCODER_PATH),
+            "mg_vae_encoder",
+        ),
+        "mg_unet": LazyModel(
+            lambda: load_net(MODEL_MG_UNET_PATH, WEIGHT_MG_UNET_PATH), "mg_unet"
+        ),
+        "mg_vae_decoder": LazyModel(
+            lambda: load_net(MODEL_MG_VAE_DECODER_PATH, WEIGHT_MG_VAE_DECODER_PATH),
+            "mg_vae_decoder",
         ),
     }
 
