@@ -79,14 +79,14 @@ parser.add_argument("--seed", type=int, default=42, help="random seed")
 parser.add_argument(
     "--resolution",
     type=int,
-    default=1280,
-    help="inference resolution of layer decomposition",
+    default=640,
+    help="inference resolution of layer decomposition (1280 for sharper layers)",
 )
 parser.add_argument(
     "--resolution_depth",
     type=int,
-    default=768,
-    help="inference resolution of depth estimation",
+    default=512,
+    help="inference resolution of depth estimation (768 for sharper depth)",
 )
 parser.add_argument(
     "--steps",
@@ -374,8 +374,7 @@ def infer(net, feeds):
         return net.run(None, feeds)
 
 
-def encode_tags(models, tokenizers, tags):
-    tokenizer, tokenizer_2 = tokenizers
+def encode_tags(models, tags):
 
     def tokenize(tok):
         return tok(
@@ -386,9 +385,13 @@ def encode_tags(models, tokenizers, tags):
             return_tensors="np",
         ).input_ids.astype(np.int64)
 
-    output = infer(models["ld_text_encoder"], {"input_ids": tokenize(tokenizer)})
+    output = infer(
+        models["ld_text_encoder"], {"input_ids": tokenize(models["ld_tokenizer"])}
+    )
     hidden_states = output[0]
-    output = infer(models["ld_text_encoder_2"], {"input_ids": tokenize(tokenizer_2)})
+    output = infer(
+        models["ld_text_encoder_2"], {"input_ids": tokenize(models["ld_tokenizer_2"])}
+    )
     hidden_states_2, text_embeds = output
 
     prompt_embeds = np.concatenate([hidden_states, hidden_states_2], axis=-1)
@@ -494,7 +497,7 @@ def run_layer_decomposition(models, input_img, body_embeds, head_embeds):
     return fullpage, layers
 
 
-def estimate_depth(models, tokenizer, fullpage, layers):
+def estimate_depth(models, fullpage, layers):
     """Estimates the depth of all layers at once.
 
     Returns uint8 depth maps keyed by tag, and the layers composited in depth order.
@@ -551,7 +554,7 @@ def estimate_depth(models, tokenizer, fullpage, layers):
         [np.broadcast_to(latents[-1:], latents.shape), latents], axis=1
     )
 
-    input_ids = tokenizer(
+    input_ids = models["mg_tokenizer"](
         "", padding="do_not_pad", max_length=77, truncation=True, return_tensors="np"
     ).input_ids.astype(np.int64)
     output = infer(models["mg_text_encoder"], {"input_ids": input_ids})
@@ -732,11 +735,10 @@ def save_psd(savepath, part_list, size, mode="RGBA", img_key="img"):
     psd.save(savepath)
 
 
-def recognize_from_image(models, tokenizers):
-    tokenizer, tokenizer_2, tokenizer_mg = tokenizers
+def recognize_from_image(models):
     # the tags are fixed, so their embeddings are computed once
-    body_embeds = encode_tags(models, (tokenizer, tokenizer_2), BODY_TAGS)
-    head_embeds = encode_tags(models, (tokenizer, tokenizer_2), HEAD_TAGS)
+    body_embeds = encode_tags(models, BODY_TAGS)
+    head_embeds = encode_tags(models, HEAD_TAGS)
     models["ld_text_encoder"].unload()
     models["ld_text_encoder_2"].unload()
 
@@ -754,7 +756,7 @@ def recognize_from_image(models, tokenizers):
         if args.seed is not None:
             np.random.seed(args.seed)
         logger.info("Estimating depth...")
-        depths, reconstruction = estimate_depth(models, tokenizer_mg, fullpage, layers)
+        depths, reconstruction = estimate_depth(models, fullpage, layers)
         models["mg_vae_decoder"].unload()
 
         parts = extract_parts(fullpage, layers, depths)
@@ -872,7 +874,11 @@ def main():
 
             return onnxruntime.InferenceSession(weight_path, providers=providers)
 
+    tokenizer, tokenizer_2, tokenizer_mg = load_tokenizers()
     models = {
+        "ld_tokenizer": tokenizer,
+        "ld_tokenizer_2": tokenizer_2,
+        "mg_tokenizer": tokenizer_mg,
         "ld_text_encoder": LazyModel(
             lambda: load_net(MODEL_LD_TEXT_ENCODER_PATH, WEIGHT_LD_TEXT_ENCODER_PATH),
             "ld_text_encoder",
@@ -911,8 +917,7 @@ def main():
         ),
     }
 
-    tokenizers = load_tokenizers()
-    recognize_from_image(models, tokenizers)
+    recognize_from_image(models)
 
 
 if __name__ == "__main__":
