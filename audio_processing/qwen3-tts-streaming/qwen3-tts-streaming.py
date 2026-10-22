@@ -111,10 +111,18 @@ parser.add_argument('--top_k', type=int, default=50, help='talker top-k')
 parser.add_argument('--subtalker_temperature', type=float, default=0.9, help='code predictor temperature, 0 = greedy')
 parser.add_argument('--emit_every', type=int, default=8, help='emit a PCM chunk every N frames (N * 80 ms)')
 parser.add_argument('--decode_window', type=int, default=80, help='frames decoded for each chunk (context + chunk)')
+parser.add_argument('--decode_select', type=int, default=16,
+                    help='frames the decoder renders a call: the emitted frames and the ones in front of them '
+                         '(a shape of the decoder_window model)')
 parser.add_argument('--first_chunk_emit', type=int, default=0, help='frames in the first chunk, 0 = same as --emit_every')
 parser.add_argument('--seed', type=int, default=None, help='random seed')
 # runtime
 parser.add_argument('--onnx', action='store_true', help='execute onnxruntime version.')
+parser.add_argument(
+    '--coreml', action='store_true',
+    help='run the models on Core ML (macOS 15 or later), the talker, the code predictor and the decoder on '
+         'the Neural Engine. The reference encoder of -m base stays ONNX (ailia, or onnxruntime with --onnx)'
+)
 parser.add_argument(
     '--cuda_graph', default='talker,code_predictor',
     help='onnxruntime + CUDA: which fixed-shape graphs to replay as CUDA graphs (comma list, or none)'
@@ -161,10 +169,20 @@ def model_path(name, extra=""):
     return weight, weight + ".prototxt"
 
 
+def coreml_path(name, extra=""):
+    """The Core ML counterpart of a model (export/coreml/export_coreml.py): same split, same
+    inputs and outputs, a compiled .mlmodelc directory (downloaded zipped)."""
+    return f"qwen3_tts_{name}_{parameter_num}{MODEL_SUFFIX}{extra}.mlmodelc"
+
+
+COREML_TALKER_FILES = 2     # the talker's layers in two files (one does not load on the Neural Engine)
+coreml_list = [coreml_path("prompt"), coreml_path("codec_embedding"), coreml_path("code_predictor"),
+               coreml_path("decoder_window")] + [coreml_path("talker", f"_{i}") for i in range(COREML_TALKER_FILES)]
+
 WEIGHT_PATH_ENCODER, MODEL_PATH_ENCODER = model_path("encoder")
 WEIGHT_PATH_PROMPT, MODEL_PATH_PROMPT = model_path("prompt")
 WEIGHT_PATH_CODEC_EMBEDDING, MODEL_PATH_CODEC_EMBEDDING = model_path("codec_embedding")
-WEIGHT_PATH_DECODER, MODEL_PATH_DECODER = model_path("decoder")
+WEIGHT_PATH_DECODER, MODEL_PATH_DECODER = model_path("decoder_window")
 WEIGHT_PATH_TALKER_STATIC, MODEL_PATH_TALKER_STATIC = model_path("talker", "_static")
 WEIGHT_PATH_CODE_PREDICTOR_FRAME, MODEL_PATH_CODE_PREDICTOR_FRAME = model_path("code_predictor")
 
@@ -175,10 +193,12 @@ onnx_list = [
     (WEIGHT_PATH_CODE_PREDICTOR_FRAME, MODEL_PATH_CODE_PREDICTOR_FRAME),
     (WEIGHT_PATH_DECODER, MODEL_PATH_DECODER),
 ]
+if args.coreml:
+    onnx_list = []          # Core ML models instead; the encoder below stays ONNX
 if args.model == "base":
     onnx_list.append((WEIGHT_PATH_ENCODER, MODEL_PATH_ENCODER))
 # weights over the 2GB protobuf limit live next to the ONNX in a .data file (the 1.7B talker)
-external_data_list = [WEIGHT_PATH_TALKER_STATIC + ".data"] if parameter_num == "1.7B" else []
+external_data_list = [WEIGHT_PATH_TALKER_STATIC + ".data"] if parameter_num == "1.7B" and not args.coreml else []
 
 TOKENIZER_DIR = "./tokenizer"
 VOCAB_PATH = os.path.join(TOKENIZER_DIR, "vocab.json")
@@ -193,7 +213,7 @@ TOKENIZER_SPECIAL_TOKENS = [
 ]
 
 # the ailia path needs 1.7.0 or later (fused code predictor graph: TopK etc.)
-if not args.onnx:
+if not args.onnx and not args.coreml:
     _v = [int(x) for x in ailia.get_version().split(".")[:2]]
     if _v < [1, 7]:
         logger.error(f"ailia SDK {ailia.get_version()} is too old: 1.7.0 or later is required (or run with --onnx)")
@@ -519,6 +539,153 @@ class AiliaStaticTalker(AiliaNet):
 
 
 # ======================
+# Core ML
+# ======================
+class RecentInputs:
+    """Keeps the last few input dicts of predict() alive.
+
+    coremltools hands the numpy arrays to Core ML without a copy, and Core ML
+    releases its inputs some time after predict() returns, on a dispatch queue
+    of its own (MLE5ExecutionStream resetAfterLingering). When that release is
+    the last reference, it frees the Python object without holding the GIL and
+    the process crashes (SIGSEGV in _PyObject_Free) at a random later point.
+    Holding a reference here until a few calls later leaves Core ML's release
+    with nothing to free."""
+
+    def __init__(self, keep=16):
+        from collections import deque
+        self.items = deque(maxlen=keep)
+
+    def add(self, feed):
+        self.items.append(feed)
+        return feed
+
+
+class CoreMLNet:
+    """One Core ML model (a compiled .mlmodelc); run(*inputs) in the input order of
+    the ONNX model it replaces, and the outputs in its output order. Inputs are cast
+    to the types the model declares (fp16 / int32)."""
+
+    def __init__(self, path, units, bench, name, input_names, output_names, function_name=None):
+        import coremltools as ct
+        self.model = ct.models.CompiledMLModel(path, units, function_name=function_name)
+        meta = json.load(open(os.path.join(path, "metadata.json"), encoding="utf-8"))[0]
+        if function_name:
+            meta = next(f for f in meta["functions"] if f["name"] == function_name)
+        dtypes = {"Float16": np.float16, "Float32": np.float32, "Int32": np.int32}
+        self.types = {i["name"]: dtypes[i["dataType"]] for i in meta["inputSchema"]}
+        self.inputs, self.outputs = input_names, output_names
+        self.bench, self.name = bench, name
+        self.recent = RecentInputs()
+
+    def run(self, *inputs):
+        t = time.perf_counter()
+        feed = {n: np.array(v, dtype=self.types[n]) for n, v in zip(self.inputs, inputs)}
+        out = self.model.predict(self.recent.add(feed))
+        self.bench.add(self.name, time.perf_counter() - t)
+        # copies: the arrays predict returns are not safe to keep (the sample holds
+        # slices of the prompt's output; kept as they were, the process crashed)
+        return [np.array(out[n]) for n in self.outputs]
+
+    @staticmethod
+    def functions(path):
+        meta = json.load(open(os.path.join(path, "metadata.json"), encoding="utf-8"))[0]
+        return [f["name"] for f in meta.get("functions", [])]
+
+
+class CoreMLTalker:
+    """The talker on the Neural Engine, with the step / prefill interface of the
+    ONNX static talker.
+
+    Its layers are split in files (qwen3_tts_talker_..._<i>.mlmodelc) that each
+    have a "decode" (1 row) and a "prefill" (64 rows) function sharing one Core
+    ML state, the KV cache of their layers (1024 positions). The ANE has no
+    scatter, so a row is written by a one hot blend: `place` puts the new key /
+    value at a position and `keep` clears it, and `mask` hides the positions
+    past the current one; this class builds those and the RoPE rows. The cache
+    stays across calls like the ONNX buffer, so a prefix prefilled once stays
+    valid (prefix_key)."""
+
+    P, HEAD_DIM, MASKED = 64, 128, -10000.0
+
+    def __init__(self, paths, bench, hidden, rope_theta):
+        import coremltools as ct
+        units = ct.ComputeUnit.CPU_AND_NE
+        self.dec = [ct.models.CompiledMLModel(p, units, function_name="decode") for p in paths]
+        self.pre = [ct.models.CompiledMLModel(p, units, function_name="prefill") for p in paths]
+        self.states = [m.make_state() for m in self.dec]
+        self.buf = 1024
+        self.hidden = hidden
+        self.bench = bench
+        self.prefix_key = None
+        self.recent = RecentInputs()
+        inv = 1.0 / np.power(rope_theta, np.arange(0, self.HEAD_DIM, 2, dtype=np.float64) / self.HEAD_DIM)
+        ang = np.arange(self.buf, dtype=np.float64)[:, None] * inv[None]
+        self.cos = np.tile(np.cos(ang), 2).astype(np.float16)
+        self.sin = np.tile(np.sin(ang), 2).astype(np.float16)
+        self.cols = np.arange(self.buf)
+
+    def _run(self, models, feed):
+        out = None
+        for model, state in zip(models, self.states):
+            out = model.predict(self.recent.add(feed), state=state)
+            if "x_out" in out:
+                feed = dict(feed, x=out["x_out"].astype(np.float16), lo=out["lo_out"].astype(np.float16))
+        return {k: np.array(v) for k, v in out.items()}
+
+    def _prefill_rows(self, rows, start):
+        P, L = self.P, self.buf
+        for s in range(0, len(rows), P):
+            n = min(P, len(rows) - s)
+            pos = start + s + np.arange(P)
+            valid = pos < L
+            x = np.zeros((P, self.hidden), np.float16)
+            x[:n] = rows[s:s + n]
+            mask = np.where(self.cols[None] <= pos[:, None], 0, self.MASKED).astype(np.float16)
+            place = np.zeros((L, P), np.float16)
+            place[pos[valid], np.arange(P)[valid]] = 1
+            keep = np.ones((L, 1), np.float16)
+            keep[pos[valid]] = 0
+            p = np.minimum(pos, L - 1)
+            self._run(self.pre, dict(x=x, cos=self.cos[p], sin=self.sin[p], mask=mask, place=place, keep=keep))
+
+    def prefill(self, inputs_embeds, start=0):
+        """Feed positions start..; returns (logits, last_hidden) of the last one."""
+        t = time.perf_counter()
+        rows = inputs_embeds[0].astype(np.float16)
+        if len(rows) > 1:
+            self._prefill_rows(rows[:-1], start)
+        self.bench.add("talker_prefill", time.perf_counter() - t)
+        return self.step(inputs_embeds[:, -1:], start + len(rows) - 1)
+
+    def step(self, x, position):
+        t = time.perf_counter()
+        L = self.buf
+        mask = np.where(self.cols <= position, 0, self.MASKED).astype(np.float16)[None]
+        place = np.zeros((L, 1), np.float16)
+        place[position] = 1
+        keep = np.ones((L, 1), np.float16)
+        keep[position] = 0
+        out = self._run(self.dec, dict(
+            x=np.asarray(x, np.float16).reshape(1, self.hidden), cos=self.cos[position:position + 1],
+            sin=self.sin[position:position + 1], mask=mask, place=place, keep=keep))
+        self.bench.add("talker", time.perf_counter() - t)
+        return (out["logits"].astype(np.float32).reshape(1, 1, -1),
+                out["hidden"].astype(np.float32).reshape(1, 1, -1))
+
+
+def check_and_download_coreml(path, remote_path):
+    """A .mlmodelc is a directory: it is stored zipped and unpacked here."""
+    if os.path.isdir(path):
+        return
+    import zipfile
+    check_and_download_file(path + ".zip", remote_path)
+    with zipfile.ZipFile(path + ".zip") as z:
+        z.extractall(os.path.dirname(os.path.abspath(path)))
+    os.remove(path + ".zip")
+
+
+# ======================
 # Voice
 # ======================
 class Voice:
@@ -588,10 +755,16 @@ class Qwen3TTSStreaming:
         self.bench = Benchmark()
         self.encode, self.tokenizer = create_tokenizer()
         self.decode_window_frames = args.decode_window
+        self.decode_select_frames = args.decode_select
+        if args.emit_every > args.decode_select - 8:
+            logger.warning(f"--emit_every {args.emit_every}: the decoder renders {args.decode_select} frames a call, "
+                           f"so fewer than 8 frames of context are in front of the emitted ones")
         self.cuda_graph = tuple(x for x in args.cuda_graph.split(",") if x and x != "none")
 
         self.encoder = None
-        if args.onnx:
+        if args.coreml:
+            self._load_coreml(memory_mode, env_id)
+        elif args.onnx:
             self._load_onnx(env_id)
         else:
             self._load_ailia(memory_mode, env_id)
@@ -681,6 +854,40 @@ class Qwen3TTSStreaming:
         self.code_predictor = mk(MODEL_PATH_CODE_PREDICTOR_FRAME, WEIGHT_PATH_CODE_PREDICTOR_FRAME, "code_predictor", static)
         self.decoder = mk(MODEL_PATH_DECODER, WEIGHT_PATH_DECODER, "decoder")
 
+    def _load_coreml(self, memory_mode, env_id):
+        """The Core ML models of export/coreml/export_coreml.py: the talker, the
+        code predictor and the decoder on the Neural Engine (fp16), the two
+        gathers on the CPU. The Base model's reference encoder runs once at
+        start up and stays ONNX, on ailia or (--onnx) onnxruntime."""
+        import coremltools as ct
+        cpu, ane = ct.ComputeUnit.CPU_ONLY, ct.ComputeUnit.CPU_AND_NE
+        self.prompt = CoreMLNet(coreml_path("prompt"), cpu, self.bench, "prompt",
+                                ["text_tokens"], ["projected_text"])
+        self.codec_embedding = CoreMLNet(coreml_path("codec_embedding"), cpu, self.bench, "codec_embedding",
+                                         ["codec_rows"], ["codec_embeds"])
+        tc = self.cfg["talker_config"]
+        self.talker = CoreMLTalker([coreml_path("talker", f"_{i}") for i in range(COREML_TALKER_FILES)],
+                                   self.bench, self.hidden, tc["rope_theta"])
+        self.code_predictor = CoreMLNet(coreml_path("code_predictor"), ane, self.bench, "code_predictor",
+                                        ["past_hidden", "group0", "noise", "temperature"], ["groups", "frame_embed"])
+        # the decoder takes one window length per function ("w80"): --decode_window must be one of them
+        windows = CoreMLNet.functions(coreml_path("decoder_window"))
+        if f"w{self.decode_window_frames}" not in windows:
+            raise ValueError(f"--decode_window {self.decode_window_frames}: the Core ML decoder has {windows}")
+        self.decoder = CoreMLNet(coreml_path("decoder_window"), ane, self.bench, "decoder", ["codes", "select"],
+                                 ["waveform"],
+                                 function_name=f"w{self.decode_window_frames}")
+        if args.model == "base":
+            if args.onnx:
+                self.encoder = OnnxNet(WEIGHT_PATH_ENCODER, ["CPUExecutionProvider"], self.bench, "encoder")
+            else:
+                varying = ailia.get_memory_mode(reduce_constant=True, ignore_input_with_initializer=True,
+                                                reduce_interstage=False, reuse_interstage=True)
+                self.encoder = AiliaNet(MODEL_PATH_ENCODER, WEIGHT_PATH_ENCODER, varying, env_id, self.bench, "encoder")
+        self.providers = ["Core ML (talker / code predictor / decoder: Neural Engine)"]
+        if self.encoder is not None:
+            self.providers.append("encoder: " + ("onnxruntime" if args.onnx else f"ailia env_id={env_id}"))
+
     # ---------------- embeddings ----------------
     def group_embed(self, group, token):
         row = token if group == 0 else self.talker_vocab + (group - 1) * self.group_vocab + token
@@ -703,8 +910,15 @@ class Qwen3TTSStreaming:
     def voice_clone_prompt(self, ref_audio, ref_text):
         """Encode the reference once: its codec frames, speaker embedding and the
         projected reference text, i.e. everything the ICL prompt is built from."""
-        import librosa
-        wav, sr = librosa.load(ref_audio, sr=SAMPLE_RATE, mono=True)
+        # what librosa.load(sr=SAMPLE_RATE, mono=True) does, without it: librosa.load
+        # probes audioread's backends, which starts ffmpeg as a subprocess, and a
+        # fork after Core ML has loaded crashes the process (--coreml)
+        import soundfile as sf
+        wav, sr = sf.read(ref_audio, dtype="float32", always_2d=True)
+        wav = wav.mean(axis=1)
+        if sr != SAMPLE_RATE:
+            import librosa
+            wav, sr = librosa.resample(wav, orig_sr=sr, target_sr=SAMPLE_RATE), SAMPLE_RATE
         codes, spk = self.encoder.run(wav[None, None].astype(np.float32), mel_spectrogram(wav, sr))
         frames = [[int(t) for t in f] for f in codes[0, : self.num_groups].T]   # [T][16]
         speaker = spk.reshape(1, 1, -1).astype(np.float32)
@@ -755,23 +969,32 @@ class Qwen3TTSStreaming:
         return [int(g) for g in groups], frame_embed[0, 0]
 
     # ---------------- decoder ----------------
-    def decode_window(self, codes):
-        """codes: list of up to decode_window_frames 16-token frames -> their waveform.
+    def decode_window(self, codes, emit):
+        """codes: list of up to decode_window_frames 16-token frames, the newest
+        last -> the waveform of the last `emit` of them.
 
-        The decoder always sees a window of exactly decode_window_frames frames:
-        a shorter one (the first chunks of an utterance, the final flush) is padded
-        on the right with its last frame and the output is cut to the real frames.
-        The decoder is causal, so the padding does not change them (max 1% of the
-        signal rms in fp16); one input shape means one cuDNN algorithm search and
-        one CUDA graph instead of one per window length on both runtimes."""
+        The decoder (decoder_window) always sees a window of exactly
+        decode_window_frames frames: a shorter one (the first chunks of an
+        utterance) is padded on the right with its last frame. Its transformer
+        reads the whole window, which is where the long context matters; its
+        480x upsampling, nearly all of the compute, renders only the
+        decode_select frames `select` names: the `emit` frames to return and
+        the ones just in front of them, which cover its receptive field (about
+        8 frames). While the utterance is shorter than decode_select the
+        selection starts at its first frame, where the upsampler's own zero
+        padding is the start of the audio, and runs on into the right padding,
+        which is causal and does not change the real frames. One input shape
+        means one cuDNN algorithm search and one CUDA graph."""
         n = len(codes)
-        W = self.decode_window_frames
+        W, K = self.decode_window_frames, self.decode_select_frames
         padded = list(codes) + [codes[-1]] * (W - n)
         arr = np.array(padded, dtype=np.int64).T[None]             # [1, 16, W]
-        wav = self.decoder.run(arr)[0][0, 0].astype(np.float32)
-        if n == W:
-            return wav
-        return wav[: len(wav) - (W - n) * FRAME_SAMPLES]           # the decoder trims a constant tail
+        start = max(0, n - K)
+        select = np.zeros((W, K), np.float32)
+        select[start + np.arange(K), np.arange(K)] = 1
+        wav = self.decoder.run(arr, select)[0].reshape(-1).astype(np.float32)   # the K selected frames
+        end = n - start                                            # selected frames that are real
+        return wav[(end - emit) * FRAME_SAMPLES:end * FRAME_SAMPLES]
 
     # ---------------- the live text loop ----------------
     def stream(self, source, speaker, language,
@@ -916,16 +1139,14 @@ class Qwen3TTSStreaming:
             if frames_since_emit < cur_emit:
                 continue
             frames_since_emit = 0
-            wav = self.decode_window(codes[-cur_window:])
+            wav = self.decode_window(codes[-cur_window:], cur_emit)
             total_emitted = len(codes)
-            yield wav[-FRAME_SAMPLES * cur_emit:]
+            yield wav
 
         # --- flush the frames not emitted yet, decoded with context in front ---
         remaining = len(codes) - total_emitted
         if remaining > 0:
-            context = min(total_emitted, decode_window_frames - remaining)
-            wav = self.decode_window(codes[total_emitted - context:])
-            yield wav[context * FRAME_SAMPLES:]
+            yield self.decode_window(codes[-decode_window_frames:], remaining)
         if not ended and not closed:
             raise RuntimeError(f"max_frames={max_frames} reached while text was still expected")
 
@@ -1136,6 +1357,9 @@ def main():
         check_and_download_models(onnx, prototxt, REMOTE_PATH)
     for f in external_data_list:
         check_and_download_file(f, REMOTE_PATH)
+    if args.coreml:
+        for path in coreml_list:
+            check_and_download_coreml(path, REMOTE_PATH)
     os.makedirs(TOKENIZER_DIR, exist_ok=True)
     check_and_download_file(VOCAB_PATH, TOKENIZER_REMOTE_PATH)
     check_and_download_file(MERGES_PATH, TOKENIZER_REMOTE_PATH)
@@ -1179,7 +1403,7 @@ def main():
 
     if args.benchmark:
         tts.bench.report()
-    if args.profile and not args.onnx:
+    if args.profile and not args.onnx and not args.coreml:
         for name in ("prompt", "codec_embedding", "talker", "code_predictor", "decoder"):
             print(name + " : ")
             print(getattr(tts, name).net.get_summary())
@@ -1193,7 +1417,8 @@ def main():
     if args.results:
         with open(args.results, "a", encoding="utf-8") as f:
             for r in results:
-                r.update(runtime="onnxruntime" if args.onnx else "ailia", parameter_num=parameter_num, model=args.model,
+                r.update(runtime="coreml" if args.coreml else "onnxruntime" if args.onnx else "ailia",
+                         parameter_num=parameter_num, model=args.model,
                          commit=args.commit, cuda_graph=args.cuda_graph if args.onnx else None,
                          emit_every=args.emit_every, decode_window=args.decode_window,
                          timing=tts.bench.as_dict())

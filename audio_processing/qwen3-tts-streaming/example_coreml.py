@@ -10,25 +10,30 @@ import numpy as np
 # Qwen3-TTS streaming on Core ML (Apple Neural Engine), macOS 15 or later.
 #
 # The same live text loop as qwen3-tts-streaming.py (Base voice clone, 0.6B),
-# with the models replaced by the Core ML build of Qwen3-TTS-12Hz-0.6B-Base
-# (https://huggingface.co/tinytrashlabs/Qwen3-TTS-0.6B-Base-ANE):
+# with the models in Core ML: the export of export/export_coreml.py (--coreml_dir),
+# or the build https://huggingface.co/tinytrashlabs/Qwen3-TTS-0.6B-Base-ANE it
+# follows the layout of (downloaded when --coreml_dir does not exist):
 #   prompt            text token ids -> talker hidden: 4 bit text embedding + projection MLP, numpy
 #   codec_embedding   the 16 codec tables, numpy
 #   talker            talker0 / talker1.mlmodelc, 14 layers each, KV cache in a Core ML state, ANE
-#   code_predictor    cp_ane.mlmodelc, groups 1..15 of a frame in one call (greedy inside the graph), ANE
+#   code_predictor    cp_ane.mlmodelc, groups 1..15 of a frame in one call, ANE (the export samples
+#                     inside the graph with noise from here, the tinytrashlabs build picks the argmax)
 #   decoder           vocoder head (RVQ + pre_conv + 8 layer transformer), numpy, then
 #                     upF.mlmodelc (CPU) and upMall.mlmodelc (GPU, see --vocoder_units)
 #   encoder           the ONNX reference encoder of qwen3-tts-streaming (ailia or onnxruntime):
-#                     the Core ML speech encoder of the ANE build degenerates after ~2.7 s on M2
+#                     the Core ML speech encoder of the tinytrashlabs build degenerates after ~2.7 s on M2
 # The model classes keep the interface of qwen3-tts-streaming.py (prompt.run,
-# talker.prefill / step, ...), so a Core ML conversion of the ailia ONNX split
-# can take their place.
+# talker.prefill / step, ...).
 
-# import original modules
+# import original modules (ailia-models layout); fall back to small shims so the
+# sample also runs outside ailia-models
 sys.path.append('../../util')
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from arg_utils import get_base_parser, update_parser  # noqa: E402
-from model_utils import check_and_download_models, check_and_download_file  # noqa: E402
+try:
+    from arg_utils import get_base_parser, update_parser  # noqa: E402
+    from model_utils import check_and_download_models, check_and_download_file  # noqa: E402
+except ImportError:  # not inside ailia-models
+    from ailia_shim import get_base_parser, update_parser, check_and_download_models, check_and_download_file  # noqa: E402
 try:
     import ailia
     AILIA_EXIST = True
@@ -120,6 +125,8 @@ parser.add_argument('--results', default=None, help='append one JSON line of tim
 # generation
 parser.add_argument('--temperature', type=float, default=0.9, help='talker sampling temperature, 0 = greedy')
 parser.add_argument('--top_k', type=int, default=50, help='talker top-k')
+parser.add_argument('--subtalker_temperature', type=float, default=0.9,
+                    help='code predictor temperature, 0 = greedy (a code predictor with a noise input only)')
 parser.add_argument(
     '--emit_every', type=int, default=12,
     help='frames per audio chunk, 1..12 (the upsampler decodes windows of 12 new frames; a shorter chunk is '
@@ -402,19 +409,32 @@ class CoreMLTalker:
 
 class CoreMLCodePredictor:
     """Groups 1..15 of a frame from the talker's hidden state and the group 0
-    embedding, one call. The 15 steps are unrolled in the graph and pick the
-    argmax (there is no sampling input), so --subtalker_temperature does not
-    exist here."""
+    embedding, one call, the 15 steps unrolled in the graph.
 
-    def __init__(self, coreml_dir, bench):
+    The export of export/coreml samples inside the graph:
+    argmax(top_50(logits) + noise), with noise = temperature * Gumbel noise from
+    here (--subtalker_temperature, 0 = greedy). A model without the noise input
+    (the tinytrashlabs build) always picks the argmax."""
+
+    def __init__(self, coreml_dir, bench, rng, temperature):
         import coremltools as ct
-        self.model = ct.models.CompiledMLModel(os.path.join(coreml_dir, "cp_ane.mlmodelc"), ct.ComputeUnit.CPU_AND_NE)
-        self.bench = bench
+        path = os.path.join(coreml_dir, "cp_ane.mlmodelc")
+        self.model = ct.models.CompiledMLModel(path, ct.ComputeUnit.CPU_AND_NE)
+        meta = json.load(open(os.path.join(path, "metadata.json")))[0]
+        self.samples = any(i["name"] == "noise" for i in meta.get("inputSchema", []))
+        self.bench, self.rng, self.temperature = bench, rng, temperature
 
     def run(self, past_hidden, e0):
         t = time.perf_counter()
-        codes = self.model.predict(dict(hidden=np.asarray(past_hidden, np.float16).reshape(1, -1),
-                                        e0=np.asarray(e0, np.float16).reshape(1, -1)))["codes"]
+        feed = dict(hidden=np.asarray(past_hidden, np.float16).reshape(1, -1),
+                    e0=np.asarray(e0, np.float16).reshape(1, -1))
+        if self.samples:
+            if self.temperature > 0:
+                u = self.rng.uniform(1e-10, 1.0 - 1e-7, (15, 2048))
+                feed["noise"] = (self.temperature * -np.log(-np.log(u))).astype(np.float16)
+            else:
+                feed["noise"] = np.zeros((15, 2048), np.float16)
+        codes = self.model.predict(feed)["codes"]
         self.bench.add("code_predictor", time.perf_counter() - t)
         if not np.isfinite(codes).all():
             raise RuntimeError("code predictor output is not finite")
@@ -427,6 +447,7 @@ class VocoderHead:
     transformer (keeps every past key and value)."""
 
     LAYERS, HEADS, HEAD_DIM = 8, 16, 64
+    WINDOW = 72         # the transformer's sliding window (speech tokenizer config sliding_window)
 
     def __init__(self, vochead_dir):
         ld = lambda n: np.load(os.path.join(vochead_dir, n + ".npy")).astype(np.float32)
@@ -484,12 +505,15 @@ class VocoderHead:
             qh = rope((a @ w["q"].T).reshape(T, nh, hd))
             kh = rope((a @ w["k"].T).reshape(T, nh, hd))
             vh = (a @ w["v"].T).reshape(T, nh, hd)
-            st["k"][i] = kh if st["k"][i] is None else np.concatenate([st["k"][i], kh])
-            st["v"][i] = vh if st["v"][i] is None else np.concatenate([st["v"][i], vh])
-            K, V = st["k"][i], st["v"][i]                                          # [S, nh, hd]
+            K = kh if st["k"][i] is None else np.concatenate([st["k"][i], kh])
+            V = vh if st["v"][i] is None else np.concatenate([st["v"][i], vh])     # [S, nh, hd]
+            # causal, within the sliding window: query p reads keys p - WINDOW < j <= p
+            q_pos = st["off"] + np.arange(T)
+            k_pos = st["off"] + T - K.shape[0] + np.arange(K.shape[0])
+            hidden = (k_pos[None] > q_pos[:, None]) | (k_pos[None] <= q_pos[:, None] - self.WINDOW)
             scores = np.einsum("thd,shd->hts", qh, K) / np.sqrt(hd)
-            causal = np.arange(K.shape[0])[None] > (st["off"] + np.arange(T))[:, None]
-            scores = np.where(causal[None], -np.inf, scores)
+            scores = np.where(hidden[None], -np.inf, scores)
+            st["k"][i], st["v"][i] = K[-(self.WINDOW - 1):], V[-(self.WINDOW - 1):]
             scores = np.exp(scores - scores.max(-1, keepdims=True))
             scores /= scores.sum(-1, keepdims=True)
             att = np.einsum("hts,shd->thd", scores, V).reshape(T, nh * hd)
@@ -759,7 +783,7 @@ class Qwen3TTSStreaming:
         logger.info("loading the Core ML models (the first run compiles them for the Neural Engine, "
                     "which can take a minute or two)")
         self.talker = CoreMLTalker(coreml_dir, self.bench, self.hidden)
-        self.code_predictor = CoreMLCodePredictor(coreml_dir, self.bench)
+        self.code_predictor = CoreMLCodePredictor(coreml_dir, self.bench, self.rng, args.subtalker_temperature)
         self.decoder = CoreMLDecoder(coreml_dir, os.path.join(args.coreml_dir, "vochead"), self.bench,
                                      args.vocoder_units)
         self.providers = ["Core ML: talker / code predictor on the ANE, upsampler on {}".format(args.vocoder_units),
