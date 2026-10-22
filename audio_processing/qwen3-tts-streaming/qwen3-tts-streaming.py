@@ -157,7 +157,7 @@ CONFIG_PATH = f"config_{parameter_num}{MODEL_SUFFIX}.json"
 #                     (export --only code_predictor_frame, simplify_frame.py, then
 #                     convert_to_fp16.py, which names the result qwen3_tts_code_predictor_...)
 #   decoder           codec frames -> waveform
-def model_path(name, extra=""):
+def model_path(name, extra="", suffix=None):
     # the talker, the code predictor and the decoder are pure fp16 graphs (opset
     # 23, every tensor fp16; the IO fp32 but the talker's KV cache); the prompt
     # and the codec embedding run once per utterance and keep only their weights
@@ -165,7 +165,8 @@ def model_path(name, extra=""):
     # indices which fp16 flips
     if name != "encoder":
         extra += "_fp16"
-    weight = f"qwen3_tts_{name}_{parameter_num}{MODEL_SUFFIX}{extra}.onnx"
+    suffix = MODEL_SUFFIX if suffix is None else suffix
+    weight = f"qwen3_tts_{name}_{parameter_num}{suffix}{extra}.onnx"
     return weight, weight + ".prototxt"
 
 
@@ -182,7 +183,8 @@ coreml_list = [coreml_path("prompt"), coreml_path("codec_embedding"), coreml_pat
 WEIGHT_PATH_ENCODER, MODEL_PATH_ENCODER = model_path("encoder")
 WEIGHT_PATH_PROMPT, MODEL_PATH_PROMPT = model_path("prompt")
 WEIGHT_PATH_CODEC_EMBEDDING, MODEL_PATH_CODEC_EMBEDDING = model_path("codec_embedding")
-WEIGHT_PATH_DECODER, MODEL_PATH_DECODER = model_path("decoder_window")
+# the speech tokenizer is the same for Base and CustomVoice: one decoder for both
+WEIGHT_PATH_DECODER, MODEL_PATH_DECODER = model_path("decoder_window", suffix="")
 WEIGHT_PATH_TALKER_STATIC, MODEL_PATH_TALKER_STATIC = model_path("talker", "_static")
 WEIGHT_PATH_CODE_PREDICTOR_FRAME, MODEL_PATH_CODE_PREDICTOR_FRAME = model_path("code_predictor")
 
