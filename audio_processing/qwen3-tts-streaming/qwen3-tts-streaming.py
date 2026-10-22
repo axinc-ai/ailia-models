@@ -1064,6 +1064,16 @@ class Qwen3TTSStreaming:
 
         def pick(logits, allow_eos):
             sup = self.suppress if allow_eos else self.suppress + self.codec_eos
+            if allow_eos:
+                # an fp16 talker leaves EOS a little less probable, and an
+                # utterance that misses it runs on in silence up to the wind
+                # down: stop when EOS is the most likely token, not only when
+                # it is drawn
+                masked = logits.astype(np.float64, copy=True)
+                masked[self.suppress] = -np.inf
+                best = int(np.argmax(masked))
+                if best in self.eos_ids:
+                    return best
             return sample_token(logits, self.rng, temperature, top_k, 1.0, sup)
 
         # --- prefill: the prefix only when the buffer does not hold it already ---
