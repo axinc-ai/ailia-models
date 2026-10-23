@@ -43,6 +43,7 @@ REFERENCE_WAV_PATH = 'reference.wav'
 REFERENCE_TEXT = "かしこまりました。"
 UTTERANCE_END = "。！？!?"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/qwen3-tts-streaming/"
+COREML_REMOTE_PATH = REMOTE_PATH + "coreml/"   # the .mlmodelc directories, zipped
 TOKENIZER_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/qwen3-tts/"   # same tokenizer as qwen3-tts
 
 SAMPLE_RATE = 24000
@@ -1371,7 +1372,7 @@ def main():
         check_and_download_file(f, REMOTE_PATH)
     if args.coreml:
         for path in coreml_list:
-            check_and_download_coreml(path, REMOTE_PATH)
+            check_and_download_coreml(path, COREML_REMOTE_PATH)
     os.makedirs(TOKENIZER_DIR, exist_ok=True)
     check_and_download_file(VOCAB_PATH, TOKENIZER_REMOTE_PATH)
     check_and_download_file(MERGES_PATH, TOKENIZER_REMOTE_PATH)
